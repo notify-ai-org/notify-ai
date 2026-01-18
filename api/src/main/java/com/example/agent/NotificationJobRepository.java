@@ -1,0 +1,13 @@
+package com.example.agent;
+
+import com.example.agent.models.NotificationJob;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.repository.query.Param;
+
+public interface NotificationJobRepository
+        extends JpaRepository<NotificationJob,Long> {
+            Optional<NotificationJob> findByEventName(@Param("eventName") String eventName);
+        }

@@ -1,0 +1,26 @@
+package com.example.agent;
+
+import com.example.agent.models.Event;
+import com.example.agent.models.EventCapture;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.List;
+import java.util.Optional;
+
+public interface EventRepository extends JpaRepository<Event, String> {
+    Optional<Event> findById(String id);
+    List<Event> findByType(String type);
+    List<Event> findByStatus(Event.EventStatus status);
+    List<Event> findByCorrelationId(String correlationId);
+    List<Event> findAll();
+    
+    /**
+     * Get history of event captures for a given event name/type
+     * @param eventName The name/type of the event
+     * @return List of EventCapture records for the given event name
+     */
+    @Query("SELECT ec FROM EventCapture ec JOIN ec.event e WHERE e.type = :eventName ORDER BY ec.timestamp DESC")
+    List<EventCapture> getHistory(@Param("eventName") String eventName);
+}
+
