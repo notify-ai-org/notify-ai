@@ -9,22 +9,16 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.annotation.Scope;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
-
-import com.example.agent.DispatcherWorkerPool.DispatcherProperties;
 import com.example.agent.models.ConnectorMetrics;
 import com.example.agent.models.NotificationAttemptLog;
 import com.example.agent.models.NotificationConnector;
 import com.example.agent.models.NotificationJob;
-
+import com.example.agent.models.subject.Subject;
 import lombok.RequiredArgsConstructor;
 
 @Component
@@ -38,22 +32,18 @@ public class NotificationWorker implements Runnable {
 
     private final BlockingQueue<NotificationJob> queue;
     private final ConnectorRegistry connectorRegistry;
-    private final NotificationAttemptLogRepository logRepo;
-    private final DispatcherProperties properties;
     private Instant lastActiveAt;
-    private final RestTemplate rest;
 
     private volatile boolean running = true;
     private volatile WorkerStatus status = WorkerStatus.INITIALIZING;
 
-    private final AtomicReference<ConnectorMetrics> metrics =
-            new AtomicReference<>(new ConnectorMetrics());
+    private final AtomicReference<ConnectorMetrics> metrics = new AtomicReference<>(new ConnectorMetrics());
 
     private static final Pattern TOKEN_PATTERN = Pattern.compile("\\$(\\w+)");
 
     private AtomicReference<List<NotificationAttemptLog>> logBuffer = null;
 
-    NotificationJob currentJob;
+    private NotificationJob currentJob = null;
 
     /**
      * @return the logBuffer
@@ -168,30 +158,25 @@ public class NotificationWorker implements Runnable {
         log.debug("Processing job {}", job.getId());
 
         try {
-            Map<String, String> vocabulary = fetchVocabulary(job.getCallbackUrl());
-
-            if (!executeRules(job)) {
-                log.info("Rules evaluated to false, skipping notification {}",
-                        job.getId());
-                return;
-            }
-
+            Map<String, String> vocabulary = job.getAttributes();
             String renderedContent = render(job.getTemplate(), vocabulary);
-
             job.setTemplate(renderedContent);
-
             NotificationConnector connector = connectorRegistry.get(job.getChannel());
-
             connector.bind(null);
-
             connector.init(metrics);
 
-            connector.send(job);
+            for(Subject subject : job.getSubjects()){
+                try {
+                    connector.send(job,subject);
+                    recordSuccess(job, start,subject);
+                } catch (Exception e) {
+                    recordFailure(job, start, subject, e);
+                }
+            }
             
-            recordSuccess(job, start);
-
+            connector.close();
         } catch (Exception ex) {
-            recordFailure(job, start, ex);
+            recordFailure(job, start,null, ex);
             throw ex; // important: let dispatcher retry/DLQ decide
         }
     }
@@ -214,61 +199,20 @@ public class NotificationWorker implements Runnable {
     }
 
     /* =========================
-     * External calls
-     * ========================= */
-
-    private Map<String, String> fetchVocabulary(String callbackUrl) {
-        try {
-            ResponseEntity<Map<String, String>> res =
-                    rest.getForEntity(callbackUrl,
-                            (Class<Map<String, String>>) (Class<?>) Map.class);
-
-            if (!res.getStatusCode().is2xxSuccessful() || res.getBody() == null) {
-                throw new IllegalStateException("Vocabulary fetch failed");
-            }
-            return res.getBody();
-
-        } catch (RestClientException ex) {
-            throw new RuntimeException("Failed to fetch vocabulary", ex);
-        }
-    }
-
-    private boolean executeRules(NotificationJob job) {
-        if (job.getRuleExpressions() == null || job.getRuleExpressions().isBlank()) {
-            return true;
-        }
-
-        try {
-            ResponseEntity<Boolean> res =
-                    rest.postForEntity(
-                            job.getCallbackUrl(),
-                            job.getRuleExpressions(),
-                            Boolean.class
-                    );
-
-            return Boolean.TRUE.equals(res.getBody());
-
-        } catch (RestClientException ex) {
-            throw new RuntimeException("Rule execution failed", ex);
-        }
-    }
-
-    /* =========================
      * Metrics & logging
      * ========================= */
 
-    private void recordSuccess(NotificationJob job, Instant start) {
+    private void recordSuccess(NotificationJob job, Instant start,Subject subject) {
         long durationMs = Instant.now().toEpochMilli() - start.toEpochMilli();
-
-        //metrics.updateAndGet(m -> m.recordSuccess(durationMs));
-
-        log.info("Notification {} sent via {} in {} ms",
+        log.info("Notification {} sent via {} to {} in {} ms",
                 job.getId(),
                 job.getChannel(),
+                subject.getAddress(),
                 durationMs);
+        saveAttemptLog(job, subject,  null);
     }
 
-    private void recordFailure(NotificationJob job, Instant start, Exception ex) {
+    private void recordFailure(NotificationJob job, Instant start,Subject subject, Exception ex) {
         long durationMs = Instant.now().toEpochMilli() - start.toEpochMilli();
         //metrics.updateAndGet(m -> m.recordFailure(durationMs));
 
@@ -277,14 +221,21 @@ public class NotificationWorker implements Runnable {
                 durationMs,
                 ex);
 
-        saveFailure(job, ex);
+        saveAttemptLog(job,subject, ex);
     }
 
-    private void saveFailure(NotificationJob job, Exception ex) {
+    private void saveAttemptLog(NotificationJob job,Subject subject, Exception ex) {
         NotificationAttemptLog logEntry = new NotificationAttemptLog();
         logEntry.setTimestamp(Instant.now());
         logEntry.setChannel(job.getChannel());
         logEntry.setError(ex.getMessage());
+        logEntry.setEventType(job.getEventType());
+        logEntry.setResult(ex!=null ? "FAILED" : "SUCCESS");
+        logEntry.setDispatchMode(job.getDispatchMode());
+        logEntry.setTemplate(job.getTemplate());
+        logEntry.setPriority(job.getPriority());
+        logEntry.setLastProcessedBy(workerId);
+        logEntry.setTarget(subject.getAddress());
         logBuffer.get().add(logEntry);
     }
 

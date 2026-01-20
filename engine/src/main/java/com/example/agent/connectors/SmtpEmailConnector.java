@@ -4,6 +4,8 @@ import org.springframework.stereotype.Component;
 
 import com.example.agent.AbstractNotificationConnector;
 import com.example.agent.models.NotificationJob;
+import com.example.agent.models.subject.EmailSubject;
+import com.example.agent.models.subject.Subject;
 
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
@@ -14,6 +16,8 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 
 import lombok.RequiredArgsConstructor;
+
+import org.checkerframework.checker.units.qual.s;
 import org.springframework.mail.MailSendException;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -42,7 +46,14 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
     }
 
     @Override
-    public void send(NotificationJob job) {
+    public void send(NotificationJob job,Subject subject) {
+
+        if(!(subject instanceof EmailSubject)){
+            return;
+        }
+
+        EmailSubject emailSubject = (EmailSubject) subject;
+
         Objects.requireNonNull(job, "job");
         if (job.getTarget() == null || job.getTarget().isBlank()) {
             throw new IllegalArgumentException("Email target (recipient) is missing");
@@ -50,12 +61,12 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
 
         Map<String, String> attrs = job.getAttributes() == null ? Map.of() : job.getAttributes();
 
-        String subject = normalizeSubject(attrs.get(ATTR_SUBJECT));
+        String address = normalizeSubject(subject.getAddress());
         boolean isHtml = parseBoolean(attrs.get(ATTR_IS_HTML),defaultHtml);
 
-        String[] to = parseAddresses(job.getTarget());
-        String[] cc = parseAddresses(attrs.get(ATTR_CC));
-        String[] bcc = parseAddresses(attrs.get(ATTR_BCC));
+        String[] to = parseAddresses(emailSubject.getAddress());
+        String[] cc = parseAddresses(emailSubject.getCc());
+        String[] bcc = parseAddresses(emailSubject.getBcc());
         String replyTo = firstOrNull(parseAddresses(attrs.get(ATTR_REPLY_TO)));
 
         try {
@@ -85,7 +96,7 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
             String content = job.getTemplate();
 
             // Subject & body
-            helper.setSubject(subject);
+            helper.setSubject(emailSubject.getAddress());
             helper.setText(content == null ? "" : content, isHtml);
 
             // Idempotency-friendly headers (doesn't prevent duplicate sends by itself,

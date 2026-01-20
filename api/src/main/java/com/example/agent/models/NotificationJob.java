@@ -5,7 +5,10 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
+
+import com.example.agent.models.subject.Subject;
 
 import jakarta.persistence.Entity;
 
@@ -45,6 +48,8 @@ public class NotificationJob {
      * Example: order-service, auth-service, billing-cron
      */
     private String source;
+
+    private List<Subject> subjects;
 
     /**
      * Event or reason for notification.
@@ -142,7 +147,5 @@ public class NotificationJob {
      */
     private String payloadHash;
 
-
-    private String ruleExpressions; // rule expressions to evaluate the event
 
 }

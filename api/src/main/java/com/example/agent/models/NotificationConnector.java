@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.example.agent.models.ConnectorProperties.ChannelConfig;
+import com.example.agent.models.subject.Subject;
 
 public interface NotificationConnector extends AutoCloseable {
 
@@ -11,7 +12,7 @@ public interface NotificationConnector extends AutoCloseable {
     String channel();
 
     // Core send method
-    void send(NotificationJob job);
+    void send(NotificationJob job,Subject subject);
 
     // Lifecycle
     void bind(ChannelConfig channelConfig);

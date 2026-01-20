@@ -19,6 +19,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.example.agent.AbstractNotificationConnector;
 import com.example.agent.models.NotificationJob;
+import com.example.agent.models.subject.Subject;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -41,7 +42,7 @@ public class WebhookConnector extends AbstractNotificationConnector {
     private int defaultTimeoutMs = 5000;
 
     @Override
-    public void send(NotificationJob job) {
+    public void send(NotificationJob job,Subject subject) {
 
         validate(job);
 

@@ -1,117 +1,102 @@
-package com.example.sdk.core;
+package com.example.agent;
 
-import com.example.notification.annotations.*;
-import com.example.sdk.model.*;
+import com.example.agent.annotations.*;
+import com.example.agent.sdk.metadata.*;
 import org.reflections.Reflections;
+import org.reflections.scanners.Scanners;
+import org.reflections.util.ConfigurationBuilder;
 
-import java.lang.reflect.*;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Annotation Processor that scans SDK domain classes and builds
- * structured metadata models to be sent to the Agent Server.
+ * Scans the client codebase for @EnableNotify and the configured base package,
+ * then records @Event, @Rule, @Callback, @Vocabulary, @Model, @VocabularySupplier,
+ * and @SubjectSupplier with their mappings to fields, methods, or classes.
  */
 public class AnnotationProcessor {
 
     private final String basePackage;
-    private final List<ClassModel> classModels = new ArrayList<>();
-    private final Map<String, CallbackRegistry> callbacks = new HashMap<>();
-    private final Map<String, RuleRegistry> rules = new HashMap<>();
-    private final Map<String, EventRegistry> events = new HashMap<>();
+    private final List<EventMetadata> events = new ArrayList<>();
+    private final List<RuleMetadata> rules = new ArrayList<>();
+    private final List<CallbackMetadata> callbacks = new ArrayList<>();
+    private final List<VocabularySupplierMetadata> vocabularySuppliers = new ArrayList<>();
+    private final List<SubjectSupplierMetadata> subjectSuppliers = new ArrayList<>();
+    private final List<ModelMetadata> models = new ArrayList<>();
 
     public AnnotationProcessor(String basePackage) {
-        this.basePackage = basePackage;
+        this.basePackage = basePackage == null || basePackage.isEmpty()
+            ? "com.example" : basePackage;
     }
 
+    /**
+     * Scan the base package and all sub-packages for annotations.
+     */
     public void process() {
-        Reflections reflections = new Reflections(basePackage);
-        Set<Class<?>> domainClasses = reflections.getTypesAnnotatedWith(Domain.class);
+        Reflections reflections = new Reflections(
+            new ConfigurationBuilder()
+                .forPackages(basePackage)
+                .setScanners(Scanners.TypesAnnotated, Scanners.MethodsAnnotated, Scanners.FieldsAnnotated)
+        );
 
-        for (Class<?> domainClass : domainClasses) {
-            processDomainClass(domainClass);
+        // @Model classes and @Vocabulary fields
+        Set<Class<?>> modelClasses = reflections.getTypesAnnotatedWith(Model.class);
+        for (Class<?> modelClass : modelClasses) {
+            processModel(modelClass);
+        }
+
+        // @Event, @Rule, @Callback, @VocabularySupplier, @SubjectSupplier on methods
+        Set<Method> methods = reflections.getMethodsAnnotatedWith(Event.class);
+        for (Method m : methods) {
+            Event a = m.getAnnotation(Event.class);
+            events.add(new EventMetadata(a.key(), a.description(), a.version(), m, m.getDeclaringClass()));
+        }
+
+        methods = reflections.getMethodsAnnotatedWith(Rule.class);
+        for (Method m : methods) {
+            Rule a = m.getAnnotation(Rule.class);
+            rules.add(new RuleMetadata(a.name(), a.description(), a.event(), m, m.getDeclaringClass()));
+        }
+
+        methods = reflections.getMethodsAnnotatedWith(Callback.class);
+        for (Method m : methods) {
+            Callback a = m.getAnnotation(Callback.class);
+            callbacks.add(new CallbackMetadata(a.event(), a.when(), m, m.getDeclaringClass()));
+        }
+
+        methods = reflections.getMethodsAnnotatedWith(VocabularySupplier.class);
+        for (Method m : methods) {
+            VocabularySupplier a = m.getAnnotation(VocabularySupplier.class);
+            vocabularySuppliers.add(new VocabularySupplierMetadata(a.event(), a.description(), m, m.getDeclaringClass()));
+        }
+
+        methods = reflections.getMethodsAnnotatedWith(SubjectSupplier.class);
+        for (Method m : methods) {
+            SubjectSupplier a = m.getAnnotation(SubjectSupplier.class);
+            subjectSuppliers.add(new SubjectSupplierMetadata(a.event(), a.description(), m, m.getDeclaringClass()));
         }
     }
 
-    private void processDomainClass(Class<?> domainClass) {
-        Domain domain = domainClass.getAnnotation(Domain.class);
+    private void processModel(Class<?> modelClass) {
+        Model ann = modelClass.getAnnotation(Model.class);
+        String description = ann != null ? ann.description() : "";
 
-        // Build ClassModel
-        List<String> attributes = Arrays.stream(domainClass.getDeclaredFields())
-                .map(Field::getName)
-                .collect(Collectors.toList());
-
-        List<String> methods = Arrays.stream(domainClass.getDeclaredMethods())
-                .map(Method::getName)
-                .collect(Collectors.toList());
-
-        ClassModel model = ClassModel.builder()
-                .packageName(domainClass.getPackageName())
-                .className(domainClass.getSimpleName())
-                .domain(domain.name())
-                .description(domain.description())
-                .attributes(attributes)
-                .methods(methods)
-                .build();
-
-        classModels.add(model);
-
-        // Scan @Vocabulary fields
-        Arrays.stream(domainClass.getDeclaredFields())
-                .filter(f -> f.isAnnotationPresent(Vocabulary.class))
-                .forEach(f -> {
-                    Vocabulary v = f.getAnnotation(Vocabulary.class);
-                    VocabularyModel vocabularyModel = new VocabularyModel(
-                            f.getName(),
-                            v.alias().isEmpty() ? f.getName() : v.alias(),
-                            v.description(),
-                            domain.name()
-                    );
-                    VocabularyRegistry.getInstance().register(vocabularyModel);
-                });
-
-        // Scan @Callback methods
-        Arrays.stream(domainClass.getDeclaredMethods())
-                .filter(m -> m.isAnnotationPresent(Callback.class))
-                .forEach(m -> {
-                    Callback cb = m.getAnnotation(Callback.class);
-                    callbacks.put(cb.event(), new CallbackRegistry(cb.event(), m, domainClass));
-                });
-
-        // Scan @Rule methods
-        Arrays.stream(domainClass.getDeclaredMethods())
-                .filter(m -> m.isAnnotationPresent(Rule.class))
-                .forEach(m -> {
-                    Rule rule = m.getAnnotation(Rule.class);
-                    rules.put(rule.name(), new RuleRegistry(rule.name(), rule.subject(), rule.channel(), rule.priority(), m, domainClass));
-                });
-
-        // Scan @Event methods
-        Arrays.stream(domainClass.getDeclaredMethods())
-                .filter(m -> m.isAnnotationPresent(Event.class))
-                .forEach(m -> {
-                    Event ev = m.getAnnotation(Event.class);
-                    events.put(ev.name(), new EventRegistry(ev.name(), ev.description(), m, domainClass));
-                });
+        List<VocabularyFieldMetadata> fields = new ArrayList<>();
+        for (Field f : modelClass.getDeclaredFields()) {
+            if (!f.isAnnotationPresent(Vocabulary.class)) continue;
+            Vocabulary v = f.getAnnotation(Vocabulary.class);
+            String name = (v.name() == null || v.name().isEmpty()) ? f.getName() : v.name();
+            fields.add(new VocabularyFieldMetadata(name, v.description(), f, modelClass));
+        }
+        models.add(new ModelMetadata(modelClass, description, fields));
     }
 
-    public List<ClassModel> getClassModels() {
-        return classModels;
-    }
-
-    public Collection<VocabularyModel> getVocabularyModels() {
-        return VocabularyRegistry.getInstance().getAll();
-    }
-
-    public Map<String, CallbackRegistry> getCallbacks() {
-        return callbacks;
-    }
-
-    public Map<String, RuleRegistry> getRules() {
-        return rules;
-    }
-
-    public Map<String, EventRegistry> getEvents() {
-        return events;
-    }
+    public List<EventMetadata> getEvents() { return Collections.unmodifiableList(events); }
+    public List<RuleMetadata> getRules() { return Collections.unmodifiableList(rules); }
+    public List<CallbackMetadata> getCallbacks() { return Collections.unmodifiableList(callbacks); }
+    public List<VocabularySupplierMetadata> getVocabularySuppliers() { return Collections.unmodifiableList(vocabularySuppliers); }
+    public List<SubjectSupplierMetadata> getSubjectSuppliers() { return Collections.unmodifiableList(subjectSuppliers); }
+    public List<ModelMetadata> getModels() { return Collections.unmodifiableList(models); }
 }

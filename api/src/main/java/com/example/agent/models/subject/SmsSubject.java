@@ -1,0 +1,30 @@
+package com.example.agent.models.subject;
+
+import java.util.Map;
+import java.util.Objects;
+
+public final class SmsSubject extends Subject {
+
+    private final String phoneNumber;
+
+    public SmsSubject(
+            String subjectId,
+            String tenantId,
+            String phoneNumber,
+            String correlationId,
+            Map<String, String> attributes) {
+
+        super(subjectId, Channel.SMS, tenantId, correlationId, attributes);
+        this.phoneNumber = Objects.requireNonNull(phoneNumber, "phoneNumber");
+    }
+
+    @Override
+    public String getAddress() {
+        return phoneNumber;
+    }
+
+    @Override
+    public String addressFingerprint() {
+        return "sms:" + phoneNumber;
+    }
+}

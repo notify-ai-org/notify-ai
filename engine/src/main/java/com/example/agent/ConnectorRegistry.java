@@ -10,10 +10,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import lombok.RequiredArgsConstructor;
 
@@ -161,40 +157,5 @@ public class ConnectorRegistry {
         }
     }
 
-    @Configuration
-    @EnableConfigurationProperties(ConnectorProperties.class)
-    @EnableScheduling
-    public class ConnectorRegistryConfig {}
 
-    @Component
-    @RequiredArgsConstructor
-    public class ConnectorConfigReloader {
-
-        private final ConnectorProperties props;
-        private final ConnectorRegistry registry;
-
-        private final AtomicReference<String> lastFingerprint = new AtomicReference<>("");
-
-        @Scheduled(fixedDelayString = "#{@connectorProperties.reload.pollMs}")
-        public void reloadIfChanged() {
-            if (!props.getReload().isEnabled()) return;
-
-            Map<String, ConnectorProperties.ChannelConfig> map = props.getChannel();
-            String fp = fingerprint(map);
-
-            String prev = lastFingerprint.get();
-            if (Objects.equals(prev, fp)) return;
-
-            lastFingerprint.set(fp);
-            registry.hotReloadAll(map);
-        }
-
-        private String fingerprint(Map<String, ConnectorProperties.ChannelConfig> map) {
-            // stable ordering for deterministic fingerprint
-            return map.entrySet().stream()
-                    .sorted(Map.Entry.comparingByKey())
-                    .map(e -> e.getKey() + "|" + e.getValue().getClazz() + "|" + e.getValue().getInstances())
-                    .reduce("", (a, b) -> a + "#" + b);
-        }
-    }
 }

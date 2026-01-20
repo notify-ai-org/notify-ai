@@ -16,9 +16,8 @@
         <module>annotations</module>
         <module>api</module>
         <module>acp-server</module>
-        <!-- <module>client</module>-->
+        <module>client</module>
         <module>engine</module>
-        <module>redis-queue</module>
     </modules>
     
     <properties>

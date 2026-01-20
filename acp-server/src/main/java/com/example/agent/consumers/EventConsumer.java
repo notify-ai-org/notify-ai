@@ -201,11 +201,7 @@ public class EventConsumer {
                                                     .correlationId(agentContext.getCorrelationId())
                                                     .eventType(capture.getEventType())
                                                     .priority(NotificationPriority.valueOf(processedEvent.get("priority").toString()))
-                                                    .dispatchMode(NotificationJob.DispatchMode.EVENT)
-                                                    .retryCount(0)
-                                                    .maxRetries(3)
-                                                    .createdAt(java.time.Instant.now())
-                                                    .updatedAt(java.time.Instant.now());
+                                                    .dispatchMode(NotificationJob.DispatchMode.EVENT);
                                                 
 
                                                 if (template != null) {
@@ -213,8 +209,7 @@ public class EventConsumer {
                                                 } else {
                                                     throw new Exception("Cannot find template for given job");
                                                 }
-                                                jobBuilder.ruleExpressions(ruleExpressions);
-
+                                                
                                                 NotificationJob job = jobBuilder.build();
                                                 if (eventTypeObj != null && eventTypeObj.equals("static")) {
                                                     notificationDispatcher.pushJob(job); 

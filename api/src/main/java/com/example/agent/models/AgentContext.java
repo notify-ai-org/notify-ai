@@ -2,6 +2,7 @@ package com.example.agent.models;
 
 import java.util.Set;
 import com.google.adk.sessions.Session;
+import com.google.genai.types.Content;
 
 public class AgentContext {
 
@@ -21,6 +22,20 @@ public class AgentContext {
 
     private String correlationId;
 
+    private Content content;
+
+    /**
+     * @return the content
+     */
+    public Content getContent() {
+        return content;
+    }
+    /**
+     * @param content the content to set
+     */
+    public void setContent(Content content) {
+        this.content = content;
+    }
     // Builder methods for new fields
     public String getIdempotencyKey() { return idempotencyKey; }
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }

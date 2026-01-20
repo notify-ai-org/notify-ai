@@ -8,8 +8,12 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.METHOD})
 public @interface Event {
-    String key();                       // e.g. "order.placed"
+    /** Event key/name, e.g. "order.placed". Alias for name. */
+    String key();
+    /** Human-readable description. */
+    String description() default "";
     String version() default "v1";
-    Class<?> payload() default Void.class; // optional override
+    /** Optional payload type override. */
+    Class<?> payload() default Void.class;
 }
 

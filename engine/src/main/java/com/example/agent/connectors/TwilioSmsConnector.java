@@ -3,6 +3,7 @@ package com.example.agent.connectors;
 import com.example.agent.AbstractNotificationConnector;
 import com.example.agent.models.ConnectorMetrics;
 import com.example.agent.models.NotificationJob;
+import com.example.agent.models.subject.Subject;
 import com.twilio.Twilio;
 import com.twilio.exception.ApiException;
 import com.twilio.rest.api.v2010.account.Message;
@@ -42,7 +43,7 @@ public class TwilioSmsConnector extends AbstractNotificationConnector {
     }
 
     @Override
-    public void send(NotificationJob job) {
+    public void send(NotificationJob job,Subject subject) {
 
         Objects.requireNonNull(job, "job");
         if (job.getTarget() == null || job.getTarget().isBlank()) {
@@ -60,7 +61,7 @@ public class TwilioSmsConnector extends AbstractNotificationConnector {
 
         try {
             MessageCreator creator = Message.creator(
-                    new PhoneNumber(normalize(job.getTarget())),
+                    new PhoneNumber(normalize(subject.getAddress())),
                     new PhoneNumber(fromNumber),
                     content
             );
