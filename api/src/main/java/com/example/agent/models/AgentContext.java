@@ -24,6 +24,9 @@ public class AgentContext {
 
     private Content content;
 
+    /** Domain content (vocabulary, rules) JSON loaded for the client. */
+    private String domainContentJson;
+
     /**
      * @return the content
      */
@@ -36,6 +39,10 @@ public class AgentContext {
     public void setContent(Content content) {
         this.content = content;
     }
+
+    public String getDomainContentJson() { return domainContentJson; }
+    public void setDomainContentJson(String domainContentJson) { this.domainContentJson = domainContentJson; }
+
     // Builder methods for new fields
     public String getIdempotencyKey() { return idempotencyKey; }
     public void setIdempotencyKey(String idempotencyKey) { this.idempotencyKey = idempotencyKey; }
@@ -88,6 +95,11 @@ public class AgentContext {
 
         public AgentContextBuilder correlationId(String correlationId) {
             ctx.setCorrelationId(correlationId);
+            return this;
+        }
+
+        public AgentContextBuilder domainContentJson(String domainContentJson) {
+            ctx.setDomainContentJson(domainContentJson);
             return this;
         }
 

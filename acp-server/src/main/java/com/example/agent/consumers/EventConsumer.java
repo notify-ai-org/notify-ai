@@ -165,20 +165,11 @@ public class EventConsumer {
                                     List<Map<String, Object>> processedEvents = mapper.readValue(json,new TypeReference<List<Map<String, Object>>>() {});
                                     for (Map<String, Object> processedEvent : processedEvents) {
                                        Object eventTypeObj = processedEvent.get("eventType");
-                                        // Extract ruleExpressions from event level
-                                        @SuppressWarnings("unchecked")
-                                        List<String> ruleExpressionsList = (List<String>) processedEvent.get("ruleExpressions");
-                                        String ruleExpressions = ruleExpressionsList != null 
-                                            ? String.join(",", ruleExpressionsList) 
-                                            : null;
-                                        
-                                        // Extract channels and create notification jobs
                                         @SuppressWarnings("unchecked")
                                         List<Map<String, String>> channels = (List<Map<String, String>>) processedEvent.get("channels");
                                         if (channels != null) {
                                             for (Map<String, String> channelInfo : channels) {
                                                 String channel = channelInfo.get("channel");
-                                                String subject = channelInfo.get("subject");
                                                 
                                                 // Find template for this event and channel
                                                 List<MessageTemplate> templates = messageTemplateRepository.findByEventType(capture.getEventName());
@@ -194,7 +185,6 @@ public class EventConsumer {
                                                 NotificationJob.NotificationJobBuilder jobBuilder = NotificationJob.builder()
                                                     .id(UUID.randomUUID().toString())
                                                     .channel(channel)
-                                                    .target(subject)
                                                     .idempotencyKey(agentContext.getIdempotencyKey())
                                                     .schemaVersion(agentContext.getSchemaVersion())
                                                     .source(agentContext.getSource())
@@ -357,14 +347,10 @@ public class EventConsumer {
         Map<String, Object> payload = new java.util.HashMap<>();
         payload.put("eventName", capture.getEventName());
         payload.put("eventType", capture.getEventType());
-        payload.put("payload", capture.getPayload());
         payload.put("eventDescription", capture.getEventDescription());
         payload.put("occuredAt", capture.getOccuredAt().toString());
         payload.put("scheduleIntent", capture.getScheduleIntent());
         payload.put("preferredTimeWindow", capture.getPreferredTimeWindow());
-        payload.put("occuredAt", capture.getOccuredAt() != null ? capture.getOccuredAt().toString() : null);
-        payload.put("durationMillis", capture.getDurationMillis());
-        payload.put("serviceName", capture.getServiceName());
         String jsonPayload = mapper.writeValueAsString(payload);
         Content prompt = Content.fromParts(Part.fromText(sb.toString()), Part.fromText(jsonPayload));
         return agentOrchestrator.new AgentTaskContext("EventNotificationScheduler", null, null, prompt);
@@ -385,8 +371,7 @@ public class EventConsumer {
 
         Map<String, Object> payload = new java.util.HashMap<>();
         payload.put("eventName", capture.getEventName());
-        payload.put("eventType", capture.getEventType());
-        payload.put("eventDescription", capture.getEventDescription());
+        payload.put("description", capture.getEventDescription());
         payload.put("payload", capture.getPayload());
         payload.put("occuredAt", capture.getOccuredAt() != null ? capture.getOccuredAt().toString() : null);
 
@@ -396,4 +381,5 @@ public class EventConsumer {
         Content prompt = Content.fromParts(Part.fromText(sb.toString()), Part.fromText(jsonPayload));
         return agentOrchestrator.new AgentTaskContext("MessageTemplateGenerator", null, null, prompt);
     }
+
 }

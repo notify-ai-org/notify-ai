@@ -1,14 +1,14 @@
-package com.example.agent.sdk.metadata;
+package com.example.agent.models.metadata;
 
 import java.lang.reflect.Method;
 
-public class VocabularySupplierMetadata {
+public class SubjectSupplierMetadata {
     private final String event;
     private final String description;
     private final Method method;
     private final Class<?> declaringClass;
 
-    public VocabularySupplierMetadata(String event, String description, Method method, Class<?> declaringClass) {
+    public SubjectSupplierMetadata(String event, String description, Method method, Class<?> declaringClass) {
         this.event = event;
         this.description = description;
         this.method = method;

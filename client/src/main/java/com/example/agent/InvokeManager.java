@@ -1,14 +1,13 @@
 package com.example.agent;
 
 import com.example.agent.annotations.Callback.When;
-import com.example.agent.sdk.metadata.*;
+import com.example.agent.models.metadata.*;
 
 import org.springframework.context.ApplicationContext;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Holds the mapping from event keys to rule executors, vocabulary suppliers,

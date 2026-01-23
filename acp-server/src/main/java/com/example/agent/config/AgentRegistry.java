@@ -7,6 +7,8 @@ import com.example.agent.EventRepository;
 import com.example.agent.RuleRepository;
 import com.example.agent.VocabularyRepository;
 import com.example.agent.agents.MessageTemplateAgent;
+import com.example.agent.service.SessionService;
+import com.example.agent.tools.ToolConfig;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import java.util.Map;
@@ -26,8 +28,8 @@ public class AgentRegistry {
     }
 
     @Bean
-    public AgentOrchestrator agentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo) {
-        return new AgentOrchestrator(snapshotRepo, logRepo);
+    public AgentOrchestrator agentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,SessionService sessionService) {
+        return new AgentOrchestrator(snapshotRepo, logRepo,sessionService);
     }
 
     // ==== Agent Name Constants ====
@@ -41,9 +43,10 @@ public class AgentRegistry {
     public com.example.agent.agents.EventProcessorAgent eventProcessorAgent(
             AgentOrchestrator orchestrator,
             EventRepository eventRepository,
-            VocabularyRepository vocabularyRepository) {
+            ToolConfig veToolConfig,
+            RuleRepository vocabularyRepository) {
         com.example.agent.agents.EventProcessorAgent agent =
-            new com.example.agent.agents.EventProcessorAgent(eventRepository, vocabularyRepository);
+            new com.example.agent.agents.EventProcessorAgent(eventRepository, vocabularyRepository,veToolConfig);
         String id = orchestrator.registerAgent(agent.getEventProcessorAgent());
         registry.put(EVENT_PROCESSOR_AGENT_ID, id);
         return agent;

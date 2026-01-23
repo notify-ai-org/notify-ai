@@ -1,4 +1,4 @@
-package com.example.agent.sdk.metadata;
+package com.example.agent.models.metadata;
 
 import java.lang.reflect.Field;
 

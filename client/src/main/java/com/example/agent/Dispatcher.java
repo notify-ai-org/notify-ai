@@ -1,12 +1,13 @@
 package com.example.agent;
 
-import com.example.agent.sdk.dto.ClassModelDto;
-import com.example.agent.sdk.dto.EventCaptureDto;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+
+import com.example.agent.models.ClassModel;
+import com.example.agent.models.EventCapture;
 
 /**
  * Thread that pulls records from the Buffer and sends them to acp-server (or
@@ -34,7 +35,7 @@ public class Dispatcher implements Runnable {
     @Override
     public void run() {
         List<Buffer.Record> batch = new ArrayList<>();
-        List<EventCaptureDto> eventBatch = new ArrayList<>();
+        List<EventCapture> eventBatch = new ArrayList<>();
 
         while (running) {
             try {
@@ -48,7 +49,7 @@ public class Dispatcher implements Runnable {
                     switch (r.getType()) {
                         case VOCABULARY:
                             @SuppressWarnings("unchecked")
-                            List<ClassModelDto> vocab = (List<ClassModelDto>) r.getPayload();
+                            List<ClassModel> vocab = (List<ClassModel>) r.getPayload();
                             postWithAuthRetry(() -> acpClient.postVocabulary(vocab, tokenSupplier.get()));
                             break;
                         case RULE:
@@ -57,13 +58,13 @@ public class Dispatcher implements Runnable {
                             postWithAuthRetry(() -> acpClient.postRule(rule, tokenSupplier.get()));
                             break;
                         case EVENT_CAPTURE:
-                            eventBatch.add((EventCaptureDto) r.getPayload());
+                            eventBatch.add((EventCapture) r.getPayload());
                             break;
                     }
                 }
 
                 if (!eventBatch.isEmpty()) {
-                    List<EventCaptureDto> toSend = new ArrayList<>(eventBatch);
+                    List<EventCapture> toSend = new ArrayList<>(eventBatch);
                     eventBatch.clear();
                     postWithAuthRetry(() -> acpClient.postEventCaptures(toSend, tokenSupplier.get()));
                 }

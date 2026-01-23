@@ -4,12 +4,10 @@ import com.example.agent.*;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-
 import com.example.agent.annotations.EnableNotify;
 
 /**
@@ -92,12 +90,5 @@ public class NotifyAutoConfiguration {
     @ConditionalOnMissingBean
     public EventListener eventListener(Buffer buffer, InvokeManager invokeManager, MetricsManager metricsManager) {
         return new EventListener(buffer, invokeManager, metricsManager);
-    }
-
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnProperty(name = "notify.kafka.enabled", havingValue = "true")
-    public NotifyKafkaListener notifyKafkaListener(Buffer buffer, InvokeManager invokeManager, MetricsManager metricsManager) {
-        return new NotifyKafkaListener(buffer, invokeManager, metricsManager);
     }
 }

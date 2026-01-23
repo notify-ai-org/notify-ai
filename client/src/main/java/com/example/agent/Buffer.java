@@ -1,13 +1,14 @@
 package com.example.agent;
 
-import com.example.agent.sdk.dto.ClassModelDto;
-import com.example.agent.sdk.dto.EventCaptureDto;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.ReentrantLock;
+
+import com.example.agent.models.ClassModel;
+import com.example.agent.models.EventCapture;
 
 /**
  * Manages a batch of records to be sent to acp-server. Flushes when either
@@ -49,7 +50,7 @@ public class Buffer {
         queue.add(new Record(type, payload));
     }
 
-    public void addVocabulary(List<ClassModelDto> list) {
+    public void addVocabulary(List<ClassModel> list) {
         add(RecordType.VOCABULARY, new ArrayList<>(list));
     }
 
@@ -62,7 +63,7 @@ public class Buffer {
         add(RecordType.RULE, m);
     }
 
-    public void addEventCapture(EventCaptureDto dto) {
+    public void addEventCapture(EventCapture dto) {
         add(RecordType.EVENT_CAPTURE, dto);
     }
 

@@ -1,7 +1,9 @@
 package com.example.agent;
 
-import com.example.agent.sdk.dto.*;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.example.agent.models.ClassModel;
+import com.example.agent.models.EventCapture;
+import com.example.agent.models.dto.ClientRegistrationDto;
+import com.example.agent.models.dto.TokenRefreshDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;
@@ -70,7 +72,7 @@ public class AcpServerClient {
     /**
      * POST /api/vocabulary with List of ClassModelDto. acp-server expects List&lt;ClassModel&gt; (same JSON shape).
      */
-    public int postVocabulary(List<ClassModelDto> list, String bearerToken) throws Exception {
+    public int postVocabulary(List<ClassModel> list, String bearerToken) throws Exception {
         if (list == null || list.isEmpty()) return 0;
         String json = mapper.writeValueAsString(list);
         return post("/api/vocabulary", json, bearerToken);
@@ -88,7 +90,7 @@ public class AcpServerClient {
     /**
      * POST /api/event with List of EventCaptureDto. acp-server expects List&lt;EventCapture&gt; (same JSON shape).
      */
-    public int postEventCaptures(List<EventCaptureDto> list, String bearerToken) throws Exception {
+    public int postEventCaptures(List<EventCapture> list, String bearerToken) throws Exception {
         if (list == null || list.isEmpty()) return 0;
         String json = mapper.writeValueAsString(list);
         return post("/api/event", json, bearerToken);

@@ -1,10 +1,10 @@
 package com.example.agent;
 
 import com.example.agent.config.NotifyProperties;
-import com.example.agent.sdk.dto.ClassModelDto;
-import com.example.agent.sdk.dto.ClientRegistrationDto;
-import com.example.agent.sdk.dto.TokenRefreshDto;
-import com.example.agent.sdk.metadata.RuleMetadata;
+import com.example.agent.models.ClassModel;
+import com.example.agent.models.dto.ClientRegistrationDto;
+import com.example.agent.models.dto.TokenRefreshDto;
+import com.example.agent.models.metadata.RuleMetadata;
 
 import jakarta.annotation.PreDestroy;
 
@@ -76,7 +76,7 @@ public class Bootstrapper {
             // acp-server may not have /api/client/register; continue without auth
         }
 
-        List<ClassModelDto> vocab = vocabularyManager.toClassModelDtoList();
+        List<ClassModel> vocab = vocabularyManager.toClassModelDtoList();
         if (!vocab.isEmpty()) buffer.addVocabulary(vocab);
 
         for (RuleMetadata r : annotationProcessor.getRules()) {

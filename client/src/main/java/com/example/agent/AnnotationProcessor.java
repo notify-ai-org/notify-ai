@@ -1,7 +1,7 @@
 package com.example.agent;
 
 import com.example.agent.annotations.*;
-import com.example.agent.sdk.metadata.*;
+import com.example.agent.models.metadata.*;
 import org.reflections.Reflections;
 import org.reflections.scanners.Scanners;
 import org.reflections.util.ConfigurationBuilder;
@@ -9,7 +9,6 @@ import org.reflections.util.ConfigurationBuilder;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Scans the client codebase for @EnableNotify and the configured base package,

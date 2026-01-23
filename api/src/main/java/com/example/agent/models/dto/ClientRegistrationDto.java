@@ -1,4 +1,4 @@
-package com.example.agent.sdk.dto;
+package com.example.agent.models.dto;
 
 /**
  * Request/response DTOs for client registration with acp-server.

@@ -26,3 +26,10 @@ vocab:
   openai-model: ${OPENAI_MODEL:gpt-4o-mini}
   openai-max-tokens: 160
   description-max-length: 512
+
+acp:
+  auth:
+    jwt:
+      secret: ${ACP_JWT_SECRET:changeme-at-least-32-characters-long-secret-key}
+      required-scope: ${ACP_JWT_REQUIRED_SCOPE:agent:invoke}
+    skip-paths: /api/client/register,/api/auth/token/refresh,/actuator/health,/actuator/info

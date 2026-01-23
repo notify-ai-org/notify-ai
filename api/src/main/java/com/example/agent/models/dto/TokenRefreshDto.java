@@ -1,4 +1,4 @@
-package com.example.agent.sdk.dto;
+package com.example.agent.models.dto;
 
 /**
  * Request/response for token refresh with acp-server.

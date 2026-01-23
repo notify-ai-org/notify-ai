@@ -2,10 +2,12 @@ package com.example.agent;
 
 import com.example.agent.models.AgentStage;
 import com.example.agent.models.AgentStageChangeEvent;
+import com.example.agent.service.SessionService;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.agents.ParallelAgent;
 import com.google.adk.events.Event;
+import com.google.adk.runner.Runner;
 import com.google.genai.types.Content;
 
 import io.reactivex.rxjava3.core.Flowable;
@@ -61,13 +63,14 @@ public class AgentOrchestrator {
     private final AgentSnapshotRepository snapshotRepo;
     private final AgentLogRepository logRepo;
     private final JedisPool jedisPool;
+    private final SessionService sessionService;
 
-    public AgentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo) {
-        this(10, 300000, true, snapshotRepo, logRepo); // Default: 10 agents, 5 min timeout, auto cleanup
+    public AgentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,SessionService sessionService) {
+        this(10, 300000, true, snapshotRepo, logRepo,sessionService); // Default: 10 agents, 5 min timeout, auto cleanup
     }
 
     public AgentOrchestrator(int maxPoolSize, long agentTimeoutMillis, boolean autoCleanup,
-            AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo) {
+            AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,SessionService sessionService) {
         this.maxPoolSize = maxPoolSize;
         this.agentTimeoutMillis = agentTimeoutMillis;
         this.autoCleanup = autoCleanup;
@@ -92,6 +95,8 @@ public class AgentOrchestrator {
         this.totalAgentsCreated = new AtomicInteger(0);
         this.totalAgentsTerminated = new AtomicInteger(0);
 
+        this.sessionService = sessionService;
+
         setupCleanupTask();
         setupEventForwarding();
     }
@@ -105,7 +110,7 @@ public class AgentOrchestrator {
         }
 
         String agentId = "agent_" + nextAgentId.getAndIncrement();
-        AgentWrapper wrapper = new AgentWrapper(agentId, agent, snapshotRepo, logRepo, jedisPool);
+        AgentWrapper wrapper = new AgentWrapper(agentId, agent, snapshotRepo, logRepo, jedisPool,sessionService);
 
         agentPool.put(agentId, wrapper);
         availableAgents.put(agentId, wrapper);

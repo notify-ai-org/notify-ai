@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Configuration properties for the Notification Engine SDK.
  * Prefix: notify
  */
-@ConfigurationProperties(prefix = "notify")
+@ConfigurationProperties(prefix = "notify.ai.properties")
 public class NotifyProperties {
 
     /** Base package to scan for @Event, @Rule, @Model, etc. From @EnableNotify(basePackage) or here. */

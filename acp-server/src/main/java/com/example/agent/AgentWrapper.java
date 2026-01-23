@@ -2,10 +2,13 @@ package com.example.agent;
 
 import com.example.agent.models.AgentStage;
 import com.example.agent.models.AgentStageChangeEvent;
+import com.example.agent.service.SessionService;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
+import com.google.adk.artifacts.InMemoryArtifactService;
 import com.google.adk.events.Event;
 import com.google.adk.runner.InMemoryRunner;
+import com.google.adk.runner.Runner;
 import com.google.adk.sessions.Session;
 import com.google.genai.types.Content;
 import io.reactivex.rxjava3.core.Flowable;
@@ -45,6 +48,8 @@ public class AgentWrapper {
     private String currentTaskId;
     private Exception lastError;
 
+    private final SessionService sessionService;
+
     private final AgentSnapshotRepository snapshotRepo;
     private final AgentLogRepository logRepo;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -52,7 +57,7 @@ public class AgentWrapper {
     private final ReentrantLock lock = new ReentrantLock();
 
     public AgentWrapper(String agentId, BaseAgent agent, AgentSnapshotRepository snapshotRepo,
-            AgentLogRepository logRepo, JedisPool jedisPool) {
+            AgentLogRepository logRepo, JedisPool jedisPool,SessionService sessionService) {
         this.agentId = agentId;
         this.agent = agent;
         this.currentStage = new AtomicReference<>(AgentStage.CREATED);
@@ -63,6 +68,7 @@ public class AgentWrapper {
         this.snapshotRepo = snapshotRepo;
         this.logRepo = logRepo;
         this.jedisPool = jedisPool;
+        this.sessionService = sessionService;
 
         persistSnapshot();
     }
@@ -116,7 +122,7 @@ public class AgentWrapper {
         }
 
         // --- Setup Runner and Session ---
-        InMemoryRunner runner = new InMemoryRunner(this.agent);
+        Runner runner = new Runner(this.agent, taskId,new InMemoryArtifactService(),sessionService);
         Session session = context.session();
         logger.info(() -> String.format("Initial session state: %s", session.state()));
 
