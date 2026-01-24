@@ -80,20 +80,25 @@ public class EventListener {
         try {
             EventCapture dto = mapper.readValue(raw, EventCapture.class);
             if (dto.getOccuredAt() == null) dto.setOccuredAt(Instant.now());
-            if (dto.getEventType() == null || dto.getEventType().isEmpty()) dto.setEventType("SCHEDULED");
+            if (dto.getEventType() == null || dto.getEventType().isEmpty()) 
+                dto.setEventType("SCHEDULED");
 
             String eventKey = dto.getEventName();
             if (eventKey != null && invokeManager != null) {
                 try {
                     Object vocab = invokeManager.invokeVocabularySupplier(eventKey, dto.getPayload());
                     if (vocab != null) {
-                        dto.setPayload(mapper.writeValueAsString(java.util.Map.of("vocabulary", vocab, "original", dto.getPayload())));
+                        dto.setPayload(
+                            mapper.writeValueAsString(
+                                java.util.Map.of("vocabulary", vocab, "original", dto.getPayload()
+                            )));
                     }
                 } catch (Exception ignored) {}
             }
 
             buffer.addEventCapture(dto);
-            if (metricsManager != null) metricsManager.recordEventCapture(dto.getEventName(), 0);
+            if (metricsManager != null) 
+                metricsManager.recordEventCapture(dto.getEventName(), 0);
         } catch (Exception e) {
             e.printStackTrace();
         }

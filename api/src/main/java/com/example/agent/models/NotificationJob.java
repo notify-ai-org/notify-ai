@@ -1,16 +1,15 @@
 package com.example.agent.models;
 
-
 import lombok.Builder;
 import lombok.Data;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-
 import com.example.agent.models.subject.Subject;
-
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.Id;
+import jakarta.persistence.Transient;
 
 @Entity
 @Data
@@ -25,6 +24,8 @@ public class NotificationJob {
      * Globally unique notification identifier.
      * Used for idempotency across retries, replays, and channels.
      */
+    @Id
+    @GeneratedValue
     private String id;
     /**
      * Optional idempotency key provided by the source system.
@@ -49,6 +50,7 @@ public class NotificationJob {
      */
     private String source;
 
+    @Transient
     private List<Subject> subjects;
 
     /**
@@ -131,6 +133,7 @@ public class NotificationJob {
      *  - sms.statusCallback
      *  - webhook.secret
      */
+    @Transient
     private Map<String, String> attributes;
 
     /* ================================

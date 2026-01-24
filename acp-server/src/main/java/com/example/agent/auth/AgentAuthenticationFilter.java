@@ -44,8 +44,8 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
     private final DomainContentService domainContentService;
     private final String[] skipPaths;
 
-    @Value("${acp.auth.jwt.secret:changeme-at-least-32-characters-long-secret}") String secret;
-            @Value("${acp.auth.jwt.required-scope:agent:invoke}") String requiredScope;
+    @Value("${acp.auth.jwt.secret:wsws}") String secret = "secretmdkemdokp4i98985908606805609706ktk0509i05968905087096870698";
+    @Value("${acp.auth.jwt.required-scope:agent:invoke}") String requiredScope="invoke";
 
     public AgentAuthenticationFilter(
                                         SessionService sessionService,

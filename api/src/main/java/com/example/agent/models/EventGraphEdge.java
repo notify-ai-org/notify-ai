@@ -6,7 +6,7 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
 
 
-@Entity
+//@Entity
 public class EventGraphEdge {
     @Id
     private String id;

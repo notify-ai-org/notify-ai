@@ -13,6 +13,6 @@ public interface AgentSessionRepository extends JpaRepository<AgentSessionEntity
 
     Optional<AgentSessionEntity> findBySessionIdAndClientId(String sessionId, String clientId);
 
-    List<AgentSessionEntity> findByClientId(String sessionId, String clientId);
+    List<AgentSessionEntity> findByClientId(String clientId);
 
 }

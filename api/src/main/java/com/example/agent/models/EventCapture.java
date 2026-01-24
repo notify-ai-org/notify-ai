@@ -21,6 +21,9 @@ public class EventCapture {
     // Raw payload (input data or message body)
     @Column(length = 10000)
     private String payload;
+
+    @ManyToOne
+    private Event event;
   
     // Execution data
     @Embedded

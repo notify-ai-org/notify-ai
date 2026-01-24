@@ -26,7 +26,6 @@ import com.google.adk.tools.ToolContext;
 import lombok.RequiredArgsConstructor;
 
 @Component
-@Configuration
 @RequiredArgsConstructor
 public class ToolConfig {
 
@@ -130,10 +129,6 @@ public class ToolConfig {
                 .collect(Collectors.joining("\n\n---\n\n"));
     }
 
-    @Bean
-    public VectorStore vectorStore(JdbcTemplate jdbcTemplate, EmbeddingClient embeddingClient) {
-        return new PgVectorStore(jdbcTemplate, embeddingClient);
-    }
 
     
 }

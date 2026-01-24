@@ -5,7 +5,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import java.util.List;
 
-@Entity
+//@Entity
 public class EventGraph {
     @Id
     private String id;

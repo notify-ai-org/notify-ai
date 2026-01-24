@@ -159,7 +159,7 @@ public class SessionService implements BaseSessionService {
     @Override
     public Single<ListSessionsResponse> listSessions(String appName, String userId) {
         return Single.fromCallable(() -> {
-            List<AgentSessionEntity> entities = repository.findByClientId(appName, userId);
+            List<AgentSessionEntity> entities = repository.findByClientId(userId);
             List<Session> sessionList = new ArrayList<>();
             for (AgentSessionEntity entity : entities) {
                 sessionList.add(entity.toSession());
