@@ -93,7 +93,7 @@ public class VocabularyConsumer {
             vocab.setDescription(classModel.getClassDescription());
             Vocabulary parent = repo.findByTermIgnoreCase(classModel.getSuperClass()).orElse(null);
             vocab.setParent(parent);
-            vocab.setPath(parent == null ? vocab.getTerm() : parent.getPath() + "-" + vocab.getTerm());
+            //vocab.setPath(parent == null ? vocab.getTerm() : parent.getPath() + "-" + vocab.getTerm());
             repo.save(vocab);
         }
 
@@ -113,7 +113,7 @@ public class VocabularyConsumer {
             vocab.setDescription(classModel.getClassDescription());
             Vocabulary parent = repo.findByTermIgnoreCase(classModel.getSuperClass()).orElse(null);
             vocab.setParent(parent);
-            vocab.setPath(parent == null ? vocab.getTerm() : parent.getPath() + "-" + vocab.getTerm());
+            //vocab.setPath(parent == null ? vocab.getTerm() : parent.getPath() + "-" + vocab.getTerm());
             repo.save(vocab);
         }
     }

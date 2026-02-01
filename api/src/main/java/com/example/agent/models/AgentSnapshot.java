@@ -1,5 +1,6 @@
 package com.example.agent.models;
 
+import com.example.agent.enums.AgentStage;
 import jakarta.persistence.*;
 import java.time.Instant;
 

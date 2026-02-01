@@ -59,6 +59,8 @@ public class NotificationJob {
      */
     private String eventType;
 
+    private String eventName;
+
     /**
      * Correlation ID for tracing across services.
      */

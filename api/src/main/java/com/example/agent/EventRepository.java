@@ -10,7 +10,6 @@ import java.util.Optional;
 
 public interface EventRepository extends JpaRepository<Event, String> {
     Optional<Event> findById(String id);
-    List<Event> findByType(String type);
     List<Event> findByStatus(Event.EventStatus status);
     List<Event> findByCorrelationId(String correlationId);
     List<Event> findAll();
@@ -20,7 +19,7 @@ public interface EventRepository extends JpaRepository<Event, String> {
      * @param eventName The name/type of the event
      * @return List of EventCapture records for the given event name
      */
-    @Query("SELECT ec FROM EventCapture ec JOIN ec.event e WHERE e.type = :eventName ORDER BY ec.timestamp DESC")
+    @Query("SELECT ec FROM EventCapture ec JOIN ec.event e WHERE e.name = :eventName ORDER BY ec.occuredAt DESC")
     List<EventCapture> getHistory(@Param("eventName") String eventName);
 }
 

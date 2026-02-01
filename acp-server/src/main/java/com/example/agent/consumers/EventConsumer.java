@@ -9,12 +9,16 @@ import com.example.agent.EventScheduleRepository;
 import com.example.agent.MessageTemplateRepository;
 import com.example.agent.NotificationDispatcher;
 import com.example.agent.NotificationJobRepository;
+import com.example.agent.interfaces.PromptAssembler;
+import com.example.agent.interfaces.RetrievalPlanner;
 import com.example.agent.models.AgentContext;
 import com.example.agent.models.EventCapture;
 import com.example.agent.models.EventSchedule;
 import com.example.agent.models.MessageTemplate;
 import com.example.agent.models.NotificationJob;
 import com.example.agent.models.NotificationJob.NotificationPriority;
+import com.example.agent.records.DecisionRequest;
+import com.example.agent.records.PromptPackage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,14 +58,20 @@ public class EventConsumer {
     private final NotificationJobRepository notificationJobRepository;
     private Disposable disposable;
 
+    private final RetrievalPlanner planner;
+
+    private final PromptAssembler assembler;
+
     // Configurable timeout or backpressure parameters
     @Value("${agent.buffer.timeout:15s}")
     private Duration bufferTimeout;
 
-    public EventConsumer(EventRepository repo, EventCaptureRepository eventCaptureRepository,
-            EventScheduleRepository eventScheduleRepository, MessageTemplateRepository messageTemplateRepository
-            ,AgentOrchestrator agentOrchestrator,
-            NotificationDispatcher notificationDispatcher,NotificationJobRepository notificationJobRepository) {
+    public EventConsumer(
+            EventRepository repo, EventCaptureRepository eventCaptureRepository,
+            EventScheduleRepository eventScheduleRepository, MessageTemplateRepository messageTemplateRepository,
+            AgentOrchestrator agentOrchestrator, RetrievalPlanner planner,PromptAssembler assembler,
+            NotificationDispatcher notificationDispatcher,NotificationJobRepository notificationJobRepository
+    ) {
         this.repo = repo;
         this.eventCaptureRepository = eventCaptureRepository;
         this.eventScheduleRepository = eventScheduleRepository;
@@ -69,6 +79,8 @@ public class EventConsumer {
         this.agentOrchestrator = agentOrchestrator;
         this.notificationDispatcher = notificationDispatcher;
         this.notificationJobRepository = notificationJobRepository;
+        this.planner = planner;
+        this.assembler = assembler;
     }
 
     @KafkaListener(topics = "${vocab.kafka-topic}", groupId = "vocab-adk-group")
@@ -140,9 +152,11 @@ public class EventConsumer {
                     throw new RuntimeException("Event capture is required with a payload");
                 }
 
-                String prompt = """
-                    Analyze the event and give the output as instructed
-                    """;
+                DecisionRequest decisionRequest = new DecisionRequest(
+
+                );
+                PromptPackage promptPackage = assembler.assemble(decisionRequest,planner.plan(decisionRequest));
+                String prompt = promptPackage.systemPrompt() + "\n" + promptPackage.userPrompt();
 
                 Flowable<com.google.adk.events.Event> flow = agentOrchestrator.executeTaskWithAgent(
                    "EventProcessorAgent",

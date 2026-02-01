@@ -29,7 +29,6 @@ public class NotificationDispatcher {
     private final DispatcherWorkerPool workerPool;
     private final Scheduler quartzScheduler;
     private final EventScheduleRepository eventScheduleRepository;
-    private final NotificationDispatcher notificationDispatcher;
     private final DeadLetterManager deadLetterManager;
     private final NotificationJobRepository notificationJobRepo;
     // --- Cleaner thread for purging expired notification jobs ---
@@ -116,7 +115,7 @@ public class NotificationDispatcher {
             // Register TriggerListener
             quartzScheduler.getListenerManager().addTriggerListener(
                 new QueueingTriggerListener(eventScheduleRepository,
-                    notificationDispatcher,
+                    this,
                     notificationJobRepo,
                     deadLetterManager
                 ));

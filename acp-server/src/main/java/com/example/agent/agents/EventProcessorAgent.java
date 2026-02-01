@@ -129,10 +129,7 @@ public class EventProcessorAgent {
                                     "subject", Schema.builder().type(Type.Known.STRING)
                                         .description("The role of the user to send the message to").build()))
                                 .build())
-                            .build(),
-                    "ruleExpressions", Schema.builder().type(Type.Known.ARRAY)
-                        .description("The rule expressions to evaluate the event").build()))
-                .build();
+                            .build())).build();
 
         // Example input and output
         com.google.genai.types.Content exampleInput = com.google.genai.types.Content.fromParts(

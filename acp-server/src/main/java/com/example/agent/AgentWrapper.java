@@ -1,13 +1,12 @@
 package com.example.agent;
 
-import com.example.agent.models.AgentStage;
+import com.example.agent.enums.AgentStage;
 import com.example.agent.models.AgentStageChangeEvent;
 import com.example.agent.service.SessionService;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.artifacts.InMemoryArtifactService;
 import com.google.adk.events.Event;
-import com.google.adk.runner.InMemoryRunner;
 import com.google.adk.runner.Runner;
 import com.google.adk.sessions.Session;
 import com.google.genai.types.Content;

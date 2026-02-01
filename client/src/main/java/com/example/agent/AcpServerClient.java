@@ -2,8 +2,8 @@ package com.example.agent;
 
 import com.example.agent.models.ClassModel;
 import com.example.agent.models.EventCapture;
-import com.example.agent.models.dto.ClientRegistrationDto;
-import com.example.agent.models.dto.TokenRefreshDto;
+import com.example.agent.models.ClientRegistrationDto;
+import com.example.agent.models.TokenRefreshDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.net.URI;

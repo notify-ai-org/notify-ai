@@ -7,7 +7,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.example.agent.models.ConnectorMetrics;
 import com.example.agent.models.ConnectorProperties.ChannelConfig;
-import com.example.agent.models.NotificationConnector;
+import com.example.agent.interfaces.NotificationConnector;
 import com.example.agent.models.NotificationJob;
 
 public abstract class AbstractNotificationConnector implements NotificationConnector {

@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -16,7 +17,7 @@ import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 import com.example.agent.models.ConnectorMetrics;
 import com.example.agent.models.NotificationAttemptLog;
-import com.example.agent.models.NotificationConnector;
+import com.example.agent.interfaces.NotificationConnector;
 import com.example.agent.models.NotificationJob;
 import com.example.agent.models.subject.Subject;
 import lombok.RequiredArgsConstructor;
@@ -30,7 +31,7 @@ public class NotificationWorker implements Runnable {
 
     private static final Logger log = LoggerFactory.getLogger(NotificationWorker.class);
 
-    private final BlockingQueue<NotificationJob> queue;
+    private BlockingQueue<NotificationJob> queue;
     private final ConnectorRegistry connectorRegistry;
     private Instant lastActiveAt;
 
@@ -98,7 +99,7 @@ public class NotificationWorker implements Runnable {
         log.info("Worker started: {}", Thread.currentThread().getName());
         status = WorkerStatus.AVAILABLE;
         Thread.currentThread().setName(workerId);
-
+        this.queue = new ArrayBlockingQueue<>(100);
         while (running) {
             try {
                 NotificationJob job = queue.poll(2, TimeUnit.SECONDS);

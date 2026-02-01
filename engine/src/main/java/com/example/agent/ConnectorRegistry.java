@@ -3,7 +3,7 @@ package com.example.agent;
 import java.util.*;
 
 import com.example.agent.models.ConnectorProperties;
-import com.example.agent.models.NotificationConnector;
+import com.example.agent.interfaces.NotificationConnector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -19,7 +19,7 @@ public class ConnectorRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(ConnectorRegistry.class);
 
-    private final ConnectorProperties connectorProperties;
+    private final ConnectorProperties connectorProperties = new ConnectorProperties();
     private final AutowireCapableBeanFactory beanFactory;
 
     /**

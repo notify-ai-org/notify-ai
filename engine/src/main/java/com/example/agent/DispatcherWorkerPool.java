@@ -32,7 +32,6 @@ import lombok.RequiredArgsConstructor;
 public class DispatcherWorkerPool implements Runnable {
 
 
-    @ConfigurationProperties(prefix = "dispatcher")
     @Data
     public class DispatcherProperties {
 
@@ -42,15 +41,15 @@ public class DispatcherWorkerPool implements Runnable {
         private int pollBatchSize = 10;
 
          // Configurable flush interval (ms) and buffer size
-    private final long logFlushIntervalMs = 5000; // e.g., configurable via @Value or DispatcherProperties
-    private final int logBufferSize = 50;         // e.g., configurable via @Value or DispatcherProperties
+        private long logFlushIntervalMs = 5000; // e.g., configurable via @Value or DispatcherProperties
+        private int logBufferSize = 50;         // e.g., configurable via @Value or DispatcherProperties
 
         private int retryMaxAttempts = 5;
         private long retryBackoffMillis = 2000;
     }
 
 
-    private final DispatcherProperties properties;
+    private final DispatcherProperties properties = new DispatcherProperties();
     private final ApplicationContext context;
     private final WorkerSnapshotRepository workerSnapshotRepository;
 

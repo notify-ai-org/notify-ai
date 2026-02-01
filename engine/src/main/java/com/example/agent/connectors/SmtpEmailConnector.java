@@ -13,6 +13,7 @@ import jakarta.mail.internet.MimeMessage;
 import java.util.Map;
 
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
 
 import lombok.RequiredArgsConstructor;
@@ -33,7 +34,7 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
     private static final String ATTR_BCC = "bcc";
     private static final String ATTR_REPLY_TO = "replyTo";
 
-    private final JavaMailSender mailSender;
+    private final JavaMailSender mailSender = new JavaMailSenderImpl();
 
     private String from;              // default from
     private String fromName;          // optional personal name

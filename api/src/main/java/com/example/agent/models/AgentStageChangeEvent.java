@@ -1,5 +1,7 @@
 package com.example.agent.models;
 
+import com.example.agent.enums.AgentStage;
+
 import java.time.Instant;
 import java.util.Map;
 

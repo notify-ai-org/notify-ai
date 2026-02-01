@@ -3,14 +3,6 @@ package com.example.agent.tools;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
-import org.springframework.ai.document.Document;
-import org.springframework.ai.embedding.EmbeddingClient;
-import org.springframework.ai.vectorstore.PgVectorStore;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 import com.example.agent.AgentContextHolder;
@@ -28,8 +20,6 @@ import lombok.RequiredArgsConstructor;
 @Component
 @RequiredArgsConstructor
 public class ToolConfig {
-
-    private final VectorStore vectorStore;
 
     private static final Logger logger = Logger.getLogger(ToolConfig.class.getName());
 
@@ -77,7 +67,7 @@ public class ToolConfig {
                 toolContext.functionCallId().orElse("N/A")));
         // Query domain context knowledge
         AgentContext agentContext = AgentContextHolder.getContext();
-        return search(agentContext.getContent().text());
+        return agentContext.getContent().text();
     }
 
     @com.google.adk.tools.Annotations.Schema(name = "searchVocabulary", description = """
@@ -119,16 +109,6 @@ public class ToolConfig {
                 toolContext.functionCallId().orElse("N/A")));
         return ruleRepository.findAll();
     }
-
-    // @Tool(id = "search_documents", description = "Search for relevant documents
-    // in the knowledge base using semantic search.", scope = ToolScope.AGENT)
-    public String search(String query) {
-        List<Document> results = vectorStore.similaritySearch(query);
-        return results.stream()
-                .map(Document::getContent)
-                .collect(Collectors.joining("\n\n---\n\n"));
-    }
-
 
     
 }

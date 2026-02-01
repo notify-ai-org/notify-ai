@@ -13,18 +13,15 @@ public interface EventCaptureRepository extends JpaRepository<EventCapture, Stri
      * @param eventName The name/type of the event
      * @return List of EventCapture records for the given event name
      */
-    @Query("SELECT ec FROM EventCapture ec JOIN ec.event e WHERE e.type = :eventName ORDER BY ec.timestamp DESC")
+    @Query("SELECT ec FROM EventCapture ec WHERE ec.eventName = :eventName ORDER BY ec.occuredAt DESC")
     List<EventCapture> getHistory(@Param("eventName") String eventName);
     
     /**
      * Find all event captures for a specific event ID
      */
-    @Query("SELECT ec FROM EventCapture ec WHERE ec.event.id = :eventId ORDER BY ec.timestamp DESC")
+    @Query("SELECT ec FROM EventCapture ec WHERE ec.eventName = :eventId ORDER BY ec.occuredAt DESC")
     List<EventCapture> findByEventId(@Param("eventId") String eventId);
     
-    /**
-     * Find event captures by correlation ID
-     */
-    List<EventCapture> findByCorrelationId(String correlationId);
+
 }
 

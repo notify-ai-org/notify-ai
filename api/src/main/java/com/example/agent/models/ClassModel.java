@@ -124,4 +124,10 @@ public class ClassModel {
         this.methods = methods;
     }
 
+    public enum ClassType {
+        CLASS,
+        INTERFACE,
+        ENUM,
+        RECORD
+    }
 }

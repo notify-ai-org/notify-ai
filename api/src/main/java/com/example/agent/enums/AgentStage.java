@@ -1,4 +1,4 @@
-package com.example.agent.models;
+package com.example.agent.enums;
 
 /**
  * Represents the different stages an agent can be in during its lifecycle

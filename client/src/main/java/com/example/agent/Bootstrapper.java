@@ -2,8 +2,8 @@ package com.example.agent;
 
 import com.example.agent.config.NotifyProperties;
 import com.example.agent.models.ClassModel;
-import com.example.agent.models.dto.ClientRegistrationDto;
-import com.example.agent.models.dto.TokenRefreshDto;
+import com.example.agent.models.ClientRegistrationDto;
+import com.example.agent.models.TokenRefreshDto;
 import com.example.agent.models.metadata.RuleMetadata;
 
 import jakarta.annotation.PreDestroy;

@@ -1,6 +1,8 @@
 package com.example.agent.models;
 
 import jakarta.persistence.*;
+import lombok.Data;
+
 import java.time.Instant;
 
 /**
@@ -11,6 +13,7 @@ import java.time.Instant;
 @Table(name = "domain_content", indexes = {
     @Index(name = "idx_domain_content_client_type", columnList = "clientId, type", unique = true)
 })
+@Data
 public class DomainContentEntity {
 
     public enum Type { VOCABULARY, RULES, FULL }
@@ -38,16 +41,4 @@ public class DomainContentEntity {
     @PreUpdate
     public void touch() { updatedAt = Instant.now(); }
 
-    public String getId() { return id; }
-    public void setId(String id) { this.id = id; }
-    public String getClientId() { return clientId; }
-    public void setClientId(String clientId) { this.clientId = clientId; }
-    public Type getType() { return type; }
-    public void setType(Type type) { this.type = type; }
-    public String getContentJson() { return contentJson; }
-    public void setContentJson(String contentJson) { this.contentJson = contentJson; }
-    public String getVersion() { return version; }
-    public void setVersion(String version) { this.version = version; }
-    public Instant getUpdatedAt() { return updatedAt; }
-    public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
 }

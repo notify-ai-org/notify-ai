@@ -20,8 +20,8 @@ public class SecurityConfig {
         http
             .csrf(AbstractHttpConfigurer::disable)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(a -> a.anyRequest().permitAll())
-            .addFilterBefore(agentAuthFilter, UsernamePasswordAuthenticationFilter.class);
+            .authorizeHttpRequests(a -> a.anyRequest().permitAll());
+           // .addFilterBefore(agentAuthFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 }
