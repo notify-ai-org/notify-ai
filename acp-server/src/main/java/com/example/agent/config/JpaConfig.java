@@ -8,7 +8,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
-import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 
@@ -20,11 +19,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
-@EnableJpaRepositories(
-    basePackages = "com.example.agent", // your repository package
-    entityManagerFactoryRef = "entityManagerFactory",
-    transactionManagerRef = "transactionManager"
-)
+@EnableJpaRepositories(basePackages = "com.example.agent", // your repository package
+        entityManagerFactoryRef = "entityManagerFactory", transactionManagerRef = "transactionManager")
 @EntityScan(basePackages = "com.example.agent.models")
 public class JpaConfig {
 
@@ -67,8 +63,7 @@ public class JpaConfig {
     // ------------------------
     @Bean(name = "transactionManager")
     public JpaTransactionManager transactionManager(
-            @Qualifier("entityManagerFactory") EntityManagerFactory entityManagerFactory
-    ) {
+            @Qualifier("entityManagerFactory") EntityManagerFactory entityManagerFactory) {
         return new JpaTransactionManager(entityManagerFactory);
     }
 
@@ -94,4 +89,3 @@ public class JpaConfig {
         return props;
     }
 }
-

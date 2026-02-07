@@ -1,64 +1,55 @@
-package com.example.agent.util;
+package com.example.agent.service;
 
-public class SimpleMemorySummarizer implements MemorySummarizer {
+import com.example.agent.MemoryPageRepository;
+import com.example.agent.enums.PageType;
+import com.example.agent.interfaces.MemoryAssembler;
+import com.example.agent.records.EntityRef;
+import com.example.agent.records.Fact;
+import com.example.agent.records.MemoryPage;
+import com.example.agent.records.VectorCandidate;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class DefaultMemoryAssembler implements MemoryAssembler {
 
     private final Duration windowSize;
     private final Duration inactivityTimeout;
     private final int maxFactsPerPage;
 
     private final MemoryPageRepository pageRepo;
-    private final MemorySummarizer summarizer;
 
-    public SimpleMemorySummarizer(
+    public DefaultMemoryAssembler(
             Duration windowSize,
             Duration inactivityTimeout,
             int maxFactsPerPage,
-            MemoryPageRepository pageRepo
-    ) {
+            MemoryPageRepository pageRepo) {
 
         this.windowSize = windowSize;
         this.inactivityTimeout = inactivityTimeout;
         this.maxFactsPerPage = maxFactsPerPage;
         this.pageRepo = pageRepo;
-        this.summarizer = summarizer;
     }
 
     @Override
     public String incrementalUpdate(MemoryPage page, Fact newFact) {
-        if (page.summary == null) {
+        if (page.summary() == null) {
             return "- " + renderFact(newFact);
         }
-        return page.summary + "\n- " + renderFact(newFact);
+        return page.summary() + "\n- " + renderFact(newFact);
     }
 
     @Override
-    public String summarize(MemoryPage page) {
-        return page.summary; // or call LLM here
-    }
-
-    private String renderFact(Fact f) {
-        return f.subject + " " + f.predicate + " " + f.object;
-    }
-
-    private String resolveNamespace(Fact fact) {
-        if (fact.subject != null) {
-            return fact.subject; // e.g. "notification:n123"
-        }
-        if (fact.correlationId != null) {
-            return "correlation:" + fact.correlationId;
-        }
-        return "tenant:" + fact.tenantId;
-    }
-
     public List<MemoryPage> buildPages(List<Fact> newFacts) {
         if (newFacts == null || newFacts.isEmpty()) {
             return List.of();
         }
 
         // 1. Group facts by namespace
-        Map<String, List<Fact>> byNamespace =
-                newFacts.stream()
-                        .collect(Collectors.groupingBy(this::resolveNamespace));
+        Map<String, List<Fact>> byNamespace = newFacts.stream()
+                .collect(Collectors.groupingBy(Fact::factType));
 
         List<MemoryPage> updatedPages = new ArrayList<>();
 
@@ -67,7 +58,7 @@ public class SimpleMemorySummarizer implements MemorySummarizer {
             List<Fact> facts = entry.getValue();
 
             // Sort facts by time (important for determinism)
-            facts.sort(Comparator.comparing(f -> f.observedAt));
+            facts.sort(Comparator.comparing(f -> f.observedAt()));
 
             for (Fact fact : facts) {
                 MemoryPage page = findOrCreatePage(namespace, fact);
@@ -79,19 +70,29 @@ public class SimpleMemorySummarizer implements MemorySummarizer {
         return updatedPages;
     }
 
+    private void appendFact(MemoryPage page, Fact fact) {
+        page.updatedAt() = fact.observedAt();
+        // Incremental summary (cheap) or defer until close
+        page.summary() = incrementalUpdate(page, fact);
+        pageRepo.save(page);
+    }
 
-    private MemoryPage findOrCreatePage(String namespace, Fact fact) {
+    @Override
+    public String summarize(MemoryPage page) {
+        // TODO: call LLM to produce a human-readable summary
+        return "Summary of facts in " + page.namespace + " (window " + page.windowStart + ")";
+    }
 
-        Instant now = fact.observedAt;
+    @Override
+    public MemoryPage findOrCreatePage(String namespace, Fact fact) {
+        Instant now = fact.observedAt();
         Instant windowStart = alignToWindow(now);
 
         // Try to find an open page
-        Optional<MemoryPage> open =
-                pageRepo.findOpenPage(namespace, windowStart);
+        Optional<MemoryPage> open = pageRepo.findOpenPage(namespace, windowStart);
 
         if (open.isPresent()) {
             MemoryPage page = open.get();
-
             if (shouldClose(page, fact)) {
                 closePage(page);
             } else {
@@ -106,13 +107,22 @@ public class SimpleMemorySummarizer implements MemorySummarizer {
         page.namespace = namespace;
         page.windowStart = windowStart;
         page.windowEnd = windowStart.plus(windowSize);
-        page.factIds = new ArrayList<>();
         page.createdAt = Instant.now();
 
         pageRepo.save(page);
         return page;
     }
 
+    @Override
+    public List<VectorCandidate> search(
+            String tenantId,
+            String queryText,
+            List<EntityRef> scope,
+            Set<PageType> pageTypes,
+            Instant since,
+            int k) {
+        return null;
+    }
 
     private Instant alignToWindow(Instant time) {
         long epoch = time.getEpochSecond();
@@ -126,10 +136,6 @@ public class SimpleMemorySummarizer implements MemorySummarizer {
     }
 
     private boolean shouldClose(MemoryPage page, Fact incoming) {
-
-        if (page.factIds.size() >= maxFactsPerPage) {
-            return true;
-        }
 
         Instant lastFactTime = page.lastUpdatedAt;
         if (lastFactTime != null &&
@@ -152,9 +158,8 @@ public class SimpleMemorySummarizer implements MemorySummarizer {
         pageRepo.save(page);
 
         // Optionally: finalize summary
-        page.summary = summarizer.summarize(page);
+        page.summary = summarize(page);
         pageRepo.save(page);
     }
-
 
 }

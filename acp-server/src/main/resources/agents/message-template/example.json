@@ -1,0 +1,24 @@
+{
+  "input": {
+    "eventType": "com.example.order.created",
+    "description": "An event representing the creation of a customer order.",
+    "payload": {
+      "orderId": "1234567890",
+      "orderAmount": 100,
+      "orderStatus": "PLACED"
+    },
+    "occuredAt": "2024-05-10T09:15:00Z"
+  },
+  "output": [
+    {
+      "channel": "EMAIL",
+      "subject": "customer",
+      "template": "Dear Customer, your order (Order ID: ORD-10001) placed on 2024-05-10 has been received.\n       The order amount is $299.99."
+    },
+    {
+      "channel": "SMS",
+      "subject": "customer",
+      "template": "Order ORD-10001 has been created on 2024-05-10. Total: $299.99."
+    }
+  ]
+}

@@ -13,14 +13,14 @@ public class Event {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
-    private String name;              // e.g. "ORDER_PLACED", "PAYMENT_FAILED"
+    private String name; // e.g. "ORDER_PLACED", "PAYMENT_FAILED"
 
-    private String description;       // event description
+    private String description; // event description
 
-    private int priority;             // resolve conflicts, tie-breaker
+    private int priority; // resolve conflicts, tie-breaker
 
     @Enumerated(EnumType.STRING)
-    private EventStatus status;       // NEW, PROCESSED, FAILED
+    private EventStatus status; // NEW, PROCESSED, FAILED
 
     // Optional correlation for deduplication/grouping
     private String correlationId;
@@ -28,6 +28,8 @@ public class Event {
     private String scheduleIntent;
 
     private String preferredTimeWindow;
+
+    private String eventType;
 
     // One-to-many relationship with EventCapture
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
@@ -41,4 +43,3 @@ public class Event {
     }
 
 }
-

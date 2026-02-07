@@ -1,0 +1,37 @@
+package com.example.agent.interfaces;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+
+import com.example.agent.enums.PageType;
+import com.example.agent.records.EntityRef;
+import com.example.agent.records.Fact;
+import com.example.agent.records.MemoryPage;
+import com.example.agent.records.VectorCandidate;
+
+public interface MemoryAssembler {
+
+    /**
+     * Incrementally update page summary with a new fact.
+     * Should be cheap or no-op.
+     */
+    String incrementalUpdate(MemoryPage page, Fact newFact);
+
+    /**
+     * Build a final narrative summary when page closes.
+     */
+    String summarize(MemoryPage page);
+
+    List<MemoryPage> buildPages(List<Fact> newFacts);
+
+    MemoryPage findOrCreatePage(String namespace, Fact fact);
+
+    List<VectorCandidate> search(
+            String tenantId,
+            String queryText,
+            List<EntityRef> scope,
+            Set<PageType> pageTypes,
+            Instant since,
+            int k);
+}

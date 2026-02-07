@@ -1,0 +1,22 @@
+{
+  "input": {
+    "clientId": "order-service",
+    "sourceType": "NOTIFICATION_LOG",
+    "rawLogs": [
+      "2026-01-02T10:11:12Z correlationId=abc123 channel=email target=user@example.com result=FAILED error=SMTP 550 mailbox unavailable eventType=ORDER_PLACED",
+      "{\"timestamp\":\"2026-01-02T10:11:20Z\",\"correlationId\":\"abc123\",\"channel\":\"email\",\"target\":\"user@example.com\",\"result\":\"SUCCESS\",\"eventType\":\"ORDER_PLACED\"}"
+    ]
+  },
+  "output": [
+    {
+      "factId": "f1",
+      "factType": "NOTIFICATION_DELIVERY_FAILURE",
+      "sentence": "Email delivery failed for event ORDER_PLACED to user@example.com (SMTP 550 mailbox unavailable).",
+      "observedAt": "2026-01-02T10:11:12Z",
+      "confidence": 0.9,
+      "importance": 0.7,
+      "ttlDays": 30,
+      "sourceEventIds": []
+    }
+  ]
+}

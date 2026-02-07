@@ -1,33 +1,41 @@
 package com.example.agent.service;
 
+import com.example.agent.FactRepository;
+import com.example.agent.MemoryPageRepository;
+import com.example.agent.consumers.FactConsumer;
+import com.example.agent.interfaces.MemoryAssembler;
+import com.example.agent.records.Fact;
+import com.example.agent.records.MemoryPage;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class LogToMemoryAgentWorker implements Runnable {
 
-    private final BlockingQueue<RawLogEnvelope> queue;
+    private final BlockingQueue<RawLog> queue;
     private final AtomicBoolean running = new AtomicBoolean(true);
 
-    private final LogPreprocessor preprocessor;
-    private final LlmFactExtractor factExtractor;
-    private final FactStore factStore;
-    private final MemoryPageAssembler pageAssembler;
-    private final MemoryStore memoryStore;
+    private final FactConsumer factExtractor;
+    private final FactRepository factStore;
+    private final MemoryAssembler pageAssembler;
+    private final MemoryPageRepository memoryStore;
 
     private final int maxBatchSize;
     private final long flushDelayMs;
 
     public LogToMemoryAgentWorker(
-            BlockingQueue<RawLogEnvelope> queue,
-            LogPreprocessor preprocessor,
-            LlmFactExtractor factExtractor,
-            FactStore factStore,
-            MemoryPageAssembler pageAssembler,
-            MemoryStore memoryStore,
+            BlockingQueue<RawLog> queue,
+            FactConsumer factExtractor,
+            FactRepository factStore,
+            MemoryAssembler pageAssembler,
+            MemoryPageRepository memoryStore,
             int maxBatchSize,
             long flushDelayMs) {
 
         this.queue = queue;
-        this.preprocessor = preprocessor;
         this.factExtractor = factExtractor;
         this.factStore = factStore;
         this.pageAssembler = pageAssembler;
@@ -38,15 +46,16 @@ public class LogToMemoryAgentWorker implements Runnable {
 
     @Override
     public void run() {
-        List<RawLogEnvelope> batch = new ArrayList<>(maxBatchSize);
+        List<RawLog> batch = new ArrayList<>(maxBatchSize);
         long lastFlush = System.currentTimeMillis();
 
         while (running.get()) {
             try {
-                RawLogEnvelope item = queue.poll(200, TimeUnit.MILLISECONDS);
+                RawLog item = queue.poll(200, TimeUnit.MILLISECONDS);
                 long now = System.currentTimeMillis();
 
-                if (item != null) batch.add(item);
+                if (item != null)
+                    batch.add(item);
 
                 boolean sizeFlush = batch.size() >= maxBatchSize;
                 boolean timeFlush = !batch.isEmpty() && (now - lastFlush) >= flushDelayMs;
@@ -68,7 +77,10 @@ public class LogToMemoryAgentWorker implements Runnable {
 
         // drain on shutdown
         if (!batch.isEmpty()) {
-            try { processBatch(batch); } catch (Exception ignored) {}
+            try {
+                processBatch(batch);
+            } catch (Exception ignored) {
+            }
         }
     }
 
@@ -76,14 +88,15 @@ public class LogToMemoryAgentWorker implements Runnable {
         running.set(false);
     }
 
-    private void processBatch(List<RawLogEnvelope> rawBatch) {
+    private void processBatch(List<RawLog> rawBatch) {
         // 1) preprocess
         List<PreprocessedLog> cleaned = rawBatch.stream()
                 .map(preprocessor::clean)
                 .filter(Objects::nonNull)
                 .toList();
 
-        if (cleaned.isEmpty()) return;
+        if (cleaned.isEmpty())
+            return;
 
         // 2) LLM → facts
         List<Fact> facts = factExtractor.extractFacts(cleaned);

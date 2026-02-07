@@ -3,14 +3,26 @@ package com.example.agent.config;
 import com.example.agent.AgentLogRepository;
 import com.example.agent.AgentOrchestrator;
 import com.example.agent.AgentSnapshotRepository;
-import com.example.agent.EventRepository;
-import com.example.agent.RuleRepository;
-import com.example.agent.VocabularyRepository;
-import com.example.agent.agents.MessageTemplateAgent;
 import com.example.agent.service.SessionService;
-import com.example.agent.tools.ToolConfig;
+import com.example.agent.util.SchemaUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.adk.agents.LlmAgent;
+import com.google.adk.examples.Example;
+import com.google.genai.types.Content;
+import com.google.genai.types.Part;
+import com.google.genai.types.Schema;
+import com.google.genai.types.Type;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -18,6 +30,18 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AgentRegistry {
 
     private final Map<String, String> registry = new ConcurrentHashMap<>();
+    private final ResourceLoader resourceLoader;
+
+    // Constants for Agent IDs
+    public static final String MESSAGE_TEMPLATE_AGENT_ID = "MessageTemplate";
+    public static final String EVENT_SCHEDULER_AGENT_ID = "EventScheduler";
+    public static final String RULE_PROCESSOR_AGENT_ID = "RuleProcessor";
+    public static final String EVENT_PROCESSOR_AGENT_ID = "EventProcessor";
+    public static final String LOG_TO_FACTS_AGENT_ID = "LogToFacts";
+
+    public AgentRegistry(ResourceLoader resourceLoader) {
+        this.resourceLoader = resourceLoader;
+    }
 
     public void put(String name, String id) {
         registry.put(name, id);
@@ -28,58 +52,245 @@ public class AgentRegistry {
     }
 
     @Bean
-    public AgentOrchestrator agentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,SessionService sessionService) {
-        return new AgentOrchestrator(snapshotRepo, logRepo,sessionService);
-    }
-
-    // ==== Agent Name Constants ====
-    public static final String MESSAGE_TEMPLATE_AGENT_ID = "MessageTemplate";
-    public static final String EVENT_SCHEDULER_AGENT_ID = "EventScheduler";
-    public static final String RULE_PROCESSOR_AGENT_ID = "RuleProcessor";
-    public static final String EVENT_PROCESSOR_AGENT_ID = "EventProcessor";
-
-    // ==== EventProcessorAgent Bean ====
-    @Bean
-    public com.example.agent.agents.EventProcessorAgent eventProcessorAgent(
-            AgentOrchestrator orchestrator,
-            EventRepository eventRepository,
-            ToolConfig veToolConfig,
-            RuleRepository vocabularyRepository) {
-        com.example.agent.agents.EventProcessorAgent agent =
-            new com.example.agent.agents.EventProcessorAgent(eventRepository, vocabularyRepository,veToolConfig);
-        String id = orchestrator.registerAgent(agent.getEventProcessorAgent());
-        registry.put(EVENT_PROCESSOR_AGENT_ID, id);
-        return agent;
+    public AgentOrchestrator agentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,
+            SessionService sessionService) {
+        return new AgentOrchestrator(snapshotRepo, logRepo, sessionService);
     }
 
     @Bean
-    public MessageTemplateAgent messageTemplateAgent(AgentOrchestrator orchestrator) {
-        MessageTemplateAgent agent = new MessageTemplateAgent();
-        String id = orchestrator.registerAgent(agent.createMessageTemplateGenerator());
-        registry.put("MessageTemplate", id);
-        return agent;
+    public ApplicationRunner agentLoader(AgentOrchestrator agentOrchestrator) {
+        return args -> {
+            loadAgents(agentOrchestrator);
+        };
     }
 
-    @Bean
-    public com.example.agent.agents.EventSchedulerAgent eventSchedulerAgent(
-            AgentOrchestrator orchestrator,
-            EventRepository eventRepository) {
-        com.example.agent.agents.EventSchedulerAgent agent = new com.example.agent.agents.EventSchedulerAgent();
-        String id = orchestrator.registerAgent(agent.getSummarizerAgent());
-        registry.put("EventScheduler", id);
-        return agent;
+    private void loadAgents(AgentOrchestrator agentOrchestrator) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            Resource resource = resourceLoader.getResource("classpath:agents/agents.json");
+            List<AgentConfig> configs;
+            try (InputStream is = resource.getInputStream()) {
+                configs = mapper.readValue(is, new TypeReference<List<AgentConfig>>() {
+                });
+            }
+
+            for (AgentConfig config : configs) {
+                try {
+                    Class<?> inputClass = Class.forName(config.getInputClass());
+                    Class<?> outputClass = Class.forName(config.getOutputClass());
+
+                    Schema inputSchema = SchemaUtil.schemaForClass(inputClass, config.getInputSchemaTitle(),
+                            config.getInputSchemaDescription());
+
+                    Schema outputSchema;
+                    if ("ARRAY".equalsIgnoreCase(config.getOutputType())) {
+                        outputSchema = Schema.builder()
+                                .title(config.getOutputSchemaTitle())
+                                .type(Type.Known.ARRAY)
+                                .description(config.getOutputSchemaDescription())
+                                .items(SchemaUtil.schemaForClass(outputClass, config.getOutputSchemaTitle() + "Item",
+                                        "Item for " + config.getOutputSchemaTitle()))
+                                .build();
+                    } else {
+                        outputSchema = SchemaUtil.schemaForClass(outputClass, config.getOutputSchemaTitle(),
+                                config.getOutputSchemaDescription());
+                    }
+
+                    String prompt = loadPrompt(config.getResourcePath() + "/prompt.md");
+                    Example example = loadSingleExample(config.getResourcePath() + "/example.json");
+
+                    LlmAgent agent = LlmAgent.builder()
+                            .name(config.getName())
+                            .description(config.getDescription())
+                            .inputSchema(inputSchema)
+                            .outputSchema(outputSchema)
+                            .instruction(prompt)
+                            .exampleProvider(example)
+                            .tools(Collections.emptyList())
+                            .outputKey(config.getOutputKey())
+                            .build();
+
+                    String id = agentOrchestrator.registerAgent(agent);
+                    registry.put(config.getId(), id);
+                    System.out.println("Registered agent: " + config.getId() + " (" + config.getName()
+                            + ") with System ID: " + id);
+
+                } catch (Exception e) {
+                    System.err.println("Failed to load agent: " + config.getName() + " Error: " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+
+        } catch (Exception e) {
+            System.err.println("Failed to load agents from agents.json");
+            e.printStackTrace();
+        }
     }
 
-    @Bean
-    public com.example.agent.agents.RuleProcessorAgent ruleProcessorAgent(
-            AgentOrchestrator orchestrator,
-            RuleRepository ruleRepository,
-            VocabularyRepository vocabularyRepository) {
-        com.example.agent.agents.RuleProcessorAgent agent = new com.example.agent.agents.RuleProcessorAgent(
-                ruleRepository, vocabularyRepository);
-        String id = orchestrator.registerAgent(agent.getRuleProcessorAgent());
-        registry.put("RuleProcessor", id);
-        return agent;
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    public static String loadPrompt(String resourcePath) {
+        try (InputStream is = getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new IllegalStateException("Prompt resource not found: " + resourcePath);
+            }
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load prompt: " + resourcePath, e);
+        }
     }
 
+    /**
+     * Load a single Example from a JSON file with shape:
+     * { "input": {...}, "output": {... or [...] } }
+     */
+    public static Example loadSingleExample(String resourcePath) {
+        try (InputStream is = getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                throw new IllegalStateException("Example resource not found: " + resourcePath);
+            }
+            Map<String, Object> root = MAPPER.readValue(is, new TypeReference<Map<String, Object>>() {
+            });
+
+            String inputJson = MAPPER.writeValueAsString(root.get("input"));
+            String outputJson = MAPPER.writeValueAsString(root.get("output"));
+
+            Content input = Content.fromParts(Part.fromText(inputJson));
+            Content output = Content.fromParts(Part.fromText(outputJson));
+
+            return Example.builder()
+                    .input(input)
+                    .output(List.of(output))
+                    .build();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to load example: " + resourcePath, e);
+        }
+    }
+
+    private static InputStream getResourceAsStream(String path) {
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        if (cl == null)
+            cl = AgentRegistry.class.getClassLoader();
+        return cl.getResourceAsStream(path);
+    }
+
+    public static class AgentConfig {
+        private String id;
+        private String name;
+        private String description;
+        private String resourcePath;
+        private String inputSchemaTitle;
+        private String inputSchemaDescription;
+        private String inputClass;
+        private String outputSchemaTitle;
+        private String outputSchemaDescription;
+        private String outputClass;
+        private String outputType;
+        private List<String> tools;
+        private String outputKey;
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public void setDescription(String description) {
+            this.description = description;
+        }
+
+        public String getResourcePath() {
+            return resourcePath;
+        }
+
+        public void setResourcePath(String resourcePath) {
+            this.resourcePath = resourcePath;
+        }
+
+        public String getInputSchemaTitle() {
+            return inputSchemaTitle;
+        }
+
+        public void setInputSchemaTitle(String inputSchemaTitle) {
+            this.inputSchemaTitle = inputSchemaTitle;
+        }
+
+        public String getInputSchemaDescription() {
+            return inputSchemaDescription;
+        }
+
+        public void setInputSchemaDescription(String inputSchemaDescription) {
+            this.inputSchemaDescription = inputSchemaDescription;
+        }
+
+        public String getInputClass() {
+            return inputClass;
+        }
+
+        public void setInputClass(String inputClass) {
+            this.inputClass = inputClass;
+        }
+
+        public String getOutputSchemaTitle() {
+            return outputSchemaTitle;
+        }
+
+        public void setOutputSchemaTitle(String outputSchemaTitle) {
+            this.outputSchemaTitle = outputSchemaTitle;
+        }
+
+        public String getOutputSchemaDescription() {
+            return outputSchemaDescription;
+        }
+
+        public void setOutputSchemaDescription(String outputSchemaDescription) {
+            this.outputSchemaDescription = outputSchemaDescription;
+        }
+
+        public String getOutputClass() {
+            return outputClass;
+        }
+
+        public void setOutputClass(String outputClass) {
+            this.outputClass = outputClass;
+        }
+
+        public String getOutputType() {
+            return outputType;
+        }
+
+        public void setOutputType(String outputType) {
+            this.outputType = outputType;
+        }
+
+        public List<String> getTools() {
+            return tools;
+        }
+
+        public void setTools(List<String> tools) {
+            this.tools = tools;
+        }
+
+        public String getOutputKey() {
+            return outputKey;
+        }
+
+        public void setOutputKey(String outputKey) {
+            this.outputKey = outputKey;
+        }
+    }
 }

@@ -1,5 +1,7 @@
-package com.example.agent;
+package com.example.agent.util;
 
+import com.example.agent.AgentLogRepository;
+import com.example.agent.AgentSnapshotRepository;
 import com.example.agent.enums.AgentStage;
 import com.example.agent.models.AgentStageChangeEvent;
 import com.example.agent.service.SessionService;
@@ -56,7 +58,7 @@ public class AgentWrapper {
     private final ReentrantLock lock = new ReentrantLock();
 
     public AgentWrapper(String agentId, BaseAgent agent, AgentSnapshotRepository snapshotRepo,
-            AgentLogRepository logRepo, JedisPool jedisPool,SessionService sessionService) {
+            AgentLogRepository logRepo, JedisPool jedisPool, SessionService sessionService) {
         this.agentId = agentId;
         this.agent = agent;
         this.currentStage = new AtomicReference<>(AgentStage.CREATED);
@@ -121,7 +123,7 @@ public class AgentWrapper {
         }
 
         // --- Setup Runner and Session ---
-        Runner runner = new Runner(this.agent, taskId,new InMemoryArtifactService(),sessionService);
+        Runner runner = new Runner(this.agent, taskId, new InMemoryArtifactService(), sessionService);
         Session session = context.session();
         logger.info(() -> String.format("Initial session state: %s", session.state()));
 
@@ -323,15 +325,16 @@ public class AgentWrapper {
             Map<String, Object> meta, String eventContent) {
         try {
             String metaJson = meta != null ? mapper.writeValueAsString(meta) : null;
-            AgentLog log = new AgentLog(
-                    agentId,
-                    Instant.now(),
-                    type,
-                    prev,
-                    curr,
-                    reason,
-                    metaJson,
-                    eventContent);
+            AgentLog log = AgentLog.builder()
+                    .agentId(agentId)
+                    .timestamp(Instant.now())
+                    .type(type)
+                    .previousStage(prev)
+                    .currentStage(curr)
+                    .reason(reason)
+                    .metadata(metaJson)
+                    .eventContent(eventContent)
+                    .build();
             if (logRepo != null) {
                 logRepo.save(log);
             }

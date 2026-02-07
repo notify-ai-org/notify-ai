@@ -3,6 +3,7 @@ package com.example.agent;
 import com.example.agent.enums.AgentStage;
 import com.example.agent.models.AgentStageChangeEvent;
 import com.example.agent.service.SessionService;
+import com.example.agent.util.AgentWrapper;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.events.Event;
@@ -65,12 +66,14 @@ public class AgentOrchestrator {
     private final JedisPool jedisPool;
     private final SessionService sessionService;
 
-    public AgentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,SessionService sessionService) {
-        this(10, 300000, true, snapshotRepo, logRepo,sessionService); // Default: 10 agents, 5 min timeout, auto cleanup
+    public AgentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,
+            SessionService sessionService) {
+        this(10, 300000, true, snapshotRepo, logRepo, sessionService); // Default: 10 agents, 5 min timeout, auto
+                                                                       // cleanup
     }
 
     public AgentOrchestrator(int maxPoolSize, long agentTimeoutMillis, boolean autoCleanup,
-            AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,SessionService sessionService) {
+            AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo, SessionService sessionService) {
         this.maxPoolSize = maxPoolSize;
         this.agentTimeoutMillis = agentTimeoutMillis;
         this.autoCleanup = autoCleanup;
@@ -110,7 +113,7 @@ public class AgentOrchestrator {
         }
 
         String agentId = "agent_" + nextAgentId.getAndIncrement();
-        AgentWrapper wrapper = new AgentWrapper(agentId, agent, snapshotRepo, logRepo, jedisPool,sessionService);
+        AgentWrapper wrapper = new AgentWrapper(agentId, agent, snapshotRepo, logRepo, jedisPool, sessionService);
 
         agentPool.put(agentId, wrapper);
         availableAgents.put(agentId, wrapper);
