@@ -1,20 +1,31 @@
 package com.example.agent.models;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.time.Instant;
 
 @Entity
 @Data
-public class EventExecutionLog {
-    
-    @Id private String id;
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+public class EventExecutionLog extends RawLog {
+
     private String eventId;
     private String ruleId;
-    private boolean matched;          // condition passed?
+    private boolean matched; // condition passed?
     private String evaluatedCondition;// actual evaluation result/expr trace
-    private Instant executedAt;
-    private String notes;             // debugging, overrides
+    private String notes; // debugging, overrides
+
+    @Deprecated
+    public Instant getExecutedAt() {
+        return getTimestamp();
+    }
+
+    @Deprecated
+    public void setExecutedAt(Instant executedAt) {
+        setTimestamp(executedAt);
+    }
 }

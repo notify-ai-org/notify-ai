@@ -1,0 +1,8 @@
+{
+    "input": {
+        "facts": "User 'john_doe' attempted to login 5 times with wrong password. Account 'john_doe' was locked for 30 minutes. Notification sent to security team."
+    },
+    "output": {
+        "summary": "User account 'john_doe' was locked for 30 minutes after multiple failed login attempts, and the security team was notified."
+    }
+}

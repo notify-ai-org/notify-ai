@@ -11,16 +11,28 @@ import jakarta.persistence.Id;
 
 @Entity
 public record MemoryPage(
-                @Id String pageId,
-                PageType pageType,
-                String summary, // already “memory-shaped”, not raw logs
-                Instant timestamp,
-                double importance,
-                double confidence,
-                Instant createdAt,
-                Instant updatedAt,
-                Set<String> tags,
-                List<EntityRef> scope,
-                String rawRef // pointer to cold storage (not inserted verbatim)
-) {
+        @Id String pageId,
+        String tenantId,
+        String namespace,
+        String correlationId,
+        PageType pageType,
+        String summary,
+        String severityMax,
+        Instant timestamp,
+        double importance,
+        double confidence,
+        Instant createdAt,
+        Instant updatedAt,
+        Set<String> tags,
+        List<EntityRef> scope,
+        String rawRef,
+        float[] embedding) {
+
+    /** Backward compatibility constructor for the old 11-field signature. */
+    public MemoryPage(String pageId, PageType pageType, String summary, Instant timestamp,
+            double importance, double confidence, Instant createdAt, Instant updatedAt,
+            Set<String> tags, List<EntityRef> scope, String rawRef) {
+        this(pageId, null, null, null, pageType, summary, null, timestamp,
+                importance, confidence, createdAt, updatedAt, tags, scope, rawRef, null);
+    }
 }

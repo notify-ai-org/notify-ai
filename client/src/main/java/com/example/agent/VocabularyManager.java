@@ -1,8 +1,13 @@
 package com.example.agent;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
+
+import com.example.agent.models.Vocabulary;
 
 import com.example.agent.models.AttributeModel;
 import com.example.agent.models.ClassModel;
@@ -22,6 +27,71 @@ public class VocabularyManager {
     }
 
     /**
+     * Build a root Vocabulary instance representing the instance graph.
+     * Each Vocabulary object's currentValue is set to the instance field's value.
+     */
+    public Vocabulary toInstanceVocabularyGraph(Object instance) {
+        if (instance == null)
+            return null;
+
+        Class<?> clazz = instance.getClass();
+        ModelMetadata metadata = annotationProcessor.getModels().stream()
+                .filter(m -> m.getModelClass().equals(clazz))
+                .findFirst()
+                .orElse(null);
+
+        Vocabulary root = new Vocabulary();
+        root.setTerm(clazz.getSimpleName());
+        root.setType("CLASS");
+        root.setCurrentValue(instance);
+        if (metadata != null) {
+            root.setDescription(metadata.getDescription());
+        }
+
+        Set<Object> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        visited.add(instance);
+        buildInstanceGraphInternal(instance, root, visited);
+        return root;
+    }
+
+    private void buildInstanceGraphInternal(Object instance, Vocabulary parent,
+            Set<Object> visited) {
+        if (instance == null)
+            return;
+
+        Class<?> clazz = instance.getClass();
+        ModelMetadata metadata = annotationProcessor.getModels().stream()
+                .filter(m -> m.getModelClass().equals(clazz))
+                .findFirst()
+                .orElse(null);
+
+        if (metadata == null)
+            return;
+
+        for (VocabularyFieldMetadata vf : metadata.getVocabularyFields()) {
+            Vocabulary v = new Vocabulary();
+            v.setTerm(vf.getName());
+            v.setDescription(vf.getDescription());
+            v.setType(vf.getField().getType().getSimpleName());
+            v.setParent(parent);
+            parent.getChildren().add(v);
+
+            try {
+                vf.getField().setAccessible(true);
+                Object val = vf.getField().get(instance);
+                v.setCurrentValue(val);
+
+                // If the value is another @Model, recurse
+                if (val != null && visited.add(val)) {
+                    buildInstanceGraphInternal(val, v, visited);
+                }
+            } catch (IllegalAccessException e) {
+                // Silently skip if we can't access
+            }
+        }
+    }
+
+    /**
      * Build ClassModelDto list from @Model classes and their @Vocabulary fields.
      */
     public List<ClassModel> toClassModelDtoList() {
@@ -32,10 +102,12 @@ public class VocabularyManager {
             dto.setPackageName(c.getPackage() != null ? c.getPackage().getName() : "");
             dto.setClassName(c.getSimpleName());
             dto.setClassDescription(model.getDescription());
-            //dto.setClassType("CLASS");
+            // dto.setClassType("CLASS");
             dto.setSuperClass(c.getSuperclass() != null && c.getSuperclass() != Object.class
-                ? c.getSuperclass().getName() : null);
-            dto.setInterfaces(java.util.Arrays.stream(c.getInterfaces()).map(Class::getName).collect(Collectors.toList()));
+                    ? c.getSuperclass().getName()
+                    : null);
+            dto.setInterfaces(
+                    java.util.Arrays.stream(c.getInterfaces()).map(Class::getName).collect(Collectors.toList()));
 
             List<AttributeModel> attrs = new ArrayList<>();
             for (VocabularyFieldMetadata vf : model.getVocabularyFields()) {

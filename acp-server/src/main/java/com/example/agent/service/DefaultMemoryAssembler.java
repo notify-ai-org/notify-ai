@@ -7,12 +7,22 @@ import com.example.agent.records.EntityRef;
 import com.example.agent.records.Fact;
 import com.example.agent.records.MemoryPage;
 import com.example.agent.records.VectorCandidate;
+import com.example.agent.AgentOrchestrator;
+import com.example.agent.config.AgentRegistry;
+import com.example.agent.models.dto.MemorySummarizationRequestDto;
+import com.example.agent.models.dto.MemorySummarizationResponseDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.genai.types.Content;
+import com.google.genai.types.Part;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Service
 public class DefaultMemoryAssembler implements MemoryAssembler {
 
     private final Duration windowSize;
@@ -20,17 +30,24 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
     private final int maxFactsPerPage;
 
     private final MemoryPageRepository pageRepo;
+    private final AgentOrchestrator orchestrator;
+    private final AgentRegistry agentRegistry;
+    private final ObjectMapper mapper = new ObjectMapper();
 
     public DefaultMemoryAssembler(
-            Duration windowSize,
-            Duration inactivityTimeout,
-            int maxFactsPerPage,
-            MemoryPageRepository pageRepo) {
+            @Value("${agent.memory.window-size:1h}") Duration windowSize,
+            @Value("${agent.memory.inactivity-timeout:30m}") Duration inactivityTimeout,
+            @Value("${agent.memory.max-facts:50}") int maxFactsPerPage,
+            MemoryPageRepository pageRepo,
+            AgentOrchestrator orchestrator,
+            AgentRegistry agentRegistry) {
 
         this.windowSize = windowSize;
         this.inactivityTimeout = inactivityTimeout;
         this.maxFactsPerPage = maxFactsPerPage;
         this.pageRepo = pageRepo;
+        this.orchestrator = orchestrator;
+        this.agentRegistry = agentRegistry;
     }
 
     @Override
@@ -58,29 +75,73 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
             List<Fact> facts = entry.getValue();
 
             // Sort facts by time (important for determinism)
-            facts.sort(Comparator.comparing(f -> f.observedAt()));
+            facts.sort(Comparator.comparing(Fact::observedAt));
 
             for (Fact fact : facts) {
                 MemoryPage page = findOrCreatePage(namespace, fact);
-                appendFact(page, fact);
-                updatedPages.add(page);
+                MemoryPage updatedPage = appendFact(page, fact);
+                updatedPages.add(updatedPage);
             }
         }
 
         return updatedPages;
     }
 
-    private void appendFact(MemoryPage page, Fact fact) {
-        page.updatedAt() = fact.observedAt();
-        // Incremental summary (cheap) or defer until close
-        page.summary() = incrementalUpdate(page, fact);
-        pageRepo.save(page);
+    private MemoryPage appendFact(MemoryPage page, Fact fact) {
+        // Create a new MemoryPage with updated fields (records are immutable)
+        String updatedSummary = incrementalUpdate(page, fact);
+
+        MemoryPage updatedPage = new MemoryPage(
+                page.pageId(),
+                fact.tenantId(),
+                page.namespace(),
+                fact.correlationId(),
+                page.pageType(),
+                updatedSummary,
+                page.severityMax(),
+                page.timestamp(),
+                page.importance(),
+                page.confidence(),
+                page.createdAt(),
+                fact.observedAt(), // updatedAt
+                page.tags(),
+                page.scope(),
+                page.rawRef(),
+                page.embedding());
+
+        pageRepo.upsert(updatedPage, Duration.ofDays(30));
+        return updatedPage;
     }
 
     @Override
     public String summarize(MemoryPage page) {
-        // TODO: call LLM to produce a human-readable summary
-        return "Summary of facts in " + page.namespace + " (window " + page.windowStart + ")";
+        if (page.summary() == null || page.summary().isBlank()) {
+            return "No facts to summarize.";
+        }
+
+        try {
+            MemorySummarizationRequestDto request = new MemorySummarizationRequestDto();
+            request.setFacts(page.summary());
+
+            String agentId = agentRegistry.get(AgentRegistry.MEMORY_SUMMARIZER_AGENT_ID);
+            Content prompt = Content.fromParts(Part.fromText(mapper.writeValueAsString(request)));
+
+            com.google.adk.events.Event event = orchestrator.executeTaskWithAgent(agentId, null, null, prompt)
+                    .blockingFirst();
+
+            if (event.content().isPresent() && event.content().get().parts().isPresent()) {
+                List<Part> parts = event.content().get().parts().get();
+                if (!parts.isEmpty() && parts.get(0).text().isPresent()) {
+                    String jsonResponse = parts.get(0).text().get();
+                    MemorySummarizationResponseDto response = mapper.readValue(jsonResponse,
+                            MemorySummarizationResponseDto.class);
+                    return response.getSummary();
+                }
+            }
+            return "Failed to parse summary from agent.";
+        } catch (Exception e) {
+            return "Error summarizing memory: " + e.getMessage();
+        }
     }
 
     @Override
@@ -100,16 +161,30 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
             }
         }
 
-        // Create a new page
-        MemoryPage page = new MemoryPage();
-        page.pageId = generatePageId(namespace, windowStart);
-        page.tenantId = fact.tenantId;
-        page.namespace = namespace;
-        page.windowStart = windowStart;
-        page.windowEnd = windowStart.plus(windowSize);
-        page.createdAt = Instant.now();
+        // Create a new page using the full record constructor
+        String pageId = generatePageId(namespace, windowStart);
+        Instant createdAt = Instant.now();
 
-        pageRepo.save(page);
+        MemoryPage page = new MemoryPage(
+                pageId,
+                fact.tenantId(),
+                namespace,
+                fact.correlationId(),
+                PageType.EPISODIC, // default page type for fact streams
+                null, // summary - will be built incrementally
+                null, // severityMax
+                windowStart, // timestamp
+                0.5, // default importance
+                0.8, // default confidence
+                createdAt,
+                createdAt, // updatedAt initially same as createdAt
+                new HashSet<>(), // empty tags
+                new ArrayList<>(), // empty scope
+                null, // no raw ref initially
+                null // no embedding initially
+        );
+
+        pageRepo.upsert(page, Duration.ofDays(30));
         return page;
     }
 
@@ -136,17 +211,19 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
     }
 
     private boolean shouldClose(MemoryPage page, Fact incoming) {
-
-        Instant lastFactTime = page.lastUpdatedAt;
+        // Use updatedAt from the record
+        Instant lastFactTime = page.updatedAt();
         if (lastFactTime != null &&
-                Duration.between(lastFactTime, incoming.observedAt)
+                Duration.between(lastFactTime, incoming.observedAt())
                         .compareTo(inactivityTimeout) > 0) {
             return true;
         }
 
         // Explicit boundary predicates
-        if ("completed".equalsIgnoreCase(incoming.predicate) ||
-                "dead_lettered".equalsIgnoreCase(incoming.predicate)) {
+        // Check if the fact sentence contains completion indicators
+        String sentence = incoming.sentence();
+        if (sentence != null && (sentence.toLowerCase().contains("completed") ||
+                sentence.toLowerCase().contains("dead_lettered"))) {
             return true;
         }
 
@@ -154,12 +231,33 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
     }
 
     private void closePage(MemoryPage page) {
-        page.closedAt = Instant.now();
-        pageRepo.save(page);
+        // Create a new page with closedAt timestamp and finalized summary
+        String finalSummary = summarize(page);
 
-        // Optionally: finalize summary
-        page.summary = summarize(page);
-        pageRepo.save(page);
+        MemoryPage closedPage = new MemoryPage(
+                page.pageId(),
+                page.tenantId(),
+                page.namespace(),
+                page.correlationId(),
+                page.pageType(),
+                finalSummary,
+                page.severityMax(),
+                page.timestamp(),
+                page.importance(),
+                page.confidence(),
+                page.createdAt(),
+                Instant.now(), // updatedAt set to now when closing
+                page.tags(),
+                page.scope(),
+                page.rawRef(),
+                page.embedding());
+
+        pageRepo.upsert(closedPage, Duration.ofDays(30));
     }
 
+    private String renderFact(Fact fact) {
+        return String.format("%s (at %s)",
+                fact.sentence(),
+                fact.observedAt());
+    }
 }

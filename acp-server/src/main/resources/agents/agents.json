@@ -73,5 +73,20 @@
         "outputType": "OBJECT",
         "tools": [],
         "outputKey": "ruleExpression"
+    },
+    {
+        "id": "MemorySummarizer",
+        "name": "Memory Summarization Agent",
+        "description": "Summarizes streams of facts into concise human-readable summaries.",
+        "resourcePath": "agents/memory-summarizer",
+        "inputSchemaTitle": "MemorySummarizationRequest",
+        "inputSchemaDescription": "Request for summarizing facts.",
+        "inputClass": "com.example.agent.models.dto.MemorySummarizationRequestDto",
+        "outputSchemaTitle": "MemorySummarizationResponse",
+        "outputSchemaDescription": "The generated summary.",
+        "outputClass": "com.example.agent.models.dto.MemorySummarizationResponseDto",
+        "outputType": "OBJECT",
+        "tools": [],
+        "outputKey": "summary"
     }
 ]

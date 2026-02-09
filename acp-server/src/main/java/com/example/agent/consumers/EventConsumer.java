@@ -17,7 +17,9 @@ import com.example.agent.models.EventSchedule;
 import com.example.agent.models.MessageTemplate;
 import com.example.agent.models.NotificationJob;
 import com.example.agent.models.NotificationJob.NotificationPriority;
+import com.example.agent.enums.DecisionType;
 import com.example.agent.records.DecisionRequest;
+import com.example.agent.records.EventRef;
 import com.example.agent.records.PromptPackage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -26,13 +28,13 @@ import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import com.example.agent.config.AgentRegistry;
 
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.core.Flowable;
-import io.reactivex.rxjava3.disposables.Disposable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -45,7 +47,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-@Component
 @RestController
 @RequestMapping("/api/event")
 public class EventConsumer {
@@ -57,7 +58,7 @@ public class EventConsumer {
     private final AgentOrchestrator agentOrchestrator;
     private final NotificationDispatcher notificationDispatcher;
     private final NotificationJobRepository notificationJobRepository;
-    private Disposable disposable;
+    private final CompositeDisposable disposables = new CompositeDisposable();
 
     private final RetrievalPlanner planner;
 
@@ -92,8 +93,8 @@ public class EventConsumer {
         try {
             List<EventCapture> captures = mapper.readValue(raw, new TypeReference<List<EventCapture>>() {
             });
-            processEventsWithAgent(captures)
-                    .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
+            Flux.from(processEventsWithAgent(captures))
+                    .collectList()
                     .subscribe(
                             events -> System.out.println("Processed " + events.size() + " event selection results"),
                             error -> System.err.println("Error processing events: " + error.getMessage()));
@@ -108,34 +109,25 @@ public class EventConsumer {
      * Accepts POST requests with event capture data.
      *
      * @param request The list of event captures
-     * @return ResponseEntity with status
+     * @return Mono<ResponseEntity> with status
      */
     @PostMapping
     @Transactional
-    public ResponseEntity<Map<String, Object>> processEvents(@RequestBody List<EventCapture> request) {
-        try {
-            if (request == null || request.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Event captures are required", "status", "BAD_REQUEST"));
-            }
-
-            processEventsWithAgent(request)
-                    .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
-                    .subscribe(
-                            events -> System.out
-                                    .println("REST: Processed " + events.size() + " event selection results"),
-                            error -> System.err.println("REST: Error processing events: " + error.getMessage()));
-
-            return ResponseEntity.accepted().body(Map.of(
-                    "message", "Event processing initiated for " + request.size() + " captures",
-                    "status", "PROCESSING"));
-
-        } catch (Exception e) {
-            System.err.println("Error processing REST event request: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to process event request: " + e.getMessage(),
-                            "status", "ERROR"));
+    public Mono<ResponseEntity<Map<String, Object>>> processEvents(@RequestBody List<EventCapture> request) {
+        if (request == null || request.isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body(Map.of("error", "Event captures are required", "status", "BAD_REQUEST")));
         }
+
+        Flux.from(processEventsWithAgent(request))
+                .collectList()
+                .subscribe(
+                        events -> System.out.println("REST: Processed " + events.size() + " event selection results"),
+                        error -> System.err.println("REST: Error processing events: " + error.getMessage()));
+
+        return Mono.just(ResponseEntity.accepted().body(Map.of(
+                "message", "Event processing initiated for " + request.size() + " captures",
+                "status", "PROCESSING")));
     }
 
     private Flowable<com.google.adk.events.Event> processEventsWithAgent(List<EventCapture> captures) {
@@ -156,8 +148,17 @@ public class EventConsumer {
                 }
 
                 DecisionRequest decisionRequest = new DecisionRequest(
-
-                );
+                        capture.getTenantId(),
+                        DecisionType.SCHEDULE,
+                        new ArrayList<>(),
+                        new EventRef(capture.getId(),
+                                capture.getEvent() != null ? capture.getEvent().getEventType() : "UNKNOWN", "INFO",
+                                capture.getTimestamp()),
+                        7,
+                        2000,
+                        5000,
+                        "en-US",
+                        "UTC");
                 PromptPackage promptPackage = assembler.assemble(decisionRequest, planner.plan(decisionRequest));
                 String prompt = promptPackage.systemPrompt() + "\n" + promptPackage.userPrompt();
 
@@ -258,7 +259,8 @@ public class EventConsumer {
         }
     }
 
-    private Disposable generateTemplatesAndSchedules(EventCapture capture, NotificationJob job) {
+    private io.reactivex.rxjava3.disposables.Disposable generateTemplatesAndSchedules(EventCapture capture,
+            NotificationJob job) {
         try {
             List<AgentTaskContext> tasks = new ArrayList<>();
             // Generate schedules and templates using agents

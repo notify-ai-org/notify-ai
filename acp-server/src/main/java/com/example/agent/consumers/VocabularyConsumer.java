@@ -14,13 +14,13 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
-import io.reactivex.rxjava3.disposables.Disposable;
-import jakarta.annotation.PreDestroy;
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import java.time.Duration;
@@ -29,10 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-@Component
 @RestController
 @RequestMapping("/api/vocabulary")
 public class VocabularyConsumer {
@@ -43,13 +41,12 @@ public class VocabularyConsumer {
     private final MessageTemplateRepository messageTemplateRepository;
     private final RuleRepository ruleRepository;
     private final AgentOrchestrator agentOrchestrator;
-    private Disposable disposable;
+    private final CompositeDisposable disposables = new CompositeDisposable();
 
-    @PreDestroy
+    // @PreDestroy - removing as we'll use a better way or just rely on
+    // CompositeDisposable
     public void onDestroy() {
-        if (disposable != null && !disposable.isDisposed()) {
-            disposable.dispose();
-        }
+        disposables.dispose();
     }
 
     // Configurable timeout or backpressure parameters
@@ -93,7 +90,8 @@ public class VocabularyConsumer {
             vocab.setDescription(classModel.getClassDescription());
             Vocabulary parent = repo.findByTermIgnoreCase(classModel.getSuperClass()).orElse(null);
             vocab.setParent(parent);
-            //vocab.setPath(parent == null ? vocab.getTerm() : parent.getPath() + "-" + vocab.getTerm());
+            // vocab.setPath(parent == null ? vocab.getTerm() : parent.getPath() + "-" +
+            // vocab.getTerm());
             repo.save(vocab);
         }
 
@@ -113,7 +111,8 @@ public class VocabularyConsumer {
             vocab.setDescription(classModel.getClassDescription());
             Vocabulary parent = repo.findByTermIgnoreCase(classModel.getSuperClass()).orElse(null);
             vocab.setParent(parent);
-            //vocab.setPath(parent == null ? vocab.getTerm() : parent.getPath() + "-" + vocab.getTerm());
+            // vocab.setPath(parent == null ? vocab.getTerm() : parent.getPath() + "-" +
+            // vocab.getTerm());
             repo.save(vocab);
         }
     }
@@ -128,21 +127,19 @@ public class VocabularyConsumer {
      */
     @PostMapping
     @Transactional
-    public ResponseEntity<Map<String, Object>> createVocabulary(@RequestBody List<ClassModel> classes) {
+    public Mono<ResponseEntity<Map<String, Object>>> createVocabulary(@RequestBody List<ClassModel> classes) {
+        if (classes == null || classes.isEmpty()) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body(Map.of("error", "Classes are required", "status", "BAD_REQUEST")));
+        }
         try {
-            if (classes == null || classes.isEmpty()) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Classes are required", "status", "BAD_REQUEST"));
-            }
             processClasses(classes);
-            return ResponseEntity.accepted().body(Map.of(
+            return Mono.just(ResponseEntity.accepted().body(Map.of(
                     "message", "Vocabulary processing initiated for " + classes.size() + " classes",
-                    "status", "PROCESSING"));
-
+                    "status", "PROCESSING")));
         } catch (Exception e) {
-            System.err.println("Error processing REST vocabulary request: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage(), "status", "ERROR"));
+            return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage(), "status", "ERROR")));
         }
     }
 
@@ -150,55 +147,49 @@ public class VocabularyConsumer {
      * REST endpoint to process a rule definition using the RuleProcessorAgent.
      * Converts natural language rule descriptions to executable expressions.
      *
-     * @param request The rule definition request containing eventName, ruleName, ruleDescription, and payload
+     * @param request The rule definition request containing eventName, ruleName,
+     *                ruleDescription, and payload
      * @return ResponseEntity with status
      */
     @PostMapping("/rules/process")
     @Transactional
-    public ResponseEntity<Map<String, Object>> processRule(@RequestBody Map<String, Object> request) {
-        try {
-            if (request == null) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Rule definition is required", "status", "BAD_REQUEST"));
-            }
-
-            String eventName = (String) request.get("eventName");
-            String ruleName = (String) request.get("ruleName");
-            String ruleDescription = (String) request.get("ruleDescription");
-            @SuppressWarnings("unchecked")
-            Map<String, Object> payload = (Map<String, Object>) request.get("payload");
-
-            if (eventName == null || ruleName == null || ruleDescription == null) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "eventName, ruleName, and ruleDescription are required", "status", "BAD_REQUEST"));
-            }
-
-            processRuleWithAgent(eventName, ruleName, ruleDescription, payload)
-                    .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
-                    .subscribe(
-                            events -> System.out.println("REST: Processed rule: " + ruleName),
-                            error -> System.err.println("REST: Error processing rule: " + error.getMessage()));
-
-            return ResponseEntity.accepted().body(Map.of(
-                    "message", "Rule processing initiated for: " + ruleName,
-                    "status", "PROCESSING"));
-
-        } catch (Exception e) {
-            System.err.println("Error processing REST rule request: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to process rule request: " + e.getMessage(),
-                            "status", "ERROR"));
+    public Mono<ResponseEntity<Map<String, Object>>> processRule(@RequestBody Map<String, Object> request) {
+        if (request == null) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body(Map.of("error", "Rule definition is required", "status", "BAD_REQUEST")));
         }
+
+        String eventName = (String) request.get("eventName");
+        String ruleName = (String) request.get("ruleName");
+        String ruleDescription = (String) request.get("ruleDescription");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> payload = (Map<String, Object>) request.get("payload");
+
+        if (eventName == null || ruleName == null || ruleDescription == null) {
+            return Mono.just(ResponseEntity.badRequest()
+                    .body(Map.of("error", "eventName, ruleName, and ruleDescription are required", "status",
+                            "BAD_REQUEST")));
+        }
+
+        Flux.from(processRuleWithAgent(eventName, ruleName, ruleDescription, payload))
+                .collectList()
+                .subscribe(
+                        events -> System.out.println("REST: Processed rule: " + ruleName),
+                        error -> System.err.println("REST: Error processing rule: " + error.getMessage()));
+
+        return Mono.just(ResponseEntity.accepted().body(Map.of(
+                "message", "Rule processing initiated for: " + ruleName,
+                "status", "PROCESSING")));
     }
 
     /**
      * Process a rule definition using the RuleProcessorAgent.
      * Converts natural language rule description to executable expression.
      *
-     * @param eventName Name of the event this rule applies to
-     * @param ruleName Name of the rule
+     * @param eventName       Name of the event this rule applies to
+     * @param ruleName        Name of the rule
      * @param ruleDescription Natural language description of the rule
-     * @param payload Example payload structure (optional)
+     * @param payload         Example payload structure (optional)
      * @return Flowable of agent events
      */
     private io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> processRuleWithAgent(
@@ -213,53 +204,56 @@ public class VocabularyConsumer {
             }
 
             String prompt = """
-                Convert the following natural language rule definition to an executable expression
-                using vocabulary terms from the database.
-                """;
+                    Convert the following natural language rule definition to an executable expression
+                    using vocabulary terms from the database.
+                    """;
 
             return agentOrchestrator.executeTaskWithAgent(
                     "RuleProcessor",
                     null,
                     null,
-                    Content.fromParts(Part.fromText(prompt), Part.fromText(mapper.writeValueAsString(ruleRequest)))
-            ).doOnNext(agentEvent -> {
-                if (agentEvent.content().isPresent()
-                        && agentEvent.content().get().parts().isPresent()
-                        && !agentEvent.content().get().parts().get().isEmpty()) {
-                    try {
-                        Optional<List<Part>> parts = agentEvent.content().get().parts();
-                        if (!parts.isPresent()) {
-                            return;
-                        }
-                        for (Part part : parts.get()) {
-                            if (part.text().isPresent()) {
-                                String json = part.text().get();
-                                // Parse the rule expression result
-                                Map<String, Object> ruleExpression = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
-                                
-                                // Create and save the rule
-                                Rule rule = new Rule();
-                                rule.setId(UUID.randomUUID().toString());
-                                rule.setName((String) ruleExpression.get("ruleName"));
-                                rule.setEventName(eventName);
-                                rule.setDescription(ruleDescription);
-                                rule.setConditionExpr((String) ruleExpression.get("conditionExpr"));
-                                rule.setEnabled(true);
-                                rule.setPriority(0); // Default priority
-                                
-                                ruleRepository.save(rule);
-                                System.out.println("Saved rule: " + rule.getName() + " with expression: " + rule.getConditionExpr());
+                    Content.fromParts(Part.fromText(prompt), Part.fromText(mapper.writeValueAsString(ruleRequest))))
+                    .doOnNext(agentEvent -> {
+                        if (agentEvent.content().isPresent()
+                                && agentEvent.content().get().parts().isPresent()
+                                && !agentEvent.content().get().parts().get().isEmpty()) {
+                            try {
+                                Optional<List<Part>> parts = agentEvent.content().get().parts();
+                                if (!parts.isPresent()) {
+                                    return;
+                                }
+                                for (Part part : parts.get()) {
+                                    if (part.text().isPresent()) {
+                                        String json = part.text().get();
+                                        // Parse the rule expression result
+                                        Map<String, Object> ruleExpression = mapper.readValue(json,
+                                                new TypeReference<Map<String, Object>>() {
+                                                });
+
+                                        // Create and save the rule
+                                        Rule rule = new Rule();
+                                        rule.setId(UUID.randomUUID().toString());
+                                        rule.setName((String) ruleExpression.get("ruleName"));
+                                        rule.setEventName(eventName);
+                                        rule.setDescription(ruleDescription);
+                                        rule.setConditionExpr((String) ruleExpression.get("conditionExpr"));
+                                        rule.setEnabled(true);
+                                        rule.setPriority(0); // Default priority
+
+                                        ruleRepository.save(rule);
+                                        System.out.println("Saved rule: " + rule.getName() + " with expression: "
+                                                + rule.getConditionExpr());
+                                    }
+                                }
+                            } catch (Exception e) {
+                                System.err.println("Error parsing rule processor output: " + e.getMessage());
+                                e.printStackTrace();
                             }
                         }
-                    } catch (Exception e) {
-                        System.err.println("Error parsing rule processor output: " + e.getMessage());
-                        e.printStackTrace();
-                    }
-                }
-            }).onErrorResumeNext(error -> {
-                System.err.println("Rule processor agent call failed: " + error.getMessage());
-                return io.reactivex.rxjava3.core.Flowable.empty();
-            });
+                    }).onErrorResumeNext(error -> {
+                        System.err.println("Rule processor agent call failed: " + error.getMessage());
+                        return io.reactivex.rxjava3.core.Flowable.empty();
+                    });
         } catch (Exception e) {
             System.err.println("Error invoking rule processor agent: " + e.getMessage());
             return io.reactivex.rxjava3.core.Flowable.error(e);

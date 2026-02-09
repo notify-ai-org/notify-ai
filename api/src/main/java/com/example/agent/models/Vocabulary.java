@@ -2,6 +2,8 @@ package com.example.agent.models;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "vocab_terms", uniqueConstraints = @UniqueConstraint(columnNames = { "term" }))
@@ -25,5 +27,8 @@ public class Vocabulary {
 
     @Transient
     private Object currentValue;
+
+    @Transient
+    private List<Vocabulary> children = new ArrayList<>();
 
 }

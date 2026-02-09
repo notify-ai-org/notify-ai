@@ -2,8 +2,11 @@ package com.example.agent;
 
 import com.example.agent.enums.AgentStage;
 import com.example.agent.models.AgentStageChangeEvent;
+import com.example.agent.service.LogToMemoryAgentWorker;
 import com.example.agent.service.SessionService;
 import com.example.agent.util.AgentWrapper;
+import com.example.agent.util.CentralExecutorRegistry;
+import com.example.agent.util.CentralExecutorRegistry.ExecutorType;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.events.Event;
@@ -25,6 +28,8 @@ import redis.clients.jedis.JedisPool;
 
 import javax.annotation.PreDestroy;
 
+import org.springframework.stereotype.Service;
+
 /**
  * Agent orchestrator that manages a pool of agents, maintains state machines,
  * and emits stage change events. Similar to a thread pool executor but for
@@ -34,6 +39,7 @@ import javax.annotation.PreDestroy;
  * Batch job execution
  * Efficient job transfer
  */
+@Service
 public class AgentOrchestrator {
     private static final Logger logger = Logger.getLogger(AgentOrchestrator.class.getName());
 
@@ -65,21 +71,28 @@ public class AgentOrchestrator {
     private final AgentLogRepository logRepo;
     private final JedisPool jedisPool;
     private final SessionService sessionService;
+    private final CentralExecutorRegistry executorRegistry;
+    private final LogToMemoryAgentWorker logToMemoryAgentWorker;
 
     public AgentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,
-            SessionService sessionService) {
-        this(10, 300000, true, snapshotRepo, logRepo, sessionService); // Default: 10 agents, 5 min timeout, auto
-                                                                       // cleanup
+            SessionService sessionService, CentralExecutorRegistry executorRegistry,
+            LogToMemoryAgentWorker logToMemoryAgentWorker) {
+        this(10, 300000, true, snapshotRepo, logRepo, sessionService, executorRegistry,
+                logToMemoryAgentWorker); // Default: 10 agents, 5 min timeout, auto
+                                         // cleanup
     }
 
     public AgentOrchestrator(int maxPoolSize, long agentTimeoutMillis, boolean autoCleanup,
-            AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo, SessionService sessionService) {
+            AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo, SessionService sessionService,
+            CentralExecutorRegistry executorRegistry, LogToMemoryAgentWorker logToMemoryAgentWorker) {
         this.maxPoolSize = maxPoolSize;
         this.agentTimeoutMillis = agentTimeoutMillis;
         this.autoCleanup = autoCleanup;
         this.snapshotRepo = snapshotRepo;
         this.logRepo = logRepo;
-
+        this.sessionService = sessionService;
+        this.executorRegistry = executorRegistry;
+        this.logToMemoryAgentWorker = logToMemoryAgentWorker;
         this.agentPool = new ConcurrentHashMap<>();
         this.availableAgents = new ConcurrentHashMap<>();
         this.busyAgents = new ConcurrentHashMap<>();
@@ -97,8 +110,6 @@ public class AgentOrchestrator {
         this.totalTasksExecuted = new AtomicInteger(0);
         this.totalAgentsCreated = new AtomicInteger(0);
         this.totalAgentsTerminated = new AtomicInteger(0);
-
-        this.sessionService = sessionService;
 
         setupCleanupTask();
         setupEventForwarding();
@@ -199,10 +210,16 @@ public class AgentOrchestrator {
                 .doOnComplete(() -> {
                     busyAgents.remove(agentId);
                     availableAgents.put(agentId, agent);
+                    executorRegistry
+                            .get(ExecutorType.LLM)
+                            .submit(() -> logToMemoryAgentWorker.run());
                 })
                 .doOnError(error -> {
                     busyAgents.remove(agentId);
                     availableAgents.put(agentId, agent);
+                    executorRegistry
+                            .get(ExecutorType.LLM)
+                            .submit(() -> logToMemoryAgentWorker.run());
                 });
     }
 
@@ -221,7 +238,11 @@ public class AgentOrchestrator {
             flowable = flowable.concatWith(
                     executeTaskWithAgent(atc.agentId, atc.context, atc.taskId, atc.prompt));
         }
-        return flowable;
+        return flowable.doOnComplete(() -> {
+            executorRegistry
+                    .get(ExecutorType.LLM)
+                    .submit(() -> logToMemoryAgentWorker.run());
+        });
     }
 
     /**
@@ -237,7 +258,11 @@ public class AgentOrchestrator {
         for (AgentTaskContext atc : agentContexts) {
             flowables.add(executeTaskWithAgent(atc.agentId, atc.context, atc.taskId, atc.prompt));
         }
-        return Flowable.merge(flowables);
+        return Flowable.merge(flowables).doOnComplete(() -> {
+            executorRegistry
+                    .get(ExecutorType.LLM)
+                    .submit(() -> logToMemoryAgentWorker.run());
+        });
     }
 
     /**

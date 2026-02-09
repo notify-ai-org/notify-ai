@@ -12,7 +12,8 @@ import com.example.agent.annotations.EnableNotify;
 
 /**
  * Spring Boot auto-configuration for the Notification Engine Client SDK.
- * Enable with @EnableNotify on a @Configuration class and set notify.base-package
+ * Enable with @EnableNotify on a @Configuration class and set
+ * notify.base-package
  * (or @EnableNotify(basePackage="...") when found on a config bean).
  */
 @Configuration
@@ -29,10 +30,12 @@ public class NotifyAutoConfiguration {
             for (Object b : beans.values()) {
                 EnableNotify en = b.getClass().getAnnotation(EnableNotify.class);
                 if (en != null && en.basePackage() != null && !en.basePackage().isEmpty()) {
-                    pkg = en.basePackage(); break;
+                    pkg = en.basePackage();
+                    break;
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return new AnnotationProcessor(pkg);
     }
 
@@ -75,20 +78,21 @@ public class NotifyAutoConfiguration {
     @Bean(initMethod = "bootstrap")
     @ConditionalOnMissingBean
     public Bootstrapper bootstrapper(NotifyProperties props,
-                                    AnnotationProcessor annotationProcessor,
-                                    VocabularyManager vocabularyManager,
-                                    Buffer buffer,
-                                    AcpServerClient acpServerClient,
-                                    TokenHolder tokenHolder,
-                                    InvokeManager invokeManager,
-                                    MetricsManager metricsManager) {
+            AnnotationProcessor annotationProcessor,
+            VocabularyManager vocabularyManager,
+            Buffer buffer,
+            AcpServerClient acpServerClient,
+            TokenHolder tokenHolder,
+            InvokeManager invokeManager,
+            MetricsManager metricsManager) {
         return new Bootstrapper(props, annotationProcessor, vocabularyManager, buffer,
-            acpServerClient, tokenHolder, invokeManager, metricsManager);
+                acpServerClient, tokenHolder, invokeManager, metricsManager);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    public EventListener eventListener(Buffer buffer, InvokeManager invokeManager, MetricsManager metricsManager) {
-        return new EventListener(buffer, invokeManager, metricsManager);
+    public EventListener eventListener(Buffer buffer, InvokeManager invokeManager, MetricsManager metricsManager,
+            VocabularyManager vocabularyManager) {
+        return new EventListener(buffer, invokeManager, metricsManager, vocabularyManager);
     }
 }

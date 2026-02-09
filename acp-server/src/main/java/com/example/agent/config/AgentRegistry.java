@@ -1,9 +1,6 @@
 package com.example.agent.config;
 
-import com.example.agent.AgentLogRepository;
 import com.example.agent.AgentOrchestrator;
-import com.example.agent.AgentSnapshotRepository;
-import com.example.agent.service.SessionService;
 import com.example.agent.util.SchemaUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,6 +35,7 @@ public class AgentRegistry {
     public static final String RULE_PROCESSOR_AGENT_ID = "RuleProcessor";
     public static final String EVENT_PROCESSOR_AGENT_ID = "EventProcessor";
     public static final String LOG_TO_FACTS_AGENT_ID = "LogToFacts";
+    public static final String MEMORY_SUMMARIZER_AGENT_ID = "MemorySummarizer";
 
     public AgentRegistry(ResourceLoader resourceLoader) {
         this.resourceLoader = resourceLoader;
@@ -49,12 +47,6 @@ public class AgentRegistry {
 
     public String get(String name) {
         return registry.get(name);
-    }
-
-    @Bean
-    public AgentOrchestrator agentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,
-            SessionService sessionService) {
-        return new AgentOrchestrator(snapshotRepo, logRepo, sessionService);
     }
 
     @Bean

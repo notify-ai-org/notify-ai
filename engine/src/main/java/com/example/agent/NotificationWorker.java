@@ -19,6 +19,7 @@ import com.example.agent.models.ConnectorMetrics;
 import com.example.agent.models.NotificationAttemptLog;
 import com.example.agent.interfaces.NotificationConnector;
 import com.example.agent.models.NotificationJob;
+import com.example.agent.models.WorkerSnapshot;
 import com.example.agent.models.subject.Subject;
 import lombok.RequiredArgsConstructor;
 
@@ -46,6 +47,8 @@ public class NotificationWorker implements Runnable {
 
     private NotificationJob currentJob = null;
 
+    private final NotificationJobRepository jobRepository;
+
     /**
      * @return the logBuffer
      */
@@ -53,8 +56,14 @@ public class NotificationWorker implements Runnable {
         return logBuffer;
     }
 
-    public void setLogBuffer(AtomicReference<List<NotificationAttemptLog>> buffer){
+    public void setLogBuffer(AtomicReference<List<NotificationAttemptLog>> buffer) {
         this.logBuffer = buffer;
+    }
+
+    public void loadState(WorkerSnapshot snapshot) {
+        this.lastActiveAt = snapshot.getLastActiveAt();
+        this.status = WorkerStatus.valueOf(snapshot.getStatus());
+        this.currentJob = jobRepository.findById(snapshot.getJobId()).orElse(null);
     }
 
     /**
@@ -92,7 +101,6 @@ public class NotificationWorker implements Runnable {
     public ConnectorMetrics getMetrics() {
         return metrics.get();
     }
-
 
     @Override
     public void run() {
@@ -132,7 +140,8 @@ public class NotificationWorker implements Runnable {
     }
 
     public boolean assignJob(NotificationJob job) {
-        if (!running) return false;
+        if (!running)
+            return false;
 
         try {
             return queue.offer(job, 1, TimeUnit.SECONDS);
@@ -150,9 +159,11 @@ public class NotificationWorker implements Runnable {
         running = false;
     }
 
-    /* =========================
+    /*
+     * =========================
      * Job processing
-     * ========================= */
+     * =========================
+     */
 
     private void process(NotificationJob job) {
         Instant start = Instant.now();
@@ -166,25 +177,27 @@ public class NotificationWorker implements Runnable {
             connector.bind(null);
             connector.init(metrics);
 
-            for(Subject subject : job.getSubjects()){
+            for (Subject subject : job.getSubjects()) {
                 try {
-                    connector.send(job,subject);
-                    recordSuccess(job, start,subject);
+                    connector.send(job, subject);
+                    recordSuccess(job, start, subject);
                 } catch (Exception e) {
                     recordFailure(job, start, subject, e);
                 }
             }
-            
+
             connector.close();
         } catch (Exception ex) {
-            recordFailure(job, start,null, ex);
+            recordFailure(job, start, null, ex);
             throw ex; // important: let dispatcher retry/DLQ decide
         }
     }
 
-    /* =========================
+    /*
+     * =========================
      * Rendering
-     * ========================= */
+     * =========================
+     */
 
     public String render(String template, Map<String, String> vocab) {
         Matcher matcher = TOKEN_PATTERN.matcher(template);
@@ -199,39 +212,41 @@ public class NotificationWorker implements Runnable {
         return sb.toString();
     }
 
-    /* =========================
+    /*
+     * =========================
      * Metrics & logging
-     * ========================= */
+     * =========================
+     */
 
-    private void recordSuccess(NotificationJob job, Instant start,Subject subject) {
+    private void recordSuccess(NotificationJob job, Instant start, Subject subject) {
         long durationMs = Instant.now().toEpochMilli() - start.toEpochMilli();
         log.info("Notification {} sent via {} to {} in {} ms",
                 job.getId(),
                 job.getChannel(),
                 subject.getAddress(),
                 durationMs);
-        saveAttemptLog(job, subject,  null);
+        saveAttemptLog(job, subject, null);
     }
 
-    private void recordFailure(NotificationJob job, Instant start,Subject subject, Exception ex) {
+    private void recordFailure(NotificationJob job, Instant start, Subject subject, Exception ex) {
         long durationMs = Instant.now().toEpochMilli() - start.toEpochMilli();
-        //metrics.updateAndGet(m -> m.recordFailure(durationMs));
+        // metrics.updateAndGet(m -> m.recordFailure(durationMs));
 
         log.warn("Notification {} failed after {} ms",
                 job.getId(),
                 durationMs,
                 ex);
 
-        saveAttemptLog(job,subject, ex);
+        saveAttemptLog(job, subject, ex);
     }
 
-    private void saveAttemptLog(NotificationJob job,Subject subject, Exception ex) {
+    private void saveAttemptLog(NotificationJob job, Subject subject, Exception ex) {
         NotificationAttemptLog logEntry = new NotificationAttemptLog();
         logEntry.setTimestamp(Instant.now());
         logEntry.setChannel(job.getChannel());
         logEntry.setError(ex.getMessage());
         logEntry.setEventType(job.getEventType());
-        logEntry.setResult(ex!=null ? "FAILED" : "SUCCESS");
+        logEntry.setResult(ex != null ? "FAILED" : "SUCCESS");
         logEntry.setDispatchMode(job.getDispatchMode());
         logEntry.setTemplate(job.getTemplate());
         logEntry.setPriority(job.getPriority());
@@ -240,9 +255,11 @@ public class NotificationWorker implements Runnable {
         logBuffer.get().add(logEntry);
     }
 
-    /* =========================
+    /*
+     * =========================
      * Worker states
-     * ========================= */
+     * =========================
+     */
 
     public enum WorkerStatus {
         INITIALIZING,

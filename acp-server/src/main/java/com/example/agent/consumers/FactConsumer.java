@@ -1,152 +1,173 @@
 package com.example.agent.consumers;
 
-import com.example.agent.AgentContextHolder;
 import com.example.agent.AgentOrchestrator;
 import com.example.agent.FactRepository;
 import com.example.agent.config.AgentRegistry;
-import com.example.agent.models.AgentContext;
+import com.example.agent.interfaces.MemoryAssembler;
+import com.example.agent.MemoryPageRepository;
 import com.example.agent.models.FactEntity;
+import com.example.agent.models.RawLog;
+import com.example.agent.records.Fact;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 
+import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.Disposable;
 import jakarta.annotation.PreDestroy;
+
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
+@Service
 public class FactConsumer {
 
     private final ObjectMapper mapper = new ObjectMapper();
     private final AgentOrchestrator orchestrator;
     private final AgentRegistry agentRegistry;
     private final FactRepository factRepository;
-    private Disposable disposable;
+    private final MemoryAssembler pageAssembler;
+    private final MemoryPageRepository memoryStore;
+    private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
     @Value("${agent.buffer.timeout:15s}")
     private Duration bufferTimeout;
 
-    public FactConsumer(AgentOrchestrator orchestrator, AgentRegistry agentRegistry, FactRepository factRepository) {
+    public FactConsumer(AgentOrchestrator orchestrator, AgentRegistry agentRegistry,
+            FactRepository factRepository, MemoryAssembler pageAssembler,
+            MemoryPageRepository memoryStore) {
         this.orchestrator = orchestrator;
         this.agentRegistry = agentRegistry;
         this.factRepository = factRepository;
+        this.pageAssembler = pageAssembler;
+        this.memoryStore = memoryStore;
     }
 
     @PreDestroy
     public void onDestroy() {
-        if (disposable != null && !disposable.isDisposed()) {
-            disposable.dispose();
-        }
+        compositeDisposable.dispose();
     }
 
-    @Transactional
-    public ResponseEntity<Map<String, Object>> ingest(@RequestBody Map<String, Object> request) {
+    /**
+     * Primary entry point for extracting facts from a batch of raw logs.
+     * Feeds the logs into the Log-to-Facts agent and persists resulting facts.
+     */
+    public void extractFacts(List<? extends RawLog> logs) {
+        if (logs == null || logs.isEmpty()) {
+            return;
+        }
+
+        // Extract context from the first log
+        RawLog exemplar = logs.get(0);
+        String tenantId = exemplar.getTenantId() != null ? exemplar.getTenantId() : "unknown";
+        String correlationId = exemplar.getCorrelationId();
+        String sourceType = determineSourceType(logs);
+
         try {
-            if (request == null) {
-                return ResponseEntity.badRequest().body(Map.of("error", "request_required"));
-            }
-
-            String clientId = (String) request.get("clientId");
-            String sourceType = (String) request.getOrDefault("sourceType", "EVENT_LOG");
-            String correlationId = (String) request.get("correlationId");
-
-            @SuppressWarnings("unchecked")
-            List<String> rawLogs = (List<String>) request.get("rawLogs");
-            if (rawLogs == null) {
-                String rawLog = (String) request.get("rawLog");
-                rawLogs = rawLog != null ? List.of(rawLog) : List.of();
-            }
-            if (rawLogs.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "rawLogs_required"));
-            }
-
-            // Prefer authenticated clientId if present
-            AgentContext ctx = AgentContextHolder.getContext();
-            String resolvedClientId = clientId;
-            if (ctx.getSource() != null && !ctx.getSource().isBlank()) {
-                resolvedClientId = ctx.getSource();
-            }
-            if (resolvedClientId == null || resolvedClientId.isBlank()) {
-                resolvedClientId = "unknown";
+            String agentId = agentRegistry.get(AgentRegistry.LOG_TO_FACTS_AGENT_ID);
+            if (agentId == null) {
+                throw new IllegalStateException("extraction_agent_not_found");
             }
 
             Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("clientId", resolvedClientId);
+            payload.put("tenantId", tenantId);
             payload.put("sourceType", sourceType);
-            payload.put("rawLogs", rawLogs);
-            if (correlationId != null)
+            payload.put("logs", logs);
+            if (correlationId != null) {
                 payload.put("correlationId", correlationId);
-
-            String agentId = agentRegistry.get(AgentRegistry.LOG_TO_FACTS_AGENT_ID);
-            if (agentId == null) {
-                return ResponseEntity.internalServerError().body(Map.of("error", "agent_not_registered"));
             }
 
             Content prompt = Content.fromParts(
                     Part.fromText("Extract facts from the following raw logs."),
                     Part.fromText(mapper.writeValueAsString(payload)));
 
-            final String finalClientId = resolvedClientId;
-            disposable = orchestrator.executeTaskWithAgent(agentId, null, null, prompt)
+            Disposable d = orchestrator.executeTaskWithAgent(agentId, null, null, prompt)
                     .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
                     .subscribe(events -> {
                         for (com.google.adk.events.Event agentEvent : events) {
-                            if (agentEvent.content().isEmpty() || agentEvent.content().get().parts().isEmpty())
-                                continue;
-                            Optional<List<Part>> partsOpt = agentEvent.content().get().parts();
-                            if (partsOpt.isEmpty())
-                                continue;
-                            for (Part part : partsOpt.get()) {
-                                if (part.text().isEmpty())
-                                    continue;
-                                persistFactsFromJson(part.text().get(), finalClientId, sourceType, correlationId);
-                            }
+                            agentEvent.content().flatMap(Content::parts).ifPresent(parts -> {
+                                for (Part part : parts) {
+                                    part.text().ifPresent(json -> {
+                                        List<Fact> facts = persistFactsFromJson(json, tenantId, sourceType,
+                                                correlationId);
+                                        if (!facts.isEmpty()) {
+                                            pageAssembler.buildPages(facts);
+                                        }
+                                    });
+                                }
+                            });
                         }
-                    }, err -> {
-                        // log
-                        err.printStackTrace();
-                    });
+                    }, Throwable::printStackTrace);
 
-            return ResponseEntity.accepted().body(Map.of(
-                    "status", "PROCESSING",
-                    "message", "Fact extraction initiated",
-                    "rawLogsCount", rawLogs.size()));
+            compositeDisposable.add(d);
+
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
+            throw new RuntimeException("Fact extraction initiation failed", e);
         }
     }
 
-    private void persistFactsFromJson(String json, String clientId, String sourceType, String correlationId) {
+    private String determineSourceType(List<? extends RawLog> logs) {
+        if (logs == null || logs.isEmpty())
+            return "RAW_LOG";
+        String className = logs.get(0).getClass().getSimpleName();
+        return switch (className) {
+            case "EventCapture" -> "EVENT";
+            case "EventExecutionLog" -> "EXECUTION";
+            case "NotificationAttemptLog" -> "NOTIFICATION";
+            default -> "RAW_LOG";
+        };
+    }
+
+    private List<Fact> persistFactsFromJson(String json, String tenantId, String sourceType, String correlationId) {
+        List<Fact> result = new ArrayList<>();
         try {
             List<Map<String, Object>> facts = mapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {
             });
             for (Map<String, Object> f : facts) {
+                String factType = asString(f.get("factType"));
+                String sentence = asString(f.get("sentence"));
+                Instant observedAt = parseInstant(asString(f.get("observedAt")));
+                String factCorrelationId = asString(f.getOrDefault("correlationId", correlationId));
+
                 FactEntity entity = new FactEntity();
-                entity.setClientId(clientId);
+                entity.setClientId(tenantId);
                 entity.setSourceType(sourceType);
-                entity.setFactType(asString(f.get("factType")));
-                entity.setSentence(asString(f.get("sentence")));
-                entity.setCorrelationId(asString(f.getOrDefault("correlationId", correlationId)));
+                entity.setFactType(factType);
+                entity.setSentence(sentence);
+                entity.setCorrelationId(factCorrelationId);
                 entity.setConfidence(asDouble(f.get("confidence"), 0.7));
                 entity.setImportance(asDouble(f.get("importance"), 0.5));
                 entity.setTtlDays(asInt(f.get("ttlDays"), 14));
                 entity.setEvidenceJson(writeJson(f.get("evidence")));
                 entity.setSourceEventIdsJson(writeJson(f.getOrDefault("sourceEventIds", List.of())));
-                entity.setObservedAt(parseInstant(asString(f.get("observedAt"))));
+                entity.setObservedAt(observedAt);
                 factRepository.save(entity);
+
+                @SuppressWarnings("unchecked")
+                List<String> sourceEventIds = (List<String>) f.getOrDefault("sourceEventIds", List.of());
+
+                result.add(new Fact(
+                        null, // factId generated later or not needed for assembly
+                        tenantId,
+                        factType,
+                        sentence,
+                        observedAt,
+                        entity.getConfidence(),
+                        entity.getImportance(),
+                        entity.getTtlDays(),
+                        sourceEventIds,
+                        factCorrelationId));
             }
         } catch (Exception e) {
-            // log parse failure
             e.printStackTrace();
         }
+        return result;
     }
 
     private String asString(Object o) {

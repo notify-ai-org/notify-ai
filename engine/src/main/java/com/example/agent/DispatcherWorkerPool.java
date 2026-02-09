@@ -12,7 +12,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
@@ -31,7 +30,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class DispatcherWorkerPool implements Runnable {
 
-
     @Data
     public class DispatcherProperties {
 
@@ -40,48 +38,37 @@ public class DispatcherWorkerPool implements Runnable {
         private int idleWorkerTtlSeconds = 30;
         private int pollBatchSize = 10;
 
-         // Configurable flush interval (ms) and buffer size
+        // Configurable flush interval (ms) and buffer size
         private long logFlushIntervalMs = 5000; // e.g., configurable via @Value or DispatcherProperties
-        private int logBufferSize = 50;         // e.g., configurable via @Value or DispatcherProperties
+        private int logBufferSize = 50; // e.g., configurable via @Value or DispatcherProperties
 
         private int retryMaxAttempts = 5;
         private long retryBackoffMillis = 2000;
     }
 
-
     private final DispatcherProperties properties = new DispatcherProperties();
+
+    public DispatcherProperties getProperties() {
+        return properties;
+    }
+
     private final ApplicationContext context;
+
     private final WorkerSnapshotRepository workerSnapshotRepository;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
     private final Set<NotificationWorker> workers = ConcurrentHashMap.newKeySet();
 
-    // Log buffer for NotificationAttemptLog, uses AtomicReference for safe concurrent updates.
+    // Log buffer for NotificationAttemptLog, uses AtomicReference for safe
+    // concurrent updates.
     private final AtomicReference<List<NotificationAttemptLog>> logBuffer = new AtomicReference<>(new ArrayList<>());
-    
 
-    // Reference to the NotificationAttemptLog repository (assume injected via constructor if necessary)
+    // Reference to the NotificationAttemptLog repository (assume injected via
+    // constructor if necessary)
     private final NotificationAttemptLogRepository logRepo;
 
-    @PostConstruct
-    private void startLogFlusher() {
-        Executors.newSingleThreadScheduledExecutor().scheduleAtFixedRate(
-            this::flushLogBuffer,properties.getLogFlushIntervalMs(),properties.getLogFlushIntervalMs(), TimeUnit.MILLISECONDS
-        );
-    }
-
-
-    private void flushLogBuffer() {
-        if(logBuffer.get().size() < properties.getLogBufferSize()) return;
-        List<NotificationAttemptLog> toFlush = logBuffer.getAndSet(new ArrayList<>());
-        if (!toFlush.isEmpty()) {
-            logRepo.saveAll(toFlush);
-        }
-    }
-
-    private final Map<String,ConnectorMetrics> metricsMap = new HashMap<>();
-
+    private final Map<String, ConnectorMetrics> metricsMap = new HashMap<>();
 
     @PostConstruct
     public void init() {
@@ -93,6 +80,7 @@ public class DispatcherWorkerPool implements Runnable {
                 NotificationWorker worker = context.getBean(NotificationWorker.class);
                 worker.setLogBuffer(logBuffer);
                 // load state from snapshot if needed
+                worker.loadState(snapshot);
                 executor.submit(worker);
                 this.workers.add(worker);
             }
@@ -105,16 +93,16 @@ public class DispatcherWorkerPool implements Runnable {
         executor.submit(this);
     }
 
-    public void assign(NotificationJob job){
+    public void assign(NotificationJob job) {
         // scaleToFit(1)
         scaleToFit(1);
-        
+
         // get available worker, wait till timeout
         NotificationWorker availableWorker = findAvailableWorker(5, TimeUnit.SECONDS);
         if (availableWorker == null) {
             throw new RuntimeException("No available worker found within timeout");
         }
-        
+
         // set the notification job in the worker
         // notify the waiting worker thread
         if (!availableWorker.assignJob(job)) {
@@ -124,14 +112,14 @@ public class DispatcherWorkerPool implements Runnable {
 
     private NotificationWorker findAvailableWorker(long timeout, TimeUnit unit) {
         long deadline = System.nanoTime() + unit.toNanos(timeout);
-        
+
         while (System.nanoTime() < deadline) {
             for (NotificationWorker worker : workers) {
                 if (worker.isAvailable()) {
                     return worker;
                 }
             }
-            
+
             // If no worker is available, wait a bit and try again
             try {
                 Thread.sleep(100); // Wait 100ms before retrying
@@ -140,7 +128,7 @@ public class DispatcherWorkerPool implements Runnable {
                 return null;
             }
         }
-        
+
         return null;
     }
 
@@ -152,13 +140,13 @@ public class DispatcherWorkerPool implements Runnable {
 
         while (workers.size() < required) {
             NotificationWorker worker = context.getBean(NotificationWorker.class);
-
             workers.add(worker);
             executor.submit(worker);
         }
     }
 
-    // Removes workers that have been idle for longer than the specified threshold (in milliseconds)
+    // Removes workers that have been idle for longer than the specified threshold
+    // (in milliseconds)
     public void removeIdleWorkers() {
         Instant now = Instant.now();
         // Use iterator to safely remove from workers list during iteration
@@ -166,7 +154,8 @@ public class DispatcherWorkerPool implements Runnable {
             if (worker.isAvailable()) {
                 long idleMillis = java.time.Duration.between(worker.getLastActiveAt(), now).toMillis();
                 // Only remove workers if above minWorkers
-                if (idleMillis >= properties.idleWorkerTtlSeconds * 1000L && workers.size() > properties.getMinWorkers()) {
+                if (idleMillis >= properties.idleWorkerTtlSeconds * 1000L
+                        && workers.size() > properties.getMinWorkers()) {
                     worker.shutdown();
                     // delete snapshot?
                     return true;
@@ -194,16 +183,20 @@ public class DispatcherWorkerPool implements Runnable {
 
                     // Save worker snapshot
                     WorkerSnapshot snapshot = workerSnapshotRepository.findByWorkerId(worker.getWorkerId())
-                    .orElse(new WorkerSnapshot(
-                        worker.getWorkerId(),
-                        worker.getLastActiveAt(),
-                        worker.getStatus().toString(),
-                        worker.getCurrentJob().getId()
-                    ));
-                    
+                            .orElse(new WorkerSnapshot(
+                                    worker.getWorkerId(),
+                                    worker.getLastActiveAt(),
+                                    worker.getStatus().toString(),
+                                    worker.getCurrentJob().getId()));
+
                     workerSnapshotRepository.save(snapshot);
                 }
-
+                if (logBuffer.get().size() < properties.getLogBufferSize())
+                    return;
+                List<NotificationAttemptLog> toFlush = logBuffer.getAndSet(new ArrayList<>());
+                if (!toFlush.isEmpty()) {
+                    logRepo.saveAll(toFlush);
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

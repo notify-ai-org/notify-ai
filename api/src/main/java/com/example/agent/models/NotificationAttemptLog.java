@@ -1,30 +1,21 @@
-
 package com.example.agent.models;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
-
-import java.time.Instant;
-
+import lombok.Data;
+import lombok.ToString;
+import lombok.EqualsAndHashCode;
 import com.example.agent.models.NotificationJob.DispatchMode;
 import com.example.agent.models.NotificationJob.NotificationPriority;
 
-import lombok.Data;
-
 @Entity
 @Data
-public class NotificationAttemptLog {
-
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    private Instant timestamp;
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+public class NotificationAttemptLog extends RawLog {
 
     private String eventType;
- 
+
     @Lob
     private String error;
 
@@ -36,13 +27,13 @@ public class NotificationAttemptLog {
 
     private String template;
 
-     /**
+    /**
      * Target address.
      * Example: email address, phone number, webhook URL.
      */
-     private String target;
+    private String target;
 
-     private String lastProcessedBy;
+    private String lastProcessedBy;
 
-     private NotificationPriority priority;
+    private NotificationPriority priority;
 }

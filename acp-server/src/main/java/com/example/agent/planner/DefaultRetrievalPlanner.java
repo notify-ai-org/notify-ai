@@ -14,14 +14,12 @@ import java.util.stream.Collectors;
 public class DefaultRetrievalPlanner implements RetrievalPlanner {
 
     private final FactStore factStore;
-    private final PageStore pageStore;
     private final MemoryAssembler memoryAssembler;
     private final TokenEstimator tokenEstimator;
 
-    public DefaultRetrievalPlanner(FactStore factStore, PageStore pageStore, MemoryAssembler memoryAssembler,
+    public DefaultRetrievalPlanner(FactStore factStore, MemoryAssembler memoryAssembler,
             TokenEstimator tokenEstimator) {
         this.factStore = factStore;
-        this.pageStore = pageStore;
         this.memoryAssembler = memoryAssembler;
         this.tokenEstimator = tokenEstimator;
     }
@@ -39,10 +37,6 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
 
         List<Fact> facts = factStore.fetchFacts(req.tenantId(), req.entities(), req.decisionType(), now);
         budget -= estimateFactsTokens(facts);
-
-        // Procedural pages (rules/runbooks) are high ROI
-        List<MemoryPage> procedural = pageStore.fetchProcedural(req.tenantId(), req.decisionType(), 6);
-        budget -= estimatePagesTokens(procedural);
 
         // Build decision-aware retrieval queries
         List<RetrievalQuery> queries = buildQueries(req);
@@ -77,7 +71,6 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
 
         // Always keep procedural + facts even if budget gets tight
         List<MemoryPage> base = new ArrayList<>();
-        base.addAll(procedural);
 
         // Partition semantic first, episodic later
         List<ScoredPage> semantic = scored.stream().filter(sp -> sp.page.pageType() == PageType.SEMANTIC).toList();
@@ -155,13 +148,6 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
         int sum = 0;
         for (Fact f : facts)
             sum += tokenEstimator.estimateTokens(f.sentence());
-        return sum;
-    }
-
-    private int estimatePagesTokens(List<MemoryPage> pages) {
-        int sum = 0;
-        for (MemoryPage p : pages)
-            sum += tokenEstimator.estimateTokens(p.summary());
         return sum;
     }
 

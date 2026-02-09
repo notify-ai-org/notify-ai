@@ -30,6 +30,7 @@ vocab:
   openai-model: ${OPENAI_MODEL:gpt-4o-mini}
   openai-max-tokens: 160
   description-max-length: 512
+  
 
 acp:
   auth:
@@ -37,3 +38,23 @@ acp:
       secret: ${ACP_JWT_SECRET:changeme-at-least-32-characters-long-secret-key}
       required-scope: ${ACP_JWT_REQUIRED_SCOPE:agent:invoke}
     skip-paths: /api/client/register,/api/auth/token/refresh,/actuator/health,/actuator/info
+
+executors:
+  cpu:
+    core: 4
+    max: 8
+    queue: 1000
+
+  io:
+    core: 8
+    max: 64
+    queue: 5000
+
+  llm:
+    core: 2
+    max: 4
+    queue: 200
+
+  scheduler:
+    threads: 2
+
