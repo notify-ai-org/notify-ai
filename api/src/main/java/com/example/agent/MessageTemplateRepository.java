@@ -7,8 +7,10 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 
 @Repository
-public interface MessageTemplateRepository extends JpaRepository<MessageTemplate, Long> {
+public interface MessageTemplateRepository extends JpaRepository<MessageTemplate, String> {
     List<MessageTemplate> findByChannel(String channel);
-    List<MessageTemplate> findByEventType(String eventType);
-}
 
+    List<MessageTemplate> findByEventType(String eventType);
+
+    List<MessageTemplate> findByValidated(boolean validated);
+}

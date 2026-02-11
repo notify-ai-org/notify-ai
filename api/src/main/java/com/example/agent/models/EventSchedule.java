@@ -1,17 +1,15 @@
 package com.example.agent.models;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
 import java.time.Instant;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Entity
 @Data
-public class EventSchedule {
-
-    @Id
-    private String id;
+@EqualsAndHashCode(callSuper = true)
+public class EventSchedule extends BaseEntity {
 
     private String eventName;
 

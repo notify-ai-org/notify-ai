@@ -16,19 +16,26 @@ import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import lombok.RequiredArgsConstructor;
 import com.example.agent.models.NotificationJob;
+import com.example.agent.models.Event;
 import com.example.agent.interfaces.DeadLetterManager;
 import com.example.agent.models.EventSchedule;
+import com.example.agent.exceptions.ValidationRequiredException;
 
 @Service
 @RequiredArgsConstructor
 public class NotificationDispatcher {
 
+    private static final Logger logger = LoggerFactory.getLogger(NotificationDispatcher.class);
+
     private final DispatcherWorkerPool workerPool;
     private final Scheduler quartzScheduler;
     private final EventScheduleRepository eventScheduleRepository;
+    private final EventRepository eventRepository;
     private final DeadLetterManager deadLetterManager;
     private final NotificationJobRepository notificationJobRepo;
     // --- Cleaner thread for purging expired notification jobs ---
@@ -82,7 +89,8 @@ public class NotificationDispatcher {
      * Override this logic if soft-delete is wanted.
      */
     protected void purgeExpiredNotificationJobs() {
-        // This example assumes NotificationJob has a getExpiresAt() and notificationJobRepo supports delete
+        // This example assumes NotificationJob has a getExpiresAt() and
+        // notificationJobRepo supports delete
         // and find operations. Adjust as needed for your repo.
         List<NotificationJob> all = notificationJobRepo.findAll();
         Instant now = Instant.now();
@@ -114,11 +122,10 @@ public class NotificationDispatcher {
 
             // Register TriggerListener
             quartzScheduler.getListenerManager().addTriggerListener(
-                new QueueingTriggerListener(eventScheduleRepository,
-                    this,
-                    notificationJobRepo,
-                    deadLetterManager
-                ));
+                    new QueueingTriggerListener(eventScheduleRepository,
+                            this,
+                            notificationJobRepo,
+                            deadLetterManager));
 
             // Load and schedule jobs
             List<EventSchedule> schedules = eventScheduleRepository.findAll();
@@ -144,16 +151,29 @@ public class NotificationDispatcher {
 
     /**
      * Push a notification job to the queue with specified queue name and priority.
+     * Validates that the associated event has been approved before dispatching.
      * 
-     * @param job The notification job to push
+     * @param job       The notification job to push
      * @param queueName The name of the queue (defaults to "notifications")
-     * @param priority The priority of the job (higher values = higher priority)
+     * @param priority  The priority of the job (higher values = higher priority)
      * @return The job ID returned by the queue service
-     * @throws RuntimeException if serialization fails
+     * @throws RuntimeException            if serialization fails
+     * @throws ValidationRequiredException if associated event is not validated
      */
-    public void pushJob(NotificationJob job,double priority) {
+    public void pushJob(NotificationJob job, double priority) {
+        // Validation check: Ensure the associated event is validated
+        if (job.getEventName() != null) {
+            Event event = eventRepository.findByName(job.getEventName()).orElse(null);
+            if (event != null && !event.isValidated()) {
+                logger.warn("Skipping dispatch for job {} - Event '{}' (ID: {}) is not validated",
+                        job.getId(), event.getName(), event.getId());
+                throw new ValidationRequiredException("Event", event.getId());
+            }
+        }
+
         try {
             workerPool.assign(job);
+            logger.info("Dispatched job {} for validated event '{}'", job.getId(), job.getEventName());
         } catch (Exception e) {
             throw new RuntimeException("Failed to push job to queue", e);
         }
@@ -162,9 +182,9 @@ public class NotificationDispatcher {
     /**
      * Push a notification job to the queue with a delay.
      * 
-     * @param job The notification job to push
-     * @param queueName The name of the queue (defaults to "notifications")
-     * @param priority The priority of the job (higher values = higher priority)
+     * @param job         The notification job to push
+     * @param queueName   The name of the queue (defaults to "notifications")
+     * @param priority    The priority of the job (higher values = higher priority)
      * @param delayMillis Delay in milliseconds before the job becomes available
      * @return The job ID returned by the queue service
      * @throws RuntimeException if serialization fails
@@ -178,8 +198,21 @@ public class NotificationDispatcher {
         }
     }
 
-
+    /**
+     * Schedule a job using Quartz scheduler.
+     * Only schedules the job if the EventSchedule has been validated.
+     * 
+     * @param schedule The event schedule to register
+     */
     public void scheduleJob(EventSchedule schedule) {
+        // Validation check: Only schedule validated schedules
+        if (!schedule.isValidated()) {
+            logger.warn("Skipping scheduling for EventSchedule '{}' (ID: {}) - not validated. "
+                    + "Schedule will not execute until validated.",
+                    schedule.getEventName(), schedule.getId());
+            return;
+        }
+
         try {
             JobDetail job = JobBuilder.newJob(NoOpJob.class)
                     .withIdentity("job_" + schedule.getId())
@@ -200,11 +233,13 @@ public class NotificationDispatcher {
             }
 
             quartzScheduler.scheduleJob(job, triggerBuilder.build());
+            logger.info("Scheduled validated EventSchedule '{}' (ID: {})",
+                    schedule.getEventName(), schedule.getId());
         } catch (SchedulerException e) {
+            logger.error("Failed to schedule EventSchedule '{}': {}", schedule.getId(), e.getMessage());
             e.printStackTrace();
         }
     }
-
 
     @PreDestroy
     public void shutdown() {
@@ -242,13 +277,25 @@ public class NotificationDispatcher {
             // In a real scenario, we might fetch more details or construct a full
             // NotificationJob.
             EventSchedule schedule = eventScheduleRepository.findById(scheduleId).orElseThrow();
-            String eventName = schedule.getEventName();
 
+            // Recheck validation before execution (in case it was revoked after scheduling)
+            if (!schedule.isValidated()) {
+                logger.warn("EventSchedule '{}' (ID: {}) validation was revoked - skipping execution",
+                        schedule.getEventName(), schedule.getId());
+                return;
+            }
+
+            String eventName = schedule.getEventName();
             NotificationJob job = notificationJobRepo.findByEventName(eventName).orElseThrow();
-           
+
             String eventTypeObj = job.getEventType();
             if (eventTypeObj != null && eventTypeObj.equals("deffered")) {
-                notificationDispatcher.pushJob(job); 
+                try {
+                    notificationDispatcher.pushJob(job);
+                } catch (ValidationRequiredException e) {
+                    logger.error("Cannot dispatch job for schedule '{}': {}",
+                            schedule.getId(), e.getMessage());
+                }
             }
 
         }
@@ -269,16 +316,15 @@ public class NotificationDispatcher {
             Instant firstAttemptAt = Instant.now();
             NotificationJob job = notificationJobRepo.findByEventName(eventName).orElseThrow();
             deadLetterManager.enqueue(
-                job,
-                new Exception(trigger.getDescription()),
-                0,
-                firstAttemptAt,
-                Instant.now(),
-                "misfire-" + trigger.getKey().getName(),
-                "dispatcher-1",
-                null,
-                job.getTemplate()
-            );
+                    job,
+                    new Exception(trigger.getDescription()),
+                    0,
+                    firstAttemptAt,
+                    Instant.now(),
+                    "misfire-" + trigger.getKey().getName(),
+                    "dispatcher-1",
+                    null,
+                    job.getTemplate());
         }
 
         @Override

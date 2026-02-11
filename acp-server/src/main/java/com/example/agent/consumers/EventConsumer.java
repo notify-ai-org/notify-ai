@@ -27,6 +27,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import com.example.agent.config.AgentRegistry;
+import com.example.agent.exceptions.ValidationRequiredException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.core.Flowable;
@@ -64,6 +67,8 @@ public class EventConsumer {
 
     private final PromptAssembler assembler;
     private final AgentRegistry agentRegistry;
+
+    private static final Logger logger = LoggerFactory.getLogger(EventConsumer.class);
 
     // Configurable timeout or backpressure parameters
     @Value("${agent.buffer.timeout:15s}")
@@ -225,8 +230,29 @@ public class EventConsumer {
 
                                                         NotificationJob job = jobBuilder.build();
                                                         if (eventTypeObj != null && eventTypeObj.equals("static")) {
-                                                            notificationDispatcher.pushJob(job);
-                                                            notificationJobRepository.save(job);
+                                                            // Validation check before dispatching
+                                                            if (!capture.getEvent().isValidated()) {
+                                                                logger.warn(
+                                                                        "Skipping dispatch for event '{}' (ID: {}) - not validated",
+                                                                        capture.getEvent().getName(),
+                                                                        capture.getEvent().getId());
+                                                                continue;
+                                                            }
+                                                            if (template != null && !template.isValidated()) {
+                                                                logger.warn(
+                                                                        "Skipping dispatch for event '{}' - template (ID: {}) not validated",
+                                                                        capture.getEvent().getName(), template.getId());
+                                                                continue;
+                                                            }
+
+                                                            try {
+                                                                notificationDispatcher.pushJob(job);
+                                                                notificationJobRepository.save(job);
+                                                                logger.info("Dispatched job for validated event '{}'",
+                                                                        capture.getEvent().getName());
+                                                            } catch (ValidationRequiredException e) {
+                                                                logger.error("Dispatch blocked: {}", e.getMessage());
+                                                            }
                                                         } else {
                                                             generateTemplatesAndSchedules(capture, job);
                                                         }
@@ -316,8 +342,22 @@ public class EventConsumer {
                                                                 eventSchedule.setScheduledAt(Instant.now());
                                                                 eventScheduleRepository.save(eventSchedule);
 
-                                                                // dispatch deferred event schedule
-                                                                notificationDispatcher.scheduleJob(eventSchedule);
+                                                                // Validation check: only schedule if validated
+                                                                // (Note: scheduleJob() also checks, this is a safety
+                                                                // guard)
+                                                                if (!eventSchedule.isValidated()) {
+                                                                    logger.warn(
+                                                                            "EventSchedule for '{}' (ID: {}) saved but not scheduled - requires validation",
+                                                                            capture.getEvent().getName(),
+                                                                            eventSchedule.getId());
+                                                                } else {
+                                                                    // dispatch deferred event schedule
+                                                                    notificationDispatcher.scheduleJob(eventSchedule);
+                                                                    logger.info(
+                                                                            "Scheduled validated EventSchedule for '{}' (ID: {})",
+                                                                            capture.getEvent().getName(),
+                                                                            eventSchedule.getId());
+                                                                }
                                                                 // save job
                                                                 notificationJobRepository.save(job);
                                                             }

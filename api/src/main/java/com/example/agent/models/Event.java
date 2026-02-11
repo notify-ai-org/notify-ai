@@ -2,16 +2,14 @@ package com.example.agent.models;
 
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.util.List;
 
 @Entity
 @Data
-public class Event {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+@EqualsAndHashCode(callSuper = true)
+public class Event extends BaseEntity {
 
     private String name; // e.g. "ORDER_PLACED", "PAYMENT_FAILED"
 
@@ -21,9 +19,6 @@ public class Event {
 
     @Enumerated(EnumType.STRING)
     private EventStatus status; // NEW, PROCESSED, FAILED
-
-    // Optional correlation for deduplication/grouping
-    private String correlationId;
 
     private String scheduleIntent;
 

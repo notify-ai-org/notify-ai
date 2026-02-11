@@ -1,15 +1,16 @@
 package com.example.agent.models;
 
 import jakarta.persistence.*;
-import java.time.Instant;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "message_templates")
-public class MessageTemplate {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+@Data
+@EqualsAndHashCode(callSuper = true)
+@NoArgsConstructor
+public class MessageTemplate extends BaseEntity {
 
     @Column(nullable = false)
     private String channel;
@@ -26,29 +27,13 @@ public class MessageTemplate {
     @Column(length = 512)
     private String eventName; // Optional: link to event type if available
 
-    @Column(nullable = false)
-    private Instant createdAt;
-
-    public MessageTemplate() {
-        this.createdAt = Instant.now();
-    }
-
     public MessageTemplate(String channel, String subject, String template) {
-        this();
         this.channel = channel;
         this.subject = subject;
         this.template = template;
     }
 
     // Getters and setters
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
     public String getChannel() {
         return channel;
     }
@@ -81,14 +66,6 @@ public class MessageTemplate {
         this.eventType = eventType;
     }
 
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
     /**
      * @return the eventName
      */
@@ -103,4 +80,3 @@ public class MessageTemplate {
         this.eventName = eventName;
     }
 }
-

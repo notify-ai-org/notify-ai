@@ -10,16 +10,23 @@ import java.util.Optional;
 
 public interface EventRepository extends JpaRepository<Event, String> {
     Optional<Event> findById(String id);
+
+    Optional<Event> findByName(String name);
+
+    List<Event> findByValidated(boolean validated);
+
     List<Event> findByStatus(Event.EventStatus status);
+
     List<Event> findByCorrelationId(String correlationId);
+
     List<Event> findAll();
-    
+
     /**
      * Get history of event captures for a given event name/type
+     * 
      * @param eventName The name/type of the event
      * @return List of EventCapture records for the given event name
      */
     @Query("SELECT ec FROM EventCapture ec JOIN ec.event e WHERE e.name = :eventName ORDER BY ec.occuredAt DESC")
     List<EventCapture> getHistory(@Param("eventName") String eventName);
 }
-

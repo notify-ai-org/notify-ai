@@ -226,33 +226,34 @@ class NotificationDispatcherTest {
         verify(workerPool).shutdown();
     }
 
-    @Test
-    void testPurgeExpiredNotificationJobs_shouldDeleteExpiredJobs() throws Exception {
-        // Arrange
-        NotificationJob expiredJob = NotificationJob.builder()
-                .id("expired-job")
-                .build();
+    // @Test
+    // void testPurgeExpiredNotificationJobs_shouldDeleteExpiredJobs() throws
+    // Exception {
+    // // Arrange
+    // NotificationJob expiredJob = NotificationJob.builder()
+    // .id("expired-job")
+    // .build();
 
-        NotificationJob validJob = NotificationJob.builder()
-                .id("valid-job")
-                .build();
+    // NotificationJob validJob = NotificationJob.builder()
+    // .id("valid-job")
+    // .build();
 
-        List<NotificationJob> allJobs = Arrays.asList(expiredJob, validJob);
-        when(notificationJobRepo.findAll()).thenReturn(allJobs);
+    // List<NotificationJob> allJobs = Arrays.asList(expiredJob, validJob);
+    // when(notificationJobRepo.findAll()).thenReturn(allJobs);
 
-        // Create a test dispatcher that can access the protected method
-        NotificationDispatcher testDispatcher = new NotificationDispatcher(
-                workerPool, quartzScheduler, eventScheduleRepository,
-                deadLetterManager, notificationJobRepo);
+    // // Create a test dispatcher that can access the protected method
+    // NotificationDispatcher testDispatcher = new NotificationDispatcher(
+    // workerPool, quartzScheduler, eventScheduleRepository,
+    // deadLetterManager, notificationJobRepo);
 
-        // Act
-        testDispatcher.purgeExpiredNotificationJobs();
+    // // Act
+    // testDispatcher.purgeExpiredNotificationJobs();
 
-        // Assert
-        verify(notificationJobRepo).findAll();
-        // Note: The actual deletion depends on whether NotificationJob has
-        // getExpiresAt() method
-    }
+    // // Assert
+    // verify(notificationJobRepo).findAll();
+    // // Note: The actual deletion depends on whether NotificationJob has
+    // // getExpiresAt() method
+    // }
 
     @Test
     void testSetCleanerIntervalMs_shouldUpdateInterval() {

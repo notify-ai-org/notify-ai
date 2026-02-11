@@ -1,5 +1,7 @@
 package com.example.agent.models;
 
+import com.example.agent.models.dto.RuleResultDto;
+import com.example.agent.models.dto.SubjectResultDto;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -36,6 +38,13 @@ public class EventCapture extends RawLog {
 
     private String serviceName; // service name
 
+    // Subject and Rule execution results
+    @Transient
+    private SubjectResultDto subjectResult; // result from subject supplier
+
+    @Transient
+    private List<RuleResultDto> ruleResults; // results from rule executions
+
     @Deprecated
     public Instant getOccuredAt() {
         return getTimestamp();
@@ -45,39 +54,4 @@ public class EventCapture extends RawLog {
     public void setOccuredAt(Instant occuredAt) {
         setTimestamp(occuredAt);
     }
-}
-
-@Embeddable
-@Data
-class CallStack {
-    @ElementCollection
-    @CollectionTable(name = "call_stack_frames", joinColumns = @JoinColumn(name = "event_id"))
-    private List<StackFrame> frames;
-}
-
-@Embeddable
-@Data
-class StackFrame {
-    private String className; // "com.example.OrderService"
-    private String methodName; // "createOrder"
-    private int lineNumber; // line number in code
-    private String fileName; // source file
-}
-
-@Embeddable
-@Data
-class ExecutionResult {
-    private boolean success;
-    @Column(length = 5000)
-    private String returnValue; // serialized return value
-}
-
-@Embeddable
-@Data
-class ExceptionInfo {
-    private String exceptionType; // java.lang.NullPointerException
-    @Column(length = 1000)
-    private String message; // exception message
-    @Column(length = 10000)
-    private String stackTrace; // full stack trace as string
 }
