@@ -142,6 +142,11 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         try {
+            try {
+                filterChain.doFilter(request, response);
+            } finally {
+                AgentContextHolder.clear();
+            }
             String auth = request.getHeader("Authorization");
             JwtClaims claims = validateAndExtract(auth);
 

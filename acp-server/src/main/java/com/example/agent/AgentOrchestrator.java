@@ -15,6 +15,7 @@ import com.google.genai.types.Content;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.subjects.PublishSubject;
 import io.reactivex.rxjava3.subjects.Subject;
+
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -74,20 +75,14 @@ public class AgentOrchestrator {
     private final CentralExecutorRegistry executorRegistry;
     private final LogToMemoryAgentWorker logToMemoryAgentWorker;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public AgentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,
             SessionService sessionService, CentralExecutorRegistry executorRegistry,
             LogToMemoryAgentWorker logToMemoryAgentWorker) {
-        this(10, 300000, true, snapshotRepo, logRepo, sessionService, executorRegistry,
-                logToMemoryAgentWorker); // Default: 10 agents, 5 min timeout, auto
-                                         // cleanup
-    }
-
-    public AgentOrchestrator(int maxPoolSize, long agentTimeoutMillis, boolean autoCleanup,
-            AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo, SessionService sessionService,
-            CentralExecutorRegistry executorRegistry, LogToMemoryAgentWorker logToMemoryAgentWorker) {
-        this.maxPoolSize = maxPoolSize;
-        this.agentTimeoutMillis = agentTimeoutMillis;
-        this.autoCleanup = autoCleanup;
+        // Default: 10 agents, 5 min timeout, auto cleanup
+        this.maxPoolSize = 10;
+        this.agentTimeoutMillis = 300000;
+        this.autoCleanup = true;
         this.snapshotRepo = snapshotRepo;
         this.logRepo = logRepo;
         this.sessionService = sessionService;

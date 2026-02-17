@@ -27,6 +27,6 @@ public interface EventRepository extends JpaRepository<Event, String> {
      * @param eventName The name/type of the event
      * @return List of EventCapture records for the given event name
      */
-    @Query("SELECT ec FROM EventCapture ec JOIN ec.event e WHERE e.name = :eventName ORDER BY ec.occuredAt DESC")
+    @Query("SELECT ec FROM EventCapture ec JOIN ec.event e WHERE e.name = :eventName ORDER BY ec.timestamp DESC")
     List<EventCapture> getHistory(@Param("eventName") String eventName);
 }

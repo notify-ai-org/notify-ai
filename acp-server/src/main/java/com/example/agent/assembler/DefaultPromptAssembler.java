@@ -68,10 +68,6 @@ public class DefaultPromptAssembler implements PromptAssembler {
         sb.append("## Tool Receipts (summaries only)\n");
         sb.append(limitToCap(formatToolReceipts(bundle.toolReceipts()), caps.toolTokens)).append("\n\n");
 
-        // 7) Output schema
-        sb.append("## Output JSON Schema (strict)\n");
-        sb.append(outputSchema()).append("\n");
-
         return sb.toString();
     }
 
@@ -120,23 +116,6 @@ public class DefaultPromptAssembler implements PromptAssembler {
                     .append("\n");
         }
         return sb.toString();
-    }
-
-    private String outputSchema() {
-        return """
-                {
-                    "reasoning": {
-                    "bulletReasons": ["string"],
-                    "memoryUsed": ["pageId"],
-                    "factsUsed": ["factId"]
-                    },
-                    "safetyChecks": {
-                    "optOutRespected": true,
-                    "dndRespected": true,
-                    "quotaRespected": true
-                    }
-                }
-                """;
     }
 
     private String limitToCap(String text, int capTokens) {
@@ -215,7 +194,6 @@ public class DefaultPromptAssembler implements PromptAssembler {
                 .append(limitToCap(formatPages(bundle.pages(), PageType.EPISODIC), caps.episodicTokens)).append("\n\n");
         sb.append("## Tool Receipts\n")
                 .append(limitToCap(formatToolReceipts(bundle.toolReceipts()), caps.toolTokens)).append("\n\n");
-        sb.append("## Output JSON Schema\n").append(outputSchema());
         return sb.toString();
     }
 

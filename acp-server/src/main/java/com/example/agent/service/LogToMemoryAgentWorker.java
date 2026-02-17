@@ -9,9 +9,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.springframework.stereotype.Component;
-
-@Component
 public class LogToMemoryAgentWorker implements Runnable {
 
     private final BlockingQueue<RawLog> queue;

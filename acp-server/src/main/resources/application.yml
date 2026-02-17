@@ -24,20 +24,38 @@ spring:
     openai:
       api-key: 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
 
+redis:
+  host: ${REDIS_HOST:redis-19139.crce263.ap-south-1-1.ec2.cloud.redislabs.com}
+  port: ${REDIS_PORT:19139}
+  username: ${REDIS_USERNAME:test}
+  password: ${REDIS_PASSWORD:Msdian-77}
 
 vocab:
   kafka-topic: ${VOCAB_TOPIC:vocabulary-raw}
   openai-model: ${OPENAI_MODEL:gpt-4o-mini}
   openai-max-tokens: 160
   description-max-length: 512
+
+openai:
+  api:
+    base-url: ${OPENAI_API_BASE_URL:https://api.openai.com/v1}
+    key: ${OPENAI_API_KEY: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}
+    timeout: ${OPENAI_API_TIMEOUT:30s}
+    connection-timeout: ${OPENAI_API_CONNECTION_TIMEOUT:10s}
+
+embedding:
+  max-batch-size: ${EMBEDDING_MAX_BATCH_SIZE:10}
+  max-wait: ${EMBEDDING_MAX_WAIT:100ms}
+  schema-version: ${EMBEDDING_SCHEMA_VERSION:v1}
+  cache-ttl: ${EMBEDDING_CACHE_TTL:24h}
   
 
-acp:
-  auth:
-    jwt:
-      secret: ${ACP_JWT_SECRET:changeme-at-least-32-characters-long-secret-key}
-      required-scope: ${ACP_JWT_REQUIRED_SCOPE:agent:invoke}
-    skip-paths: /api/client/register,/api/auth/token/refresh,/actuator/health,/actuator/info
+#acp:
+#  auth:
+#    jwt:
+#      secret: ${ACP_JWT_SECRET:changeme-at-least-32-characters-long-secret-key}
+#      required-scope: ${ACP_JWT_REQUIRED_SCOPE:agent:invoke}
+#    skip-paths: /api/client/register,/api/auth/token/refresh,/actuator/health,/actuator/info
 
 executors:
   cpu:

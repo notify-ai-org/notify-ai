@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * Loads domain content (vocabulary, rules) for a client and aggregates
@@ -28,7 +27,8 @@ public class DomainContentService {
     @Transactional(readOnly = true)
     public String loadByClientId(String clientId) {
         List<DomainContentEntity> list = repository.findByClientId(clientId);
-        if (list == null || list.isEmpty()) return null;
+        if (list == null || list.isEmpty())
+            return null;
 
         Map<String, Object> aggregated = new HashMap<>();
         for (DomainContentEntity e : list) {
@@ -36,7 +36,8 @@ public class DomainContentService {
                 aggregated.put(e.getType().name().toLowerCase(), e.getContentJson());
             }
         }
-        if (aggregated.isEmpty()) return null;
+        if (aggregated.isEmpty())
+            return null;
         try {
             return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(aggregated);
         } catch (Exception ex) {
@@ -50,16 +51,18 @@ public class DomainContentService {
     }
 
     @Transactional
-    public DomainContentEntity upsert(String clientId, DomainContentEntity.Type type, String contentJson, String version) {
+    public DomainContentEntity upsert(String clientId, DomainContentEntity.Type type, String contentJson,
+            String version) {
         DomainContentEntity e = repository.findByClientIdAndType(clientId, type)
-            .orElseGet(() -> {
-                DomainContentEntity n = new DomainContentEntity();
-                n.setClientId(clientId);
-                n.setType(type);
-                return n;
-            });
+                .orElseGet(() -> {
+                    DomainContentEntity n = new DomainContentEntity();
+                    n.setClientId(clientId);
+                    n.setType(type);
+                    return n;
+                });
         e.setContentJson(contentJson);
-        if (version != null) e.setVersion(version);
+        if (version != null)
+            e.setVersion(version);
         return repository.save(e);
     }
 }

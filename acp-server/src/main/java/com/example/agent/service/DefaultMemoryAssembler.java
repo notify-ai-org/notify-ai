@@ -3,10 +3,7 @@ package com.example.agent.service;
 import com.example.agent.MemoryPageRepository;
 import com.example.agent.enums.PageType;
 import com.example.agent.interfaces.MemoryAssembler;
-import com.example.agent.records.EntityRef;
-import com.example.agent.records.Fact;
-import com.example.agent.records.MemoryPage;
-import com.example.agent.records.VectorCandidate;
+import com.example.agent.records.*;
 import com.example.agent.AgentOrchestrator;
 import com.example.agent.config.AgentRegistry;
 import com.example.agent.models.dto.MemorySummarizationRequestDto;
@@ -29,6 +26,8 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
     private final Duration inactivityTimeout;
     private final int maxFactsPerPage;
 
+    private final EmbeddingService embeddingService;
+
     private final MemoryPageRepository pageRepo;
     private final AgentOrchestrator orchestrator;
     private final AgentRegistry agentRegistry;
@@ -39,6 +38,7 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
             @Value("${agent.memory.inactivity-timeout:30m}") Duration inactivityTimeout,
             @Value("${agent.memory.max-facts:50}") int maxFactsPerPage,
             MemoryPageRepository pageRepo,
+            EmbeddingService embeddingService,
             AgentOrchestrator orchestrator,
             AgentRegistry agentRegistry) {
 
@@ -48,6 +48,7 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
         this.pageRepo = pageRepo;
         this.orchestrator = orchestrator;
         this.agentRegistry = agentRegistry;
+        this.embeddingService = embeddingService;
     }
 
     @Override
@@ -87,9 +88,32 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
         return updatedPages;
     }
 
-    private MemoryPage appendFact(MemoryPage page, Fact fact) {
+    public MemoryPage appendFact(MemoryPage page, Fact fact) {
         // Create a new MemoryPage with updated fields (records are immutable)
         String updatedSummary = incrementalUpdate(page, fact);
+
+        // Create a temporary page to generate embedding
+        MemoryPage tempPage = new MemoryPage(
+                page.pageId(),
+                fact.tenantId(),
+                page.namespace(),
+                fact.correlationId(),
+                page.pageType(),
+                updatedSummary,
+                page.severityMax(),
+                page.timestamp(),
+                page.importance(),
+                page.confidence(),
+                page.createdAt(),
+                fact.observedAt(), // updatedAt
+                page.tags(),
+                page.scope(),
+                page.rawRef(),
+                null // embedding will be generated next
+        );
+
+        // Generate embedding for the updated page
+        float[] embedding = embeddingService.embed(tempPage).block();
 
         MemoryPage updatedPage = new MemoryPage(
                 page.pageId(),
@@ -107,7 +131,7 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
                 page.tags(),
                 page.scope(),
                 page.rawRef(),
-                page.embedding());
+                embedding); // Use float[] directly
 
         pageRepo.upsert(updatedPage, Duration.ofDays(30));
         return updatedPage;
@@ -196,7 +220,45 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
             Set<PageType> pageTypes,
             Instant since,
             int k) {
-        return null;
+        // Build embedding request for the query text
+        String namespace = scope != null && !scope.isEmpty() ? scope.get(0).type() : "";
+        String textHash = EmbeddingService.sha256(queryText);
+
+        EmbeddingRequest embeddingRequest = new EmbeddingRequest(
+                tenantId,
+                namespace,
+                "query", // pageId for query context
+                queryText,
+                "text-embedding-3-large", // default model
+                "v1", // schema version
+                textHash);
+
+        // Get query embedding (blocking call)
+        EmbeddingResult embeddingResult = embeddingService.embedOne(embeddingRequest).block();
+        if (embeddingResult == null || embeddingResult.vector() == null) {
+            return List.of();
+        }
+
+        float[] queryVector = embeddingResult.vector();
+
+        // Perform KNN search
+        List<MemoryPageRepository.SearchResult> searchResults = pageRepo.knnSearch(
+                tenantId,
+                queryVector,
+                k,
+                Optional.ofNullable(namespace).filter(s -> !s.isEmpty()),
+                Optional.empty() // no correlationId filter for now
+        );
+
+        // Convert SearchResult to VectorCandidate
+        // Note: knnSearch returns distance (1 - similarity), so convert back to
+        // similarity
+        return searchResults.stream()
+                .map(result -> new VectorCandidate(
+                        result.page(),
+                        1.0 - result.score() // Convert distance to similarity
+                ))
+                .toList();
     }
 
     private Instant alignToWindow(Instant time) {
