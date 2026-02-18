@@ -6,6 +6,7 @@ import com.example.agent.records.EmbeddingRequest;
 import com.example.agent.records.EmbeddingResult;
 import com.example.agent.records.MemoryPage;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -34,12 +35,16 @@ public class EmbeddingService {
     @Value("${embedding.cache-ttl:24h}")
     private Duration cacheTtl;
 
-    private final reactor.core.publisher.Sinks.Many<Pending> sink = reactor.core.publisher.Sinks.many().multicast()
+    private final reactor.core.publisher.Sinks.Many<Pending> sink = reactor.core.publisher.Sinks.many().unicast()
             .onBackpressureBuffer();
 
     public EmbeddingService(EmbeddingProvider embeddingProvider, EmbeddingCache embeddingCache) {
         this.embeddingProvider = embeddingProvider;
         this.embeddingCache = embeddingCache;
+    }
+
+    @PostConstruct
+    void init() {
         startLoop();
     }
 

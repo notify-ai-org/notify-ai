@@ -105,6 +105,15 @@ public class Config {
     }
 
     @Bean
+    public io.lettuce.core.api.reactive.RedisReactiveCommands<String, byte[]> redisReactiveByteCommands(
+            RedisClient redisClient) {
+        io.lettuce.core.codec.RedisCodec<String, byte[]> codec = io.lettuce.core.codec.RedisCodec.of(
+                io.lettuce.core.codec.StringCodec.UTF8,
+                io.lettuce.core.codec.ByteArrayCodec.INSTANCE);
+        return redisClient.connect(codec).reactive();
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, AgentAuthenticationFilter agentAuthFilter)
             throws Exception {
         http
