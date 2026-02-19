@@ -4,6 +4,7 @@ import com.example.agent.AgentSessionRepository;
 import com.example.agent.models.AgentSessionEntity;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.agent.config.ObjectMapperFactory;
 import com.google.adk.events.Event;
 import com.google.adk.sessions.BaseSessionService;
 import com.google.adk.sessions.GetSessionConfig;
@@ -36,7 +37,7 @@ import java.util.concurrent.ConcurrentMap;
 public class SessionService implements BaseSessionService {
 
     private final AgentSessionRepository repository;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = ObjectMapperFactory.create();
 
     public SessionService(AgentSessionRepository repository) {
         this.repository = repository;
@@ -59,20 +60,20 @@ public class SessionService implements BaseSessionService {
     @Transactional
     public AgentSessionEntity createOrGet(String sessionId, String clientId, String userId, String scope) {
         final String effectiveSessionId = (sessionId == null || sessionId.isBlank())
-            ? "sess_" + UUID.randomUUID().toString().replace("-", "")
-            : sessionId;
+                ? "sess_" + UUID.randomUUID().toString().replace("-", "")
+                : sessionId;
         return repository.findBySessionIdAndClientId(effectiveSessionId, clientId)
-            .orElseGet(() -> {
-                AgentSessionEntity e = new AgentSessionEntity();
-                e.setSessionId(sessionId);
-                e.setClientId(clientId);
-                e.setUserId(userId);
-                e.setScope(scope);
-                e.setHistoryJson("[]");
-                e.setCreatedAt(Instant.now());
-                e.setUpdatedAt(Instant.now());
-                return repository.save(e);
-            });
+                .orElseGet(() -> {
+                    AgentSessionEntity e = new AgentSessionEntity();
+                    e.setSessionId(sessionId);
+                    e.setClientId(clientId);
+                    e.setUserId(userId);
+                    e.setScope(scope);
+                    e.setHistoryJson("[]");
+                    e.setCreatedAt(Instant.now());
+                    e.setUpdatedAt(Instant.now());
+                    return repository.save(e);
+                });
     }
 
     @Transactional
@@ -91,7 +92,8 @@ public class SessionService implements BaseSessionService {
                 List<Object> list = new ArrayList<>();
                 String prev = e.getHistoryJson();
                 if (prev != null && !prev.isBlank()) {
-                    list = mapper.readValue(prev, new TypeReference<List<Object>>() {});
+                    list = mapper.readValue(prev, new TypeReference<List<Object>>() {
+                    });
                 }
                 list.add(historyEntry);
                 e.setHistoryJson(mapper.writeValueAsString(list));
@@ -104,43 +106,45 @@ public class SessionService implements BaseSessionService {
     }
 
     @Override
-    public Single<Session> createSession(String appName, String userId, ConcurrentMap<String, Object> state, String sessionId) {
+    public Single<Session> createSession(String appName, String userId, ConcurrentMap<String, Object> state,
+            String sessionId) {
         final String effectiveSessionId = (sessionId == null || sessionId.isBlank())
-            ? "sess_" + UUID.randomUUID().toString().replace("-", "")
-            : sessionId;
+                ? "sess_" + UUID.randomUUID().toString().replace("-", "")
+                : sessionId;
         return Single.fromCallable(new Callable<Session>() {
             @Override
             public Session call() throws Exception {
                 AgentSessionEntity sessionEntity = repository.findBySessionIdAndClientId(effectiveSessionId, appName)
-                .orElseGet(() -> {
-                    AgentSessionEntity e = new AgentSessionEntity();
-                    e.setSessionId(sessionId);
-                    e.setClientId(appName);
-                    e.setUserId(userId);
-                    e.setScope(""); // or some default scope, adjust as needed
-                    e.setHistoryJson("[]");
-                    e.setCreatedAt(Instant.now());
-                    e.setUpdatedAt(Instant.now());
-                    // Save initial state in history if nonempty
-                    if (state != null && !state.isEmpty()) {
-                        try {
-                            List<Object> historyList = new ArrayList<>();
-                            historyList.add(Map.of("state", state));
-                            e.setHistoryJson(mapper.writeValueAsString(historyList));
-                        } catch (Exception ex) {
-                            // ignore, just use as empty array
-                        }
-                    }
-                    return repository.save(e);
-                });
-                 // Populate fields for Session interface
+                        .orElseGet(() -> {
+                            AgentSessionEntity e = new AgentSessionEntity();
+                            e.setSessionId(sessionId);
+                            e.setClientId(appName);
+                            e.setUserId(userId);
+                            e.setScope(""); // or some default scope, adjust as needed
+                            e.setHistoryJson("[]");
+                            e.setCreatedAt(Instant.now());
+                            e.setUpdatedAt(Instant.now());
+                            // Save initial state in history if nonempty
+                            if (state != null && !state.isEmpty()) {
+                                try {
+                                    List<Object> historyList = new ArrayList<>();
+                                    historyList.add(Map.of("state", state));
+                                    e.setHistoryJson(mapper.writeValueAsString(historyList));
+                                } catch (Exception ex) {
+                                    // ignore, just use as empty array
+                                }
+                            }
+                            return repository.save(e);
+                        });
+                // Populate fields for Session interface
                 return sessionEntity.toSession();
             }
         });
     }
 
     @Override
-    public Maybe<Session> getSession(String appName, String userId, String sessionId, Optional<GetSessionConfig> config) {
+    public Maybe<Session> getSession(String appName, String userId, String sessionId,
+            Optional<GetSessionConfig> config) {
         Optional<AgentSessionEntity> sessionOpt = repository.findBySessionIdAndClientId(sessionId, appName)
                 .filter(e -> userId == null || userId.isBlank() || userId.equals(e.getUserId()));
         if (sessionOpt.isPresent()) {
@@ -174,8 +178,8 @@ public class SessionService implements BaseSessionService {
     public Completable deleteSession(String appName, String userId, String sessionId) {
         return Completable.fromAction(() -> {
             repository.findBySessionIdAndClientId(sessionId, appName)
-                .filter(e -> userId == null || userId.isBlank() || userId.equals(e.getUserId()))
-                .ifPresent(repository::delete);
+                    .filter(e -> userId == null || userId.isBlank() || userId.equals(e.getUserId()))
+                    .ifPresent(repository::delete);
         });
     }
 
@@ -185,7 +189,7 @@ public class SessionService implements BaseSessionService {
             // Assuming there is an event repository to retrieve events by session
             AgentSessionEntity sessionEntity = repository
                     .findBySessionIdAndClientId(sessionId, appName).orElseThrow();
-            
+
             List<Event> events = sessionEntity.toSession().events();
             // Filter by userId if given
             if (clientId != null && !clientId.isBlank()) {

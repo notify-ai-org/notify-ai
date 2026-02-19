@@ -10,6 +10,7 @@ import com.example.agent.models.RawLog;
 import com.example.agent.records.Fact;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.agent.config.ObjectMapperFactory;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 
@@ -28,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class FactConsumer {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = ObjectMapperFactory.create();
     private final AgentOrchestrator orchestrator;
     private final AgentRegistry agentRegistry;
     private final FactRepository factRepository;

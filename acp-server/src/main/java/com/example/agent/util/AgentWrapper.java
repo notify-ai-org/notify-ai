@@ -26,6 +26,7 @@ import org.springframework.scheduling.annotation.Async;
 import com.example.agent.models.AgentSnapshot;
 import com.example.agent.models.AgentLog;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.agent.config.ObjectMapperFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import java.util.concurrent.locks.ReentrantLock;
@@ -53,7 +54,7 @@ public class AgentWrapper {
 
     private final AgentSnapshotRepository snapshotRepo;
     private final AgentLogRepository logRepo;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = ObjectMapperFactory.create();
     private final JedisPool jedisPool;
     private final ReentrantLock lock = new ReentrantLock();
 
@@ -132,8 +133,6 @@ public class AgentWrapper {
                 .doOnNext(event -> {
                     lastActivityAt = Instant.now();
                     logger.fine(String.format("Agent %s emitted event: %s", agentId, event.toJson()));
-                    persistLog(AgentLog.LogType.EVENT_EMITTED, AgentStage.RUNNING, AgentStage.RUNNING, "Event emitted",
-                            Map.of("taskId", taskId), event.toJson());
                     persistSnapshot();
                 })
                 .doOnComplete(() -> {

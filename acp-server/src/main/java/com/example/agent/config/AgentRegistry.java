@@ -58,7 +58,7 @@ public class AgentRegistry {
 
     private void loadAgents(AgentOrchestrator agentOrchestrator) {
         try {
-            ObjectMapper mapper = new ObjectMapper();
+            ObjectMapper mapper = ObjectMapperFactory.create();
             Resource resource = resourceLoader.getResource("classpath:agents/agents.json");
             List<AgentConfig> configs;
             try (InputStream is = resource.getInputStream()) {
@@ -119,7 +119,7 @@ public class AgentRegistry {
         }
     }
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = ObjectMapperFactory.create();
 
     public static String loadPrompt(String resourcePath) {
         try (InputStream is = getResourceAsStream(resourcePath)) {

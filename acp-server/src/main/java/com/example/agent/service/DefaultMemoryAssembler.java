@@ -9,6 +9,7 @@ import com.example.agent.config.AgentRegistry;
 import com.example.agent.models.dto.MemorySummarizationRequestDto;
 import com.example.agent.models.dto.MemorySummarizationResponseDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.agent.config.ObjectMapperFactory;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import org.springframework.beans.factory.annotation.Value;
@@ -31,7 +32,7 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
     private final MemoryPageRepository pageRepo;
     private final AgentOrchestrator orchestrator;
     private final AgentRegistry agentRegistry;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = ObjectMapperFactory.create();
 
     public DefaultMemoryAssembler(
             @Value("${agent.memory.window-size:1h}") Duration windowSize,

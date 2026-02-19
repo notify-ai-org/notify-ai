@@ -24,6 +24,7 @@ import com.example.agent.records.PromptPackage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.agent.config.ObjectMapperFactory;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import com.example.agent.config.AgentRegistry;
@@ -37,7 +38,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
-import org.springframework.kafka.annotation.KafkaListener;
+// import org.springframework.kafka.annotation.KafkaListener; // Kafka disabled
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -53,7 +54,7 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @RequestMapping("/api/event")
 public class EventConsumer {
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = ObjectMapperFactory.create();
     private final EventRepository repo;
     private final EventCaptureRepository eventCaptureRepository;
     private final EventScheduleRepository eventScheduleRepository;
@@ -92,7 +93,8 @@ public class EventConsumer {
         this.agentRegistry = agentRegistry;
     }
 
-    @KafkaListener(topics = "${vocab.kafka-topic}", groupId = "vocab-adk-group")
+    // @KafkaListener(topics = "${vocab.kafka-topic}", groupId = "vocab-adk-group")
+    // // Kafka disabled
     @Transactional
     public void onMessage(String raw) {
         try {

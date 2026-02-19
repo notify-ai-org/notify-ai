@@ -8,6 +8,8 @@ import io.lettuce.core.output.ArrayOutput;
 import io.lettuce.core.protocol.CommandArgs;
 import io.lettuce.core.protocol.ProtocolKeyword;
 
+import jakarta.annotation.PostConstruct;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -19,11 +21,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public class MemoryPageRepository {
 
+    private static final Logger log = LoggerFactory.getLogger(MemoryPageRepository.class);
     private static final String INDEX = "idx:mem:page";
     /**
      * Similarity threshold. Pages with cosine similarity >= this value are
@@ -35,12 +42,17 @@ public class MemoryPageRepository {
 
     private final StatefulRedisConnection<String, String> connection;
 
+    @Value("${redis.vector.dim:3072}")
+    private int vectorDim;
+
     public MemoryPageRepository(StatefulRedisConnection<String, String> connection) {
         this.connection = connection;
     }
 
     private enum RediSearchCommand implements ProtocolKeyword {
-        FT_SEARCH("FT.SEARCH");
+        FT_SEARCH("FT.SEARCH"),
+        FT_CREATE("FT.CREATE"),
+        FT_LIST("FT._LIST");
 
         private final byte[] bytes;
 
@@ -51,6 +63,51 @@ public class MemoryPageRepository {
         @Override
         public byte[] getBytes() {
             return bytes;
+        }
+    }
+
+    @PostConstruct
+    void ensureIndex() {
+        RedisCommands<String, String> cmd = connection.sync();
+
+        // Check if the index already exists using FT._LIST
+        try {
+            List<Object> indexes = cmd.dispatch(
+                    RediSearchCommand.FT_LIST,
+                    new ArrayOutput<>(StringCodec.UTF8),
+                    new CommandArgs<>(StringCodec.UTF8));
+            if (indexes != null && indexes.stream().anyMatch(o -> INDEX.equals(o.toString()))) {
+                log.info("RediSearch index '{}' already exists, skipping creation.", INDEX);
+                return;
+            }
+        } catch (Exception e) {
+            log.warn("Could not list RediSearch indexes, will attempt to create '{}': {}", INDEX, e.getMessage());
+        }
+
+        // Create the index
+        try {
+            cmd.dispatch(
+                    RediSearchCommand.FT_CREATE,
+                    new io.lettuce.core.output.StatusOutput<>(StringCodec.UTF8),
+                    new CommandArgs<>(StringCodec.UTF8)
+                            .add(INDEX)
+                            .add("ON").add("HASH")
+                            .add("SCHEMA")
+                            .add("tenantId").add("TAG")
+                            .add("namespace").add("TAG")
+                            .add("correlationId").add("TAG")
+                            .add("createdAt").add("NUMERIC")
+                            .add("severityMax").add("TEXT")
+                            .add("summary").add("TEXT")
+                            .add("embedding").add("VECTOR").add("HNSW")
+                            .add("6")
+                            .add("TYPE").add("FLOAT32")
+                            .add("DIM").add(String.valueOf(vectorDim))
+                            .add("DISTANCE_METRIC").add("COSINE"));
+            log.info("Created RediSearch index '{}' with VECTOR DIM={}.", INDEX, vectorDim);
+        } catch (Exception e) {
+            // Index may already exist if concurrent startup — log and continue
+            log.warn("Failed to create RediSearch index '{}': {}", INDEX, e.getMessage());
         }
     }
 
@@ -203,6 +260,16 @@ public class MemoryPageRepository {
         return parseResults(res);
     }
 
+    /**
+     * Parses FT.SEARCH results returned in DIALECT 2 (RESP3-style) format.
+     *
+     * The raw list is a map-like structure:
+     * [attributes, [], format, STRING, results, [...], total_results, N, warning,
+     * []]
+     *
+     * Each entry inside the "results" list is itself a map-like list:
+     * [id, "docKey", extra_attributes, [field1, val1, field2, val2, ...]]
+     */
     @SuppressWarnings("unchecked")
     private List<SearchResult> parseResults(List<Object> raw) {
         List<SearchResult> results = new ArrayList<>();
@@ -210,9 +277,47 @@ public class MemoryPageRepository {
             return results;
         }
 
-        for (int i = 1; i < raw.size(); i += 2) {
-            String key = raw.get(i).toString();
-            List<Object> fields = (List<Object>) raw.get(i + 1);
+        // --- Extract the "results" list from the envelope ---
+        List<Object> resultEntries = null;
+        for (int i = 0; i < raw.size() - 1; i += 2) {
+            String envKey = raw.get(i).toString();
+            if ("results".equals(envKey)) {
+                Object val = raw.get(i + 1);
+                if (val instanceof List) {
+                    resultEntries = (List<Object>) val;
+                }
+                break;
+            }
+        }
+        if (resultEntries == null || resultEntries.isEmpty()) {
+            return results;
+        }
+
+        // --- Iterate over each result entry ---
+        for (Object entry : resultEntries) {
+            if (!(entry instanceof List)) {
+                continue;
+            }
+            List<Object> entryList = (List<Object>) entry;
+
+            // Each entry is a map-like list: [id, "docKey", extra_attributes, [...]]
+            String key = "";
+            List<Object> fields = null;
+            for (int i = 0; i < entryList.size() - 1; i += 2) {
+                String entryKey = entryList.get(i).toString();
+                if ("id".equals(entryKey)) {
+                    key = entryList.get(i + 1).toString();
+                } else if ("extra_attributes".equals(entryKey)) {
+                    Object attrVal = entryList.get(i + 1);
+                    if (attrVal instanceof List) {
+                        fields = (List<Object>) attrVal;
+                    }
+                }
+            }
+
+            if (fields == null || fields.isEmpty()) {
+                continue;
+            }
 
             String tenantId = "";
             String namespace = "";
@@ -222,7 +327,7 @@ public class MemoryPageRepository {
             String summary = "";
             double score = 1.0;
 
-            for (int f = 0; f < fields.size(); f += 2) {
+            for (int f = 0; f < fields.size() - 1; f += 2) {
                 String name = fields.get(f).toString();
                 Object valObj = fields.get(f + 1);
                 if (valObj == null)

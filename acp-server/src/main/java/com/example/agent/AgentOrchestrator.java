@@ -1,6 +1,7 @@
 package com.example.agent;
 
 import com.example.agent.enums.AgentStage;
+import com.example.agent.models.AgentContext;
 import com.example.agent.models.AgentStageChangeEvent;
 import com.example.agent.service.LogToMemoryAgentWorker;
 import com.example.agent.service.SessionService;
@@ -9,6 +10,8 @@ import com.example.agent.util.CentralExecutorRegistry;
 import com.example.agent.util.CentralExecutorRegistry.ExecutorType;
 import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
+import com.google.adk.artifacts.BaseArtifactService;
+import com.google.adk.artifacts.InMemoryArtifactService;
 import com.google.adk.events.Event;
 import com.google.genai.types.Content;
 
@@ -19,9 +22,6 @@ import io.reactivex.rxjava3.subjects.Subject;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -52,16 +52,10 @@ public class AgentOrchestrator {
 
     // Configuration
     private final int maxPoolSize;
-    private final long agentTimeoutMillis;
-    private final boolean autoCleanup;
 
     // Event emission
     private final Subject<AgentStageChangeEvent> globalStageChangeSubject;
     private final Subject<AgentOrchestratorEvent> orchestratorEventSubject;
-
-    // Background tasks
-    private final ScheduledExecutorService scheduler;
-    private final Timer cleanupTimer;
 
     // Statistics
     private final AtomicInteger totalTasksExecuted;
@@ -81,8 +75,6 @@ public class AgentOrchestrator {
             LogToMemoryAgentWorker logToMemoryAgentWorker) {
         // Default: 10 agents, 5 min timeout, auto cleanup
         this.maxPoolSize = 10;
-        this.agentTimeoutMillis = 300000;
-        this.autoCleanup = true;
         this.snapshotRepo = snapshotRepo;
         this.logRepo = logRepo;
         this.sessionService = sessionService;
@@ -99,14 +91,10 @@ public class AgentOrchestrator {
         this.globalStageChangeSubject = PublishSubject.create();
         this.orchestratorEventSubject = PublishSubject.create();
 
-        this.scheduler = Executors.newScheduledThreadPool(2);
-        this.cleanupTimer = new Timer("AgentCleanupTimer", true);
-
         this.totalTasksExecuted = new AtomicInteger(0);
         this.totalAgentsCreated = new AtomicInteger(0);
         this.totalAgentsTerminated = new AtomicInteger(0);
 
-        setupCleanupTask();
         setupEventForwarding();
     }
 
@@ -183,7 +171,8 @@ public class AgentOrchestrator {
     public Flowable<Event> executeTaskWithAgent(String agentId, InvocationContext context, String taskId,
             Content prompt) {
         AgentWrapper agent = agentPool.get(agentId);
-
+        AgentContext agentContext = AgentContextHolder.getContext();
+        BaseArtifactService artifactService = new InMemoryArtifactService();
         if (taskId == null)
             taskId = UUID.randomUUID().toString();
 
@@ -191,7 +180,8 @@ public class AgentOrchestrator {
             return Flowable.error(new IllegalArgumentException("Agent not found: " + agentId));
         }
         if (context == null) {
-            context = InvocationContext.create(null, null, agent.getAgent(), null, null, null);
+            context = InvocationContext.create(sessionService, artifactService, agent.getAgent(),
+                    agentContext.getSession(), null, null);
         }
         if (!agent.isAvailable()) {
             return Flowable.error(new IllegalStateException("Agent not available: " + agentId));
@@ -310,27 +300,6 @@ public class AgentOrchestrator {
     }
 
     /**
-     * Terminate a specific agent
-     */
-    public boolean terminateAgent(String agentId, String reason) {
-        AgentWrapper agent = agentPool.get(agentId);
-        if (agent != null) {
-            boolean success = agent.terminate(reason);
-            if (success) {
-                agentPool.remove(agentId);
-                availableAgents.remove(agentId);
-                busyAgents.remove(agentId);
-                totalAgentsTerminated.incrementAndGet();
-
-                emitOrchestratorEvent(AgentOrchestratorEventType.AGENT_TERMINATED,
-                        Map.of("agentId", agentId, "reason", reason));
-            }
-            return success;
-        }
-        return false;
-    }
-
-    /**
      * Get agent statistics
      */
     public Map<String, Object> getStatistics() {
@@ -385,13 +354,6 @@ public class AgentOrchestrator {
     public void shutdown() {
         logger.info("Shutting down agent orchestrator...");
 
-        // Terminate all agents
-        agentPool.keySet().forEach(agentId -> terminateAgent(agentId, "Orchestrator shutdown"));
-
-        // Shutdown scheduler
-        scheduler.shutdown();
-        cleanupTimer.cancel();
-
         // Complete subjects
         globalStageChangeSubject.onComplete();
         orchestratorEventSubject.onComplete();
@@ -410,28 +372,6 @@ public class AgentOrchestrator {
                 .filter(AgentWrapper::isAvailable)
                 .findFirst()
                 .orElse(null);
-    }
-
-    private void setupCleanupTask() {
-        if (autoCleanup) {
-            scheduler.scheduleAtFixedRate(() -> {
-                cleanupInactiveAgents();
-            }, agentTimeoutMillis, agentTimeoutMillis, TimeUnit.MILLISECONDS);
-        }
-    }
-
-    private void cleanupInactiveAgents() {
-        Instant cutoff = Instant.now().minusMillis(agentTimeoutMillis);
-        agentPool.entrySet().removeIf(entry -> {
-            AgentWrapper agent = entry.getValue();
-            if (agent.getLastActivityAt().isBefore(cutoff) &&
-                    (agent.getCurrentStage() == AgentStage.IDLE || agent.getCurrentStage() == AgentStage.READY)) {
-                logger.info(String.format("Cleaning up inactive agent %s", agent.getAgentId()));
-                terminateAgent(agent.getAgentId(), "Inactive agent cleanup");
-                return true;
-            }
-            return false;
-        });
     }
 
     private void setupEventForwarding() {
@@ -454,7 +394,6 @@ public class AgentOrchestrator {
 
     public enum AgentOrchestratorEventType {
         AGENT_REGISTERED,
-        AGENT_TERMINATED,
         AGENT_STAGE_CHANGED,
         TASK_STARTED,
         TASK_COMPLETED,
