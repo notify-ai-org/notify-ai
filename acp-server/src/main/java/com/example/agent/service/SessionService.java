@@ -147,17 +147,26 @@ public class SessionService implements BaseSessionService {
             Optional<GetSessionConfig> config) {
         Optional<AgentSessionEntity> sessionOpt = repository.findBySessionIdAndClientId(sessionId, appName)
                 .filter(e -> userId == null || userId.isBlank() || userId.equals(e.getUserId()));
+        if (sessionOpt.isEmpty()) {
+            // Also try lookup by primary key (id) since toSession() uses the DB id
+            sessionOpt = repository.findById(sessionId)
+                    .filter(e -> userId == null || userId.isBlank() || userId.equals(e.getUserId()));
+        }
         if (sessionOpt.isPresent()) {
             try {
                 return Maybe.just(sessionOpt.get().toSession());
             } catch (Exception e1) {
-                // TODO Auto-generated catch block
                 e1.printStackTrace();
             }
-        } else {
-            return Maybe.empty();
         }
-        return null;
+        // Session not found — create it so the Runner never fails with "Session not
+        // found"
+        try {
+            AgentSessionEntity created = createOrGet(sessionId, appName, userId, "");
+            return Maybe.just(created.toSession());
+        } catch (Exception e) {
+            return Maybe.error(e);
+        }
     }
 
     @Override

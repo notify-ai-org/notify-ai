@@ -183,9 +183,9 @@ public class Config {
         Map<String, Object> props = new HashMap<>();
         props.put("hibernate.hbm2ddl.auto", "update"); // or validate, create, none
         props.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"); // change if using another DB
-        props.put("hibernate.show_sql", true);
-        props.put("hibernate.format_sql", true);
-        props.put("hibernate.use_sql_comments", true);
+        props.put("hibernate.show_sql", false);
+        props.put("hibernate.format_sql", false);
+        props.put("hibernate.use_sql_comments", false);
         props.put("hibernate.jdbc.batch_size", 20);
         return props;
     }

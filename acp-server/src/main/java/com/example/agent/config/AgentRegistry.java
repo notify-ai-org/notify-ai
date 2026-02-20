@@ -91,9 +91,14 @@ public class AgentRegistry {
                     String prompt = loadPrompt(config.getResourcePath() + "/prompt.md");
                     Example example = loadSingleExample(config.getResourcePath() + "/example.json");
 
+                    String model = config.getModel() != null && !config.getModel().isBlank()
+                            ? config.getModel()
+                            : "gemini-2.0-flash";
+
                     LlmAgent agent = LlmAgent.builder()
                             .name(config.getName())
                             .description(config.getDescription())
+                            .model(model)
                             .inputSchema(inputSchema)
                             .outputSchema(outputSchema)
                             .instruction(prompt)

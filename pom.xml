@@ -43,22 +43,20 @@
                 <artifactId>spring-boot-starter-data-jpa</artifactId>
                 <version>${spring.boot.version}</version>
             </dependency>
-            <dependency>
-                <groupId>redis.clients</groupId>
-                <artifactId>jedis</artifactId>
-                <version>5.1.0</version>
-            </dependency>
+            <!-- Jedis removed; using Lettuce via spring-boot-starter-data-redis -->
 
             <!-- Spring Data Redis (Lettuce client by default) -->
             <dependency>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-starter-data-redis</artifactId>
+                <version>${spring.boot.version}</version>
             </dependency>
 
             <!-- For pooling with Lettuce using commons-pool2 -->
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-pool2</artifactId>
+                <version>2.12.0</version>
             </dependency>
 
             <!-- PostgreSQL Driver -->

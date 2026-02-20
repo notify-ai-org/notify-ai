@@ -27,8 +27,8 @@ import com.example.agent.models.AgentSnapshot;
 import com.example.agent.models.AgentLog;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.agent.config.ObjectMapperFactory;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
+import io.lettuce.core.api.StatefulRedisConnection;
+import io.lettuce.core.api.sync.RedisCommands;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.HashMap;
 
@@ -55,11 +55,12 @@ public class AgentWrapper {
     private final AgentSnapshotRepository snapshotRepo;
     private final AgentLogRepository logRepo;
     private final ObjectMapper mapper = ObjectMapperFactory.create();
-    private final JedisPool jedisPool;
+    private final StatefulRedisConnection<String, String> redisConnection;
     private final ReentrantLock lock = new ReentrantLock();
 
     public AgentWrapper(String agentId, BaseAgent agent, AgentSnapshotRepository snapshotRepo,
-            AgentLogRepository logRepo, JedisPool jedisPool, SessionService sessionService) {
+            AgentLogRepository logRepo, StatefulRedisConnection<String, String> redisConnection,
+            SessionService sessionService) {
         this.agentId = agentId;
         this.agent = agent;
         this.currentStage = new AtomicReference<>(AgentStage.CREATED);
@@ -69,7 +70,7 @@ public class AgentWrapper {
         this.lastActivityAt = Instant.now();
         this.snapshotRepo = snapshotRepo;
         this.logRepo = logRepo;
-        this.jedisPool = jedisPool;
+        this.redisConnection = redisConnection;
         this.sessionService = sessionService;
 
         persistSnapshot();
@@ -297,8 +298,9 @@ public class AgentWrapper {
                 snapshotRepo.save(snapshot);
             }
 
-            if (jedisPool != null) {
-                try (Jedis jedis = jedisPool.getResource()) {
+            if (redisConnection != null) {
+                try {
+                    RedisCommands<String, String> commands = redisConnection.sync();
                     Map<String, String> hash = new HashMap<>();
                     hash.put("agentId", agentId);
                     hash.put("agentName", agent.name());
@@ -310,7 +312,7 @@ public class AgentWrapper {
                     }
                     hash.put("state", stateJson);
 
-                    jedis.hset("agent:snapshot:" + agentId, hash);
+                    commands.hset("agent:snapshot:" + agentId, hash);
                 } catch (Exception e) {
                     logger.warning("Failed to persist agent snapshot to Redis: " + e.getMessage());
                 }

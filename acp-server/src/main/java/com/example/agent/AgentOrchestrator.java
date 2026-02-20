@@ -25,7 +25,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
-import redis.clients.jedis.JedisPool;
+import io.lettuce.core.api.StatefulRedisConnection;
 
 import javax.annotation.PreDestroy;
 
@@ -64,7 +64,7 @@ public class AgentOrchestrator {
 
     private final AgentSnapshotRepository snapshotRepo;
     private final AgentLogRepository logRepo;
-    private final JedisPool jedisPool;
+    private final StatefulRedisConnection<String, String> redisConnection;
     private final SessionService sessionService;
     private final CentralExecutorRegistry executorRegistry;
     private final LogToMemoryAgentWorker logToMemoryAgentWorker;
@@ -72,7 +72,8 @@ public class AgentOrchestrator {
     @org.springframework.beans.factory.annotation.Autowired
     public AgentOrchestrator(AgentSnapshotRepository snapshotRepo, AgentLogRepository logRepo,
             SessionService sessionService, CentralExecutorRegistry executorRegistry,
-            LogToMemoryAgentWorker logToMemoryAgentWorker) {
+            LogToMemoryAgentWorker logToMemoryAgentWorker,
+            StatefulRedisConnection<String, String> redisConnection) {
         // Default: 10 agents, 5 min timeout, auto cleanup
         this.maxPoolSize = 10;
         this.snapshotRepo = snapshotRepo;
@@ -85,8 +86,7 @@ public class AgentOrchestrator {
         this.busyAgents = new ConcurrentHashMap<>();
         this.nextAgentId = new AtomicInteger(1);
 
-        // Initialize JedisPool with default settings (localhost:6379)
-        this.jedisPool = new JedisPool("localhost", 6379);
+        this.redisConnection = redisConnection;
 
         this.globalStageChangeSubject = PublishSubject.create();
         this.orchestratorEventSubject = PublishSubject.create();
@@ -107,7 +107,7 @@ public class AgentOrchestrator {
         }
 
         String agentId = "agent_" + nextAgentId.getAndIncrement();
-        AgentWrapper wrapper = new AgentWrapper(agentId, agent, snapshotRepo, logRepo, jedisPool, sessionService);
+        AgentWrapper wrapper = new AgentWrapper(agentId, agent, snapshotRepo, logRepo, redisConnection, sessionService);
 
         agentPool.put(agentId, wrapper);
         availableAgents.put(agentId, wrapper);
@@ -360,9 +360,8 @@ public class AgentOrchestrator {
 
         logger.info("Agent orchestrator shutdown complete");
 
-        if (jedisPool != null) {
-            jedisPool.close();
-        }
+        // StatefulRedisConnection lifecycle is managed by Spring; no manual close
+        // needed
     }
 
     // Private helper methods

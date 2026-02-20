@@ -20,9 +20,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create
+    show-sql: false
     properties:
       hibernate:
-        format_sql: true
+        show_sql: false
+        format_sql: false
   ai:
     openai:
       api-key: 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
@@ -79,3 +81,8 @@ executors:
   scheduler:
     threads: 2
 
+logging:
+  level:
+    org.hibernate.SQL: 'OFF'
+    org.hibernate.type.descriptor.sql.BasicBinder: 'OFF'
+    org.hibernate.orm.jdbc.bind: 'OFF'
