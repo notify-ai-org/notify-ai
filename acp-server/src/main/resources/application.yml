@@ -28,6 +28,8 @@ spring:
   ai:
     openai:
       api-key: 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
+    anthropic:
+      api-key: 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
 
 redis:
   host: ${REDIS_HOST:redis-19139.crce263.ap-south-1-1.ec2.cloud.redislabs.com}

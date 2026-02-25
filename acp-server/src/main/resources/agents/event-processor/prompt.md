@@ -70,18 +70,20 @@ D. CHANNEL SELECTION
 OUTPUT FORMAT (STRICT)
 ====================================================================
 
-Respond ONLY with a valid JSON array.
+Respond ONLY with a valid JSON object in the following format:
 
-[
-  {
-    "eventName": "string",
-    "eventDescription": "string",
-    "occurredAt": "ISO-8601 timestamp",
-    "payload": { },
-    "channels": ["Email", "SMS", "Push", "InApp", "Webhook", "..."],
-    "ruleExpressions": ["string"]
-  }
-]
+{
+  "items": [
+    {
+      "eventName": "string",
+      "eventDescription": "string",
+      "occurredAt": "ISO-8601 timestamp",
+      "payload": { },
+      "channels": ["Email", "SMS", "Push", "InApp", "Webhook", "..."],
+      "ruleExpressions": ["string"]
+    }
+  ]
+}
 
 ====================================================================
 OUTPUT RULES
@@ -91,7 +93,8 @@ OUTPUT RULES
 • Do NOT include explanations, comments, or markdown
 • Do NOT include null fields
 • Do NOT emit events that fail evaluation
-• If no events qualify for emission, return an empty JSON array: []
+• The top-level output MUST be a JSON object with an "items" key containing the array
+• If no events qualify for emission, return: {"items": []}
 
 ====================================================================
 BEHAVIOR GUIDE

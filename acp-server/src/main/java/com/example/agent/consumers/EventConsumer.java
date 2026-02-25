@@ -186,10 +186,13 @@ public class EventConsumer {
                                     for (Part part : parts.get()) {
                                         if (part.text().isPresent()) {
                                             String json = part.text().get();
-                                            // Parse as array of processed events
-                                            List<Map<String, Object>> processedEvents = mapper.readValue(json,
-                                                    new TypeReference<List<Map<String, Object>>>() {
+                                            // Parse as wrapper object containing the items array
+                                            Map<String, Object> wrapper = mapper.readValue(json,
+                                                    new TypeReference<Map<String, Object>>() {
                                                     });
+                                            @SuppressWarnings("unchecked")
+                                            List<Map<String, Object>> processedEvents = (List<Map<String, Object>>) wrapper
+                                                    .getOrDefault("items", java.util.Collections.emptyList());
                                             for (Map<String, Object> processedEvent : processedEvents) {
                                                 Object eventTypeObj = processedEvent.get("eventType");
                                                 @SuppressWarnings("unchecked")

@@ -22,28 +22,29 @@
     "threadName": "main",
     "serviceName": "order-service"
   },
-  "output": [
-    {
-      "eventName": "event",
-      "eventDescription": "A new order is placed by the user",
-      "eventType": "ORDER_PLACED",
-      "occurredAt": "2024-05-10T09:15:00Z",
-      "payload": {
-        "orderId": "1234567890",
-        "orderAmount": 100,
-        "orderStatus": "PLACED"
-      },
-      "channels": [
-        {
-          "channel": "EMAIL",
-          "subject": "customer"
-        }
-      ],
-      "ruleExpressions": [
-        "order.status = 'PLACED'",
-        "order.amount > 100"
-      ]
-    }
-  ]
+  "output": {
+    "items": [
+      {
+        "eventName": "event",
+        "eventDescription": "A new order is placed by the user",
+        "eventType": "ORDER_PLACED",
+        "occurredAt": "2024-05-10T09:15:00Z",
+        "payload": {
+          "orderId": "1234567890",
+          "orderAmount": 100,
+          "orderStatus": "PLACED"
+        },
+        "channels": [
+          {
+            "channel": "EMAIL",
+            "subject": "customer"
+          }
+        ],
+        "ruleExpressions": [
+          "order.status = 'PLACED'",
+          "order.amount > 100"
+        ]
+      }
+    ]
+  }
 }
-
