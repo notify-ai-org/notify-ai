@@ -12,7 +12,6 @@ import jakarta.persistence.Id;
 @Entity
 public record MemoryPage(
         @Id String pageId,
-        String tenantId,
         String namespace,
         String correlationId,
         PageType pageType,
@@ -32,7 +31,7 @@ public record MemoryPage(
     public MemoryPage(String pageId, PageType pageType, String summary, Instant timestamp,
             double importance, double confidence, Instant createdAt, Instant updatedAt,
             Set<String> tags, List<EntityRef> scope, String rawRef) {
-        this(pageId, null, null, null, pageType, summary, null, timestamp,
+        this(pageId, null, null, pageType, summary, null, timestamp,
                 importance, confidence, createdAt, updatedAt, tags, scope, rawRef, null);
     }
 }

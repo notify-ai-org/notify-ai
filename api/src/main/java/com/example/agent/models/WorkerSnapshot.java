@@ -4,14 +4,11 @@ import jakarta.persistence.*;
 import java.time.Instant;
 
 @Entity
-@Table(
-    name = "worker_snapshot",
-    indexes = {
-        @Index(name = "idx_worker_snapshot_worker_id", columnList = "workerId"),
+@Table(name = "worker_snapshot", indexes = {
+        @Index(name = "idx_worker_snapshot_worker_id", columnList = "worker_id"),
         @Index(name = "idx_worker_snapshot_status", columnList = "status"),
-        @Index(name = "idx_worker_snapshot_last_active", columnList = "lastActiveAt")
-    }
-)
+        @Index(name = "idx_worker_snapshot_last_active", columnList = "last_active_at")
+})
 public class WorkerSnapshot {
 
     @Id
@@ -26,8 +23,6 @@ public class WorkerSnapshot {
 
     @Column(name = "job_id")
     private String jobId;
-
-
 
     public WorkerSnapshot(
             String workerId,

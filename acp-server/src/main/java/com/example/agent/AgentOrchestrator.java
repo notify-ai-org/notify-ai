@@ -173,8 +173,7 @@ public class AgentOrchestrator {
         AgentWrapper agent = agentPool.get(agentId);
         AgentContext agentContext = AgentContextHolder.getContext();
         BaseArtifactService artifactService = new InMemoryArtifactService();
-        if (taskId == null)
-            taskId = UUID.randomUUID().toString();
+        final String finalTaskId = (taskId == null) ? UUID.randomUUID().toString() : taskId;
 
         if (agent == null) {
             return Flowable.error(new IllegalArgumentException("Agent not found: " + agentId));
@@ -191,10 +190,11 @@ public class AgentOrchestrator {
         availableAgents.remove(agentId);
         busyAgents.put(agentId, agent);
 
-        return agent.execute(context, taskId, prompt)
+        return agent.execute(context, finalTaskId, prompt)
                 .doOnComplete(() -> {
                     busyAgents.remove(agentId);
                     availableAgents.put(agentId, agent);
+                    agent.transitionTo(AgentStage.READY, "Task completed", Map.of("taskId", finalTaskId));
                     executorRegistry
                             .get(ExecutorType.LLM)
                             .submit(() -> logToMemoryAgentWorker.run());
@@ -202,6 +202,8 @@ public class AgentOrchestrator {
                 .doOnError(error -> {
                     busyAgents.remove(agentId);
                     availableAgents.put(agentId, agent);
+                    agent.transitionTo(AgentStage.READY, "Task failed, agent available",
+                            Map.of("taskId", finalTaskId, "error", error.getMessage()));
                     executorRegistry
                             .get(ExecutorType.LLM)
                             .submit(() -> logToMemoryAgentWorker.run());

@@ -10,7 +10,16 @@ import java.util.List;
  */
 public class EventProcessingResultListDto {
 
+    private String result;
     private List<EventProcessingResultDto> items;
+
+    public String getResult() {
+        return result;
+    }
+
+    public void setResult(String result) {
+        this.result = result;
+    }
 
     public List<EventProcessingResultDto> getItems() {
         return items;

@@ -10,6 +10,10 @@ import lombok.ToString;
 import java.time.Instant;
 import java.util.List;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.example.agent.models.deserializers.FlatteningMapDeserializer;
+import java.util.Map;
+
 @Entity
 @Table(name = "event_capture")
 @Data
@@ -18,7 +22,8 @@ import java.util.List;
 public class EventCapture extends RawLog {
 
     @Transient
-    private Vocabulary payload;
+    @JsonDeserialize(using = FlatteningMapDeserializer.class)
+    private Map<String, Object> payload;
 
     @ManyToOne
     private Event event;

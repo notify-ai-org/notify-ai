@@ -1,9 +1,19 @@
 {
   "input": {
-    "eventName": "OrderPlaced",
-    "eventType": "SERVICE_CALL",
-    "occuredAt": "2024-05-10T09:15:00Z",
-    "payload": "{\"orderId\":\"1234567890\",\"orderAmount\":100,\"orderStatus\":\"PLACED\"}",
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "timestamp": "2024-05-10T09:15:00Z",
+    "correlationId": "corr-123",
+    "event": {
+      "name": "OrderPlaced",
+      "description": "User requested to place an order",
+      "eventType": "SERVICE_CALL",
+      "priority": 1
+    },
+    "payload": {
+      "orderId": "1234567890",
+      "orderAmount": 100,
+      "orderStatus": "PLACED"
+    },
     "callStack": {
       "frames": [
         {
@@ -19,14 +29,14 @@
       "returnValue": "{\"orderId\":\"1234567890\",\"status\":\"PLACED\"}"
     },
     "durationMillis": 150,
-    "threadName": "main",
     "serviceName": "order-service"
   },
   "output": {
+    "result": "emitted",
     "items": [
       {
-        "eventName": "event",
-        "eventDescription": "A new order is placed by the user",
+        "eventName": "OrderPlaced",
+        "eventDescription": "A new order has been placed by the customer",
         "eventType": "ORDER_PLACED",
         "occurredAt": "2024-05-10T09:15:00Z",
         "payload": {
@@ -36,14 +46,26 @@
         },
         "channels": [
           {
-            "channel": "EMAIL",
-            "subject": "customer"
+            "channel": "EMAIL"
           }
         ],
         "ruleExpressions": [
-          "order.status = 'PLACED'",
-          "order.amount > 100"
-        ]
+          "order.status == 'PLACED'",
+          "order.amount > 0"
+        ],
+        "reasoning": {
+          "bulletReasons": [
+            "OrderPlaced is a significant business event that warrants customer notification",
+            "Order amount is above minimum threshold"
+          ],
+          "memoryUsed": [],
+          "factsUsed": []
+        },
+        "safetyChecks": {
+          "optOutRespected": true,
+          "dndRespected": true,
+          "quotaRespected": true
+        }
       }
     ]
   }

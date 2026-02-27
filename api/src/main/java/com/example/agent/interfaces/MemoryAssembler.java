@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Set;
 
 import com.example.agent.enums.PageType;
-import com.example.agent.records.EntityRef;
 import com.example.agent.records.Fact;
 import com.example.agent.records.MemoryPage;
 import com.example.agent.records.VectorCandidate;
@@ -28,9 +27,7 @@ public interface MemoryAssembler {
     MemoryPage findOrCreatePage(String namespace, Fact fact);
 
     List<VectorCandidate> search(
-            String tenantId,
             String queryText,
-            List<EntityRef> scope,
             Set<PageType> pageTypes,
             Instant since,
             int k);

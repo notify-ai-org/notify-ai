@@ -1,6 +1,5 @@
 package com.example.agent.planner;
 
-import com.example.agent.FactRepository;
 import com.example.agent.enums.DecisionType;
 import com.example.agent.enums.PageType;
 import com.example.agent.interfaces.*;
@@ -36,7 +35,7 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
         int reservedForModelBuffer = Math.min(250, budget / 4);
         budget = Math.max(0, budget - reservedForPromptOverhead - reservedForModelBuffer);
 
-        List<Fact> facts = factStore.fetchFacts(req.tenantId(), req.entities(), req.decisionType(), now);
+        List<Fact> facts = factStore.fetchFacts(req.decisionType(), now);
         budget -= estimateFactsTokens(facts);
 
         // Build decision-aware retrieval queries
@@ -47,9 +46,7 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
         List<VectorCandidate> candidates = new ArrayList<>();
         for (RetrievalQuery q : queries) {
             candidates.addAll(memoryAssembler.search(
-                    req.tenantId(),
                     q.queryText(),
-                    q.scope(),
                     Set.of(PageType.SEMANTIC, PageType.EPISODIC),
                     since,
                     q.k()));
@@ -161,7 +158,7 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
                     new RetrievalQuery("recent delivery failures and suppression reasons",
                             Set.of("failure", "suppression", "retry"), scope, PageType.EPISODIC, 25),
                     new RetrievalQuery("tenant provider reliability incidents",
-                            Set.of("incident", "provider", "outage"), List.of(new EntityRef("TENANT", req.tenantId())),
+                            Set.of("incident", "provider", "outage"), scope,
                             PageType.SEMANTIC, 25),
                     new RetrievalQuery("successful fallback patterns after similar failures",
                             Set.of("fallback", "success"), scope, PageType.SEMANTIC, 25));
@@ -174,7 +171,7 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
                     new RetrievalQuery("suppression reasons and complaints history",
                             Set.of("complaint", "optout", "suppression"), scope, PageType.EPISODIC, 25),
                     new RetrievalQuery("policy rules for suppression and compliance", Set.of("policy", "compliance"),
-                            List.of(new EntityRef("TENANT", req.tenantId())), PageType.PROCEDURAL, 15));
+                            scope, PageType.PROCEDURAL, 15));
             case TEMPLATE_PICK -> List.of(
                     new RetrievalQuery("template performance and engagement by channel",
                             Set.of("template", "engagement"), scope, PageType.SEMANTIC, 25),
@@ -182,7 +179,7 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
                             scope, PageType.EPISODIC, 25));
             case ESCALATE -> List.of(
                     new RetrievalQuery("escalation rules and severity thresholds", Set.of("escalation", "severity"),
-                            List.of(new EntityRef("TENANT", req.tenantId())), PageType.PROCEDURAL, 15),
+                            scope, PageType.PROCEDURAL, 15),
                     new RetrievalQuery("similar escalations and outcomes", Set.of("escalation", "outcome"), scope,
                             PageType.EPISODIC, 25));
         };

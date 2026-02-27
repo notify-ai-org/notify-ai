@@ -4,7 +4,6 @@ import com.example.agent.FactRepository;
 import com.example.agent.enums.DecisionType;
 import com.example.agent.interfaces.FactStore;
 import com.example.agent.models.FactEntity;
-import com.example.agent.records.EntityRef;
 import com.example.agent.records.Fact;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,11 +26,10 @@ public class DefaultFactStore implements FactStore {
     }
 
     @Override
-    public List<Fact> fetchFacts(String tenantId, List<EntityRef> scope, DecisionType decisionType, Instant now) {
-        // Fetch facts for the tenant that were observed before 'now'
-        // Using a lookback window - adjust as needed based on your requirements
-        Instant lookbackStart = now.minusSeconds(86400 * 30); // Last 30 days
-        List<FactEntity> entities = factRepository.findByClientIdAndObservedAtAfter(tenantId, lookbackStart);
+    public List<Fact> fetchFacts(DecisionType decisionType, Instant now) {
+        // Fetch facts observed in the last 30 days
+        Instant lookbackStart = now.minusSeconds(86400 * 30);
+        List<FactEntity> entities = factRepository.findByObservedAtAfter(lookbackStart);
 
         // Convert FactEntity to Fact record
         return entities.stream()
@@ -45,7 +43,6 @@ public class DefaultFactStore implements FactStore {
 
         return new Fact(
                 String.valueOf(entity.getId()), // factId - using the entity ID
-                entity.getClientId(), // tenantId
                 entity.getFactType(), // factType
                 entity.getSentence(), // sentence
                 entity.getObservedAt(), // observedAt

@@ -80,7 +80,7 @@ public class EventListener {
         dto.getEvent().setEventType("USER");
         dto.getEvent().setDescription(ann.description());
         dto.setOccuredAt(Instant.now());
-        dto.setPayload(vocabularyManager.toInstanceVocabularyGraph(pjp.getArgs()[0]));
+        dto.setPayload(vocabularyManager.toFlattenedMap(pjp.getArgs()[0]));
         dto.setDurationMillis(duration);
 
         // Limit call stack depth to 5
@@ -230,7 +230,7 @@ public class EventListener {
                 try {
                     Object vocab = invokeManager.invokeVocabularySupplier(eventKey, dto.getPayload());
                     if (vocab != null) {
-                        dto.setPayload(vocabularyManager.toInstanceVocabularyGraph(vocab));
+                        dto.setPayload(vocabularyManager.toFlattenedMap(vocab));
                     }
                 } catch (Exception ignored) {
                 }

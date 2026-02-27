@@ -93,7 +93,6 @@ public class MemoryPageRepository {
                             .add(INDEX)
                             .add("ON").add("HASH")
                             .add("SCHEMA")
-                            .add("tenantId").add("TAG")
                             .add("namespace").add("TAG")
                             .add("correlationId").add("TAG")
                             .add("createdAt").add("NUMERIC")
@@ -123,7 +122,6 @@ public class MemoryPageRepository {
             return Optional.empty();
         }
 
-        String tenantId = fields.getOrDefault("tenantId", "");
         String correlationId = fields.getOrDefault("correlationId", "");
         long createdAtMilli = Long.parseLong(fields.getOrDefault("createdAt", "0"));
         String severityMax = fields.getOrDefault("severityMax", "");
@@ -131,7 +129,6 @@ public class MemoryPageRepository {
 
         MemoryPage page = new MemoryPage(
                 pageId,
-                tenantId,
                 namespace,
                 correlationId,
                 null, // pageType
@@ -166,7 +163,6 @@ public class MemoryPageRepository {
         RedisCommands<String, String> cmd = connection.sync();
 
         Map<String, String> fields = new HashMap<>();
-        fields.put("tenantId", page.tenantId());
         fields.put("namespace", page.namespace());
         fields.put("correlationId", page.correlationId());
         fields.put("createdAt", page.createdAt() != null ? String.valueOf(page.createdAt().toEpochMilli()) : "0");
@@ -190,7 +186,6 @@ public class MemoryPageRepository {
 
         // Search for the single most similar page for this tenant
         List<SearchResult> results = knnSearch(
-                page.tenantId(),
                 page.embedding(),
                 1,
                 Optional.ofNullable(page.namespace()),
@@ -223,7 +218,6 @@ public class MemoryPageRepository {
     }
 
     public List<SearchResult> knnSearch(
-            String tenantId,
             float[] queryVector,
             int k,
             Optional<String> namespace,
@@ -231,8 +225,7 @@ public class MemoryPageRepository {
 
         RedisCommands<String, String> cmd = connection.sync();
 
-        StringBuilder filter = new StringBuilder();
-        filter.append("@tenantId:{").append(escape(tenantId)).append("}");
+        StringBuilder filter = new StringBuilder("*");
 
         namespace.ifPresent(ns -> filter.append(" @namespace:{").append(escape(ns)).append("}"));
         correlationId.ifPresent(cid -> filter.append(" @correlationId:{").append(escape(cid)).append("}"));
@@ -247,8 +240,7 @@ public class MemoryPageRepository {
                         .add(query)
                         .add("PARAMS").add("2").add("vec").add(encodeVector(queryVector))
                         .add("SORTBY").add("score")
-                        .add("RETURN").add("7")
-                        .add("tenantId")
+                        .add("RETURN").add("6")
                         .add("namespace")
                         .add("correlationId")
                         .add("createdAt")
@@ -319,7 +311,6 @@ public class MemoryPageRepository {
                 continue;
             }
 
-            String tenantId = "";
             String namespace = "";
             String correlationId = "";
             long createdAtMilli = 0;
@@ -335,7 +326,6 @@ public class MemoryPageRepository {
                 String val = valObj.toString();
 
                 switch (name) {
-                    case "tenantId" -> tenantId = val;
                     case "namespace" -> namespace = val;
                     case "correlationId" -> correlationId = val;
                     case "createdAt" -> createdAtMilli = Long.parseLong(val);
@@ -346,7 +336,7 @@ public class MemoryPageRepository {
             }
 
             MemoryPage page = new MemoryPage(
-                    key, tenantId, namespace, correlationId,
+                    key, namespace, correlationId,
                     null, summary, severityMax, java.time.Instant.now(), 0.0, 0.0,
                     java.time.Instant.ofEpochMilli(createdAtMilli), java.time.Instant.now(),
                     Collections.emptySet(), Collections.emptyList(), null, null);

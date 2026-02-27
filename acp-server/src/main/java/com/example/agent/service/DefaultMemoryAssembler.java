@@ -96,7 +96,6 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
         // Create a temporary page to generate embedding
         MemoryPage tempPage = new MemoryPage(
                 page.pageId(),
-                fact.tenantId(),
                 page.namespace(),
                 fact.correlationId(),
                 page.pageType(),
@@ -118,7 +117,6 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
 
         MemoryPage updatedPage = new MemoryPage(
                 page.pageId(),
-                fact.tenantId(),
                 page.namespace(),
                 fact.correlationId(),
                 page.pageType(),
@@ -192,7 +190,6 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
 
         MemoryPage page = new MemoryPage(
                 pageId,
-                fact.tenantId(),
                 namespace,
                 fact.correlationId(),
                 PageType.EPISODIC, // default page type for fact streams
@@ -215,19 +212,14 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
 
     @Override
     public List<VectorCandidate> search(
-            String tenantId,
             String queryText,
-            List<EntityRef> scope,
             Set<PageType> pageTypes,
             Instant since,
             int k) {
-        // Build embedding request for the query text
-        String namespace = scope != null && !scope.isEmpty() ? scope.get(0).type() : "";
         String textHash = EmbeddingService.sha256(queryText);
 
         EmbeddingRequest embeddingRequest = new EmbeddingRequest(
-                tenantId,
-                namespace,
+                "",
                 "query", // pageId for query context
                 queryText,
                 "text-embedding-3-large", // default model
@@ -244,11 +236,10 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
 
         // Perform KNN search
         List<MemoryPageRepository.SearchResult> searchResults = pageRepo.knnSearch(
-                tenantId,
                 queryVector,
                 k,
-                Optional.ofNullable(namespace).filter(s -> !s.isEmpty()),
-                Optional.empty() // no correlationId filter for now
+                Optional.empty(), // no namespace filter
+                Optional.empty() // no correlationId filter
         );
 
         // Convert SearchResult to VectorCandidate
@@ -299,7 +290,6 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
 
         MemoryPage closedPage = new MemoryPage(
                 page.pageId(),
-                page.tenantId(),
                 page.namespace(),
                 page.correlationId(),
                 page.pageType(),

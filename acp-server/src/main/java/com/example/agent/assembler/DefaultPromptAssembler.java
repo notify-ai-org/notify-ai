@@ -44,7 +44,7 @@ public class DefaultPromptAssembler implements PromptAssembler {
         // 1) Task
         sb.append("## Task\n");
         sb.append("- decisionType: ").append(req.decisionType()).append("\n");
-        sb.append("- tenantId: ").append(req.tenantId()).append("\n");
+
         sb.append("- entities: ").append(req.entities()).append("\n");
         sb.append("- event: ").append(req.eventRef()).append("\n\n");
 

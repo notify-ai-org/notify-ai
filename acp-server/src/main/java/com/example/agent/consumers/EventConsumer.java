@@ -9,18 +9,12 @@ import com.example.agent.EventScheduleRepository;
 import com.example.agent.MessageTemplateRepository;
 import com.example.agent.NotificationDispatcher;
 import com.example.agent.NotificationJobRepository;
-import com.example.agent.interfaces.PromptAssembler;
-import com.example.agent.interfaces.RetrievalPlanner;
 import com.example.agent.models.AgentContext;
 import com.example.agent.models.EventCapture;
 import com.example.agent.models.EventSchedule;
 import com.example.agent.models.MessageTemplate;
 import com.example.agent.models.NotificationJob;
 import com.example.agent.models.NotificationJob.NotificationPriority;
-import com.example.agent.enums.DecisionType;
-import com.example.agent.records.DecisionRequest;
-import com.example.agent.records.EventRef;
-import com.example.agent.records.PromptPackage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -64,9 +58,6 @@ public class EventConsumer {
     private final NotificationJobRepository notificationJobRepository;
     private final CompositeDisposable disposables = new CompositeDisposable();
 
-    private final RetrievalPlanner planner;
-
-    private final PromptAssembler assembler;
     private final AgentRegistry agentRegistry;
 
     private static final Logger logger = LoggerFactory.getLogger(EventConsumer.class);
@@ -78,7 +69,7 @@ public class EventConsumer {
     public EventConsumer(
             EventRepository repo, EventCaptureRepository eventCaptureRepository,
             EventScheduleRepository eventScheduleRepository, MessageTemplateRepository messageTemplateRepository,
-            AgentOrchestrator agentOrchestrator, RetrievalPlanner planner, PromptAssembler assembler,
+            AgentOrchestrator agentOrchestrator,
             NotificationDispatcher notificationDispatcher, NotificationJobRepository notificationJobRepository,
             AgentRegistry agentRegistry) {
         this.repo = repo;
@@ -88,8 +79,6 @@ public class EventConsumer {
         this.agentOrchestrator = agentOrchestrator;
         this.notificationDispatcher = notificationDispatcher;
         this.notificationJobRepository = notificationJobRepository;
-        this.planner = planner;
-        this.assembler = assembler;
         this.agentRegistry = agentRegistry;
     }
 
@@ -154,26 +143,20 @@ public class EventConsumer {
                     throw new RuntimeException("Event capture is required with a payload");
                 }
 
-                DecisionRequest decisionRequest = new DecisionRequest(
-                        capture.getTenantId(),
-                        DecisionType.SCHEDULE,
-                        new ArrayList<>(),
-                        new EventRef(capture.getId(),
-                                capture.getEvent() != null ? capture.getEvent().getEventType() : "UNKNOWN", "INFO",
-                                capture.getTimestamp()),
-                        7,
-                        2000,
-                        5000,
-                        "en-US",
-                        "UTC");
-                PromptPackage promptPackage = assembler.assemble(decisionRequest, planner.plan(decisionRequest));
-                String prompt = promptPackage.systemPrompt() + "\n" + promptPackage.userPrompt();
+                // Build a clean input payload aligned to the agent's inputSchema (EventCapture
+                // fields)
+                Map<String, Object> agentInput = buildAgentInput(capture);
+                String inputJson = mapper.writeValueAsString(agentInput);
+                logger.info("Agent Input JSON: " + inputJson);
 
                 Flowable<com.google.adk.events.Event> flow = agentOrchestrator.executeTaskWithAgent(
                         agentRegistry.get(AgentRegistry.EVENT_PROCESSOR_AGENT_ID),
                         null,
                         null,
-                        Content.fromParts(Part.fromText(prompt), Part.fromText(mapper.writeValueAsString(capture))))
+                        Content.fromParts(
+                                Part.fromText(
+                                        "Process the following event capture and determine if it should be emitted:"),
+                                Part.fromText(inputJson)))
                         .doOnNext(agentEvent -> {
                             if (agentEvent.content().isPresent()
                                     && agentEvent.content().get().parts().isPresent()
@@ -184,8 +167,13 @@ public class EventConsumer {
                                         return;
                                     }
                                     for (Part part : parts.get()) {
+                                        if (part.thought().isPresent()) {
+                                            logger.info("\n\n=== AGENT THOUGHT PROCESS ===\n" + part.thought().get()
+                                                    + "\n=============================\n");
+                                        }
                                         if (part.text().isPresent()) {
                                             String json = part.text().get();
+                                            logger.info("Agent Output JSON: " + json);
                                             // Parse as wrapper object containing the items array
                                             Map<String, Object> wrapper = mapper.readValue(json,
                                                     new TypeReference<Map<String, Object>>() {
@@ -457,6 +445,48 @@ public class EventConsumer {
         Content prompt = Content.fromParts(Part.fromText(sb.toString()), Part.fromText(jsonPayload));
         return agentOrchestrator.new AgentTaskContext(agentRegistry.get(AgentRegistry.MESSAGE_TEMPLATE_AGENT_ID), null,
                 null, prompt);
+    }
+
+    /**
+     * Builds a clean, schema-aligned input map for the EventProcessor agent from
+     * an EventCapture. Avoids JPA proxies and circular references (e.g.
+     * Event.eventCaptures) that would break serialization.
+     *
+     * Fields match the EventCapture inputSchema generated by SchemaUtil.
+     */
+    private Map<String, Object> buildAgentInput(EventCapture capture) {
+        Map<String, Object> input = new java.util.LinkedHashMap<>();
+
+        // From RawLog base
+        input.put("id", capture.getId());
+        input.put("timestamp", capture.getTimestamp() != null ? capture.getTimestamp().toString() : null);
+        input.put("correlationId", capture.getCorrelationId());
+
+        // Event metadata (flattened to avoid circular EventCapture list)
+        if (capture.getEvent() != null) {
+            Map<String, Object> event = new java.util.LinkedHashMap<>();
+            event.put("name", capture.getEvent().getName());
+            event.put("description", capture.getEvent().getDescription());
+            event.put("eventType", capture.getEvent().getEventType());
+            event.put("priority", capture.getEvent().getPriority());
+            event.put("scheduleIntent", capture.getEvent().getScheduleIntent());
+            event.put("preferredTimeWindow", capture.getEvent().getPreferredTimeWindow());
+            event.values().removeIf(java.util.Objects::isNull);
+            input.put("event", event);
+        }
+
+        // Payload
+        input.put("payload", capture.getPayload());
+
+        // Execution context
+        input.put("callStack", capture.getCallStack());
+        input.put("result", capture.getResult());
+        input.put("exception", capture.getException());
+        input.put("durationMillis", capture.getDurationMillis());
+        input.put("serviceName", capture.getServiceName());
+
+        input.values().removeIf(java.util.Objects::isNull);
+        return input;
     }
 
 }

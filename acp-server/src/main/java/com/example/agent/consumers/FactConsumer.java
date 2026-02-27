@@ -77,7 +77,6 @@ public class FactConsumer {
             }
 
             Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("tenantId", tenantId);
             payload.put("sourceType", sourceType);
             payload.put("logs", logs);
             if (correlationId != null) {
@@ -155,7 +154,6 @@ public class FactConsumer {
 
                 result.add(new Fact(
                         null, // factId generated later or not needed for assembly
-                        tenantId,
                         factType,
                         sentence,
                         observedAt,

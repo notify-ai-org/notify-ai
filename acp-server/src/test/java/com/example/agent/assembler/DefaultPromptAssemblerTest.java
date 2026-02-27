@@ -38,7 +38,6 @@ class DefaultPromptAssemblerTest {
         promptAssembler = new DefaultPromptAssembler(tokenEstimator);
 
         testRequest = new DecisionRequest(
-                "tenant-1",
                 DecisionType.ESCALATE,
                 List.of(new EntityRef("user", "user-1")),
                 new EventRef("event-1", "ORDER_CREATED", "HIGH", Instant.now()),

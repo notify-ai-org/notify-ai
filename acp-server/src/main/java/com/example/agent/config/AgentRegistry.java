@@ -7,8 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.agents.LlmAgent;
 import com.google.adk.examples.Example;
 import com.google.genai.types.Content;
+import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.Part;
 import com.google.genai.types.Schema;
+import com.google.genai.types.ThinkingConfig;
 import com.google.genai.types.Type;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Bean;
@@ -95,6 +97,14 @@ public class AgentRegistry {
                             ? config.getModel()
                             : "gemini-2.0-flash";
 
+                    GenerateContentConfig generateContentConfig = null;
+                    // Enable thought process specifically for thinking-capable models
+                    if (model.contains("-thinking-") || model.contains("-2.5-pro") || model.contains("-3.0-")) {
+                        generateContentConfig = GenerateContentConfig.builder()
+                                .thinkingConfig(ThinkingConfig.builder().includeThoughts(true).build())
+                                .build();
+                    }
+
                     LlmAgent agent = LlmAgent.builder()
                             .name(config.getName())
                             .description(config.getDescription())
@@ -105,6 +115,7 @@ public class AgentRegistry {
                             .exampleProvider(example)
                             .tools(Collections.emptyList())
                             .outputKey(config.getOutputKey())
+                            .generateContentConfig(generateContentConfig)
                             .build();
 
                     String id = agentOrchestrator.registerAgent(agent);

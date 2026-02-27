@@ -67,7 +67,7 @@ class EmbeddingServiceTest {
                 float[] cachedVector = new float[] { 0.5f, 0.6f, 0.7f };
 
                 // First model tried is "text-embedding-3-large"
-                when(embeddingCache.get("tenant-1", "text-embedding-3-large", null, textHash))
+                when(embeddingCache.get("text-embedding-3-large", null, textHash))
                                 .thenReturn(Mono.just(cachedVector));
 
                 // Act & Assert
@@ -95,7 +95,7 @@ class EmbeddingServiceTest {
                                 "text-embedding-3-large", textHash, expectedVector);
 
                 // Cache miss for the first model
-                when(embeddingCache.get("tenant-1", "text-embedding-3-large", null, textHash))
+                when(embeddingCache.get("text-embedding-3-large", null, textHash))
                                 .thenReturn(Mono.empty());
 
                 // Provider returns a result
@@ -103,7 +103,7 @@ class EmbeddingServiceTest {
                                 .thenReturn(Mono.just(List.of(providerResult)));
 
                 // Cache put succeeds
-                when(embeddingCache.put(eq("tenant-1"), eq("text-embedding-3-large"), isNull(),
+                when(embeddingCache.put(eq("text-embedding-3-large"), isNull(),
                                 eq(textHash), eq(expectedVector), any()))
                                 .thenReturn(Mono.empty());
 
@@ -116,7 +116,7 @@ class EmbeddingServiceTest {
                                 .verifyComplete();
 
                 verify(embeddingProvider).embedBatch(eq("text-embedding-3-large"), anyList(), anyList());
-                verify(embeddingCache).put(eq("tenant-1"), eq("text-embedding-3-large"), isNull(),
+                verify(embeddingCache).put(eq("text-embedding-3-large"), isNull(),
                                 eq(textHash), eq(expectedVector), any());
         }
 
@@ -133,7 +133,7 @@ class EmbeddingServiceTest {
                                 "text-embedding-3-small", textHash, expectedVector);
 
                 // Cache miss for both models
-                when(embeddingCache.get(eq("tenant-1"), anyString(), any(), eq(textHash)))
+                when(embeddingCache.get(anyString(), any(), eq(textHash)))
                                 .thenReturn(Mono.empty());
 
                 // First model fails
@@ -145,7 +145,7 @@ class EmbeddingServiceTest {
                                 .thenReturn(Mono.just(List.of(providerResult)));
 
                 // Cache put succeeds
-                when(embeddingCache.put(eq("tenant-1"), eq("text-embedding-3-small"), isNull(),
+                when(embeddingCache.put(eq("text-embedding-3-small"), isNull(),
                                 eq(textHash), eq(expectedVector), any()))
                                 .thenReturn(Mono.empty());
 
@@ -167,7 +167,7 @@ class EmbeddingServiceTest {
                 String textHash = EmbeddingService.sha256(builtText);
 
                 // Cache miss for both models
-                when(embeddingCache.get(eq("tenant-1"), anyString(), any(), eq(textHash)))
+                when(embeddingCache.get(anyString(), any(), eq(textHash)))
                                 .thenReturn(Mono.empty());
 
                 // Both models fail
@@ -249,7 +249,6 @@ class EmbeddingServiceTest {
                         String pageId, String summary) {
                 return new MemoryPage(
                                 pageId,
-                                tenantId,
                                 namespace,
                                 "correlation-1",
                                 PageType.SEMANTIC,

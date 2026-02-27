@@ -60,7 +60,6 @@ class DefaultMemoryAssemblerTest {
 
                 testFact = new Fact(
                                 "fact-1",
-                                "tenant-1",
                                 "correlation-1",
                                 "Test fact sentence",
                                 Instant.now(),
@@ -72,7 +71,6 @@ class DefaultMemoryAssemblerTest {
 
                 testPage = new MemoryPage(
                                 "page-1",
-                                "tenant-1",
                                 "namespace-1",
                                 "correlation-1",
                                 PageType.SEMANTIC,
@@ -154,15 +152,13 @@ class DefaultMemoryAssemblerTest {
 
                 when(embeddingService.embedOne(any(EmbeddingRequest.class)))
                                 .thenReturn(Mono.just(embeddingResult));
-                when(pageRepo.knnSearch(anyString(), any(float[].class), anyInt(), any(), any()))
+                when(pageRepo.knnSearch(any(float[].class), anyInt(), any(), any()))
                                 .thenReturn(searchResults);
 
                 // Act
                 List<VectorCandidate> results = memoryAssembler.search(
-                                "tenant-1",
                                 queryText,
-                                List.of(new EntityRef("user", "user-1")),
-                                null,
+                                Set.of(PageType.SEMANTIC),
                                 null,
                                 k);
 
@@ -170,7 +166,7 @@ class DefaultMemoryAssemblerTest {
                 assertNotNull(results);
                 assertEquals(2, results.size());
                 verify(embeddingService).embedOne(any(EmbeddingRequest.class));
-                verify(pageRepo).knnSearch(eq("tenant-1"), eq(queryVector), eq(k), any(), any());
+                verify(pageRepo).knnSearch(eq(queryVector), eq(k), any(), any());
         }
 
         @Test
@@ -181,15 +177,13 @@ class DefaultMemoryAssemblerTest {
 
                 when(embeddingService.embedOne(any(EmbeddingRequest.class)))
                                 .thenReturn(Mono.just(embeddingResult));
-                when(pageRepo.knnSearch(anyString(), any(float[].class), anyInt(), any(), any()))
+                when(pageRepo.knnSearch(any(float[].class), anyInt(), any(), any()))
                                 .thenReturn(List.of());
 
                 // Act
                 List<VectorCandidate> results = memoryAssembler.search(
-                                "tenant-1",
                                 "test query",
-                                List.of(),
-                                null,
+                                Set.of(PageType.SEMANTIC),
                                 null,
                                 5);
 
@@ -212,15 +206,13 @@ class DefaultMemoryAssemblerTest {
 
                 when(embeddingService.embedOne(any(EmbeddingRequest.class)))
                                 .thenReturn(Mono.just(embeddingResult));
-                when(pageRepo.knnSearch(anyString(), any(float[].class), anyInt(), any(), any()))
+                when(pageRepo.knnSearch(any(float[].class), anyInt(), any(), any()))
                                 .thenReturn(searchResults);
 
                 // Act
                 List<VectorCandidate> results = memoryAssembler.search(
-                                "tenant-1",
                                 "test query",
-                                List.of(),
-                                null,
+                                Set.of(PageType.SEMANTIC),
                                 null,
                                 5);
 
@@ -249,16 +241,14 @@ class DefaultMemoryAssemblerTest {
 
                 // Act
                 List<VectorCandidate> results = memoryAssembler.search(
-                                "tenant-1",
                                 "test query",
-                                List.of(),
-                                null,
+                                Set.of(PageType.SEMANTIC),
                                 null,
                                 5);
 
                 // Assert
                 assertNotNull(results);
                 assertTrue(results.isEmpty());
-                verify(pageRepo, never()).knnSearch(anyString(), any(), anyInt(), any(), any());
+                verify(pageRepo, never()).knnSearch(any(), anyInt(), any(), any());
         }
 }

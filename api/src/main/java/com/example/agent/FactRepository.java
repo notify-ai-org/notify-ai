@@ -10,6 +10,8 @@ import org.springframework.data.jpa.repository.Query;
 public interface FactRepository extends JpaRepository<FactEntity, Long> {
     List<FactEntity> findByClientIdAndObservedAtAfter(String clientId, Instant after);
 
+    List<FactEntity> findByObservedAtAfter(Instant after);
+
     List<FactEntity> findByCorrelationId(String correlationId);
 
     @Modifying

@@ -91,6 +91,28 @@ public class VocabularyManager {
         }
     }
 
+    public java.util.Map<String, Object> toFlattenedMap(Object instance) {
+        Vocabulary root = toInstanceVocabularyGraph(instance);
+        java.util.Map<String, Object> result = new java.util.HashMap<>();
+        if (root != null) {
+            for (Vocabulary child : root.getChildren()) {
+                flattenVocabulary(child.getTerm(), child, result);
+            }
+        }
+        return result;
+    }
+
+    private void flattenVocabulary(String prefix, Vocabulary current, java.util.Map<String, Object> result) {
+        if (current.getChildren().isEmpty()) {
+            result.put(prefix, current.getCurrentValue());
+        } else {
+            for (Vocabulary child : current.getChildren()) {
+                String newPrefix = prefix.isEmpty() ? child.getTerm() : prefix + "." + child.getTerm();
+                flattenVocabulary(newPrefix, child, result);
+            }
+        }
+    }
+
     /**
      * Build ClassModelDto list from @Model classes and their @Vocabulary fields.
      */

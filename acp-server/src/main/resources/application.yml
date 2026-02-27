@@ -1,4 +1,6 @@
 spring:
+  main:
+    allow-bean-definition-overriding: true
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
@@ -54,10 +56,11 @@ embedding:
   max-batch-size: ${EMBEDDING_MAX_BATCH_SIZE:10}
   max-wait: ${EMBEDDING_MAX_WAIT:100ms}
   schema-version: ${EMBEDDING_SCHEMA_VERSION:v1}
-  cache-ttl: ${EMBEDDING_CACHE_TTL:24h}
-  
-
-#acp:
+connector:
+  channel:
+    WEBHOOK:
+      clazz: "com.example.agent.connectors.WebhookConnector"
+      instances: 1
 #  auth:
 #    jwt:
 #      secret: ${ACP_JWT_SECRET:changeme-at-least-32-characters-long-secret-key}

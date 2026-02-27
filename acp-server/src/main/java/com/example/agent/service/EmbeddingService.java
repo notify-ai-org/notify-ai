@@ -158,9 +158,8 @@ public class EmbeddingService {
     }
 
     private Mono<float[]> tryModel(MemoryPage page, String text, String textHash, String model) {
-        return embeddingCache.get(page.tenantId(), model, schemaVersion, textHash).switchIfEmpty(
+        return embeddingCache.get(model, schemaVersion, textHash).switchIfEmpty(
                 embedOne(new EmbeddingRequest(
-                        page.tenantId(),
                         page.namespace(),
                         page.pageId(),
                         text,
@@ -169,6 +168,6 @@ public class EmbeddingService {
                         textHash))
                         .map(EmbeddingResult::vector)
                         .flatMap(vec -> embeddingCache
-                                .put(page.tenantId(), model, schemaVersion, textHash, vec, cacheTtl).thenReturn(vec)));
+                                .put(model, schemaVersion, textHash, vec, cacheTtl).thenReturn(vec)));
     }
 }
