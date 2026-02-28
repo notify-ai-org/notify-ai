@@ -7,7 +7,7 @@ import lombok.Data;
 @Embeddable
 @Data
 public class ExecutionResult {
-    private boolean success;
+    private Boolean success;
     @Column(length = 5000)
     private String returnValue; // serialized return value
 }

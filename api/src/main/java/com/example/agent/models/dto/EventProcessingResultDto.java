@@ -8,15 +8,36 @@ import java.util.Map;
  */
 public class EventProcessingResultDto {
 
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
+    private String result;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
     private String eventName;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
     private String eventDescription;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
     private String eventType;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
     private String occurredAt;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
+    private String priority;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
     private Map<String, Object> payload;
-    private List<Map<String, String>> channels;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
+    private List<ChannelDto> channels;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
     private List<String> ruleExpressions;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
     private Reasoning reasoning;
+    @com.fasterxml.jackson.annotation.JsonProperty(required = true)
     private SafetyChecks safetyChecks;
+
+    public String getPriority() {
+        return priority;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
+    }
 
     public String getEventName() {
         return eventName;
@@ -58,11 +79,11 @@ public class EventProcessingResultDto {
         this.payload = payload;
     }
 
-    public List<Map<String, String>> getChannels() {
+    public List<ChannelDto> getChannels() {
         return channels;
     }
 
-    public void setChannels(List<Map<String, String>> channels) {
+    public void setChannels(List<ChannelDto> channels) {
         this.channels = channels;
     }
 
@@ -91,8 +112,11 @@ public class EventProcessingResultDto {
     }
 
     public static class Reasoning {
+        @com.fasterxml.jackson.annotation.JsonProperty(required = true)
         private List<String> bulletReasons;
+        @com.fasterxml.jackson.annotation.JsonProperty(required = true)
         private List<String> memoryUsed;
+        @com.fasterxml.jackson.annotation.JsonProperty(required = true)
         private List<String> factsUsed;
 
         public List<String> getBulletReasons() {
@@ -120,9 +144,25 @@ public class EventProcessingResultDto {
         }
     }
 
+    public static class ChannelDto {
+        @com.fasterxml.jackson.annotation.JsonProperty(required = true)
+        private String channel;
+
+        public String getChannel() {
+            return channel;
+        }
+
+        public void setChannel(String channel) {
+            this.channel = channel;
+        }
+    }
+
     public static class SafetyChecks {
+        @com.fasterxml.jackson.annotation.JsonProperty(required = true)
         private Boolean optOutRespected;
+        @com.fasterxml.jackson.annotation.JsonProperty(required = true)
         private Boolean dndRespected;
+        @com.fasterxml.jackson.annotation.JsonProperty(required = true)
         private Boolean quotaRespected;
 
         public Boolean getOptOutRespected() {

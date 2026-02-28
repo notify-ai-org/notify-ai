@@ -3,7 +3,6 @@ package com.example.agent.consumers;
 import com.example.agent.AgentContextHolder;
 import com.example.agent.AgentOrchestrator;
 import com.example.agent.AgentOrchestrator.AgentTaskContext;
-import com.example.agent.EventRepository;
 import com.example.agent.EventCaptureRepository;
 import com.example.agent.EventScheduleRepository;
 import com.example.agent.MessageTemplateRepository;
@@ -14,7 +13,7 @@ import com.example.agent.models.EventCapture;
 import com.example.agent.models.EventSchedule;
 import com.example.agent.models.MessageTemplate;
 import com.example.agent.models.NotificationJob;
-import com.example.agent.models.NotificationJob.NotificationPriority;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,7 +25,6 @@ import com.example.agent.exceptions.ValidationRequiredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.core.Flowable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -49,15 +47,12 @@ import java.util.concurrent.TimeUnit;
 @RequestMapping("/api/event")
 public class EventConsumer {
     private final ObjectMapper mapper = ObjectMapperFactory.create();
-    private final EventRepository repo;
     private final EventCaptureRepository eventCaptureRepository;
     private final EventScheduleRepository eventScheduleRepository;
     private final MessageTemplateRepository messageTemplateRepository;
     private final AgentOrchestrator agentOrchestrator;
     private final NotificationDispatcher notificationDispatcher;
     private final NotificationJobRepository notificationJobRepository;
-    private final CompositeDisposable disposables = new CompositeDisposable();
-
     private final AgentRegistry agentRegistry;
 
     private static final Logger logger = LoggerFactory.getLogger(EventConsumer.class);
@@ -67,12 +62,11 @@ public class EventConsumer {
     private Duration bufferTimeout;
 
     public EventConsumer(
-            EventRepository repo, EventCaptureRepository eventCaptureRepository,
+            EventCaptureRepository eventCaptureRepository,
             EventScheduleRepository eventScheduleRepository, MessageTemplateRepository messageTemplateRepository,
             AgentOrchestrator agentOrchestrator,
             NotificationDispatcher notificationDispatcher, NotificationJobRepository notificationJobRepository,
             AgentRegistry agentRegistry) {
-        this.repo = repo;
         this.eventCaptureRepository = eventCaptureRepository;
         this.eventScheduleRepository = eventScheduleRepository;
         this.messageTemplateRepository = messageTemplateRepository;
@@ -136,12 +130,9 @@ public class EventConsumer {
                 if (capture.getEvent().getEventType() == null) {
                     throw new RuntimeException("Event capture is required with an eventType");
                 }
-                if (capture.getOccuredAt() == null) {
-                    throw new RuntimeException("Event capture is required with an occuredAt");
-                }
-                if (capture.getPayload() == null) {
-                    throw new RuntimeException("Event capture is required with a payload");
-                }
+
+                capture.setId(null);
+                eventCaptureRepository.save(capture);
 
                 // Build a clean input payload aligned to the agent's inputSchema (EventCapture
                 // fields)
@@ -167,21 +158,28 @@ public class EventConsumer {
                                         return;
                                     }
                                     for (Part part : parts.get()) {
-                                        if (part.thought().isPresent()) {
-                                            logger.info("\n\n=== AGENT THOUGHT PROCESS ===\n" + part.thought().get()
-                                                    + "\n=============================\n");
-                                        }
                                         if (part.text().isPresent()) {
                                             String json = part.text().get();
                                             logger.info("Agent Output JSON: " + json);
-                                            // Parse as wrapper object containing the items array
-                                            Map<String, Object> wrapper = mapper.readValue(json,
-                                                    new TypeReference<Map<String, Object>>() {
-                                                    });
-                                            @SuppressWarnings("unchecked")
-                                            List<Map<String, Object>> processedEvents = (List<Map<String, Object>>) wrapper
-                                                    .getOrDefault("items", java.util.Collections.emptyList());
+                                            List<Map<String, Object>> processedEvents;
+                                            try {
+                                                // Parse as direct array of event objects
+                                                processedEvents = mapper.readValue(json,
+                                                        new TypeReference<List<Map<String, Object>>>() {
+                                                        });
+                                            } catch (JsonProcessingException e) {
+                                                logger.warn("Skipping non-JSON part: " + json);
+                                                continue;
+                                            }
+
                                             for (Map<String, Object> processedEvent : processedEvents) {
+                                                String resultStatus = (String) processedEvent.get("result");
+                                                if ("suppressed".equalsIgnoreCase(resultStatus)) {
+                                                    logger.info("Event '{}' suppressed by agent.",
+                                                            capture.getEvent().getName());
+                                                    continue;
+                                                }
+
                                                 Object eventTypeObj = processedEvent.get("eventType");
                                                 @SuppressWarnings("unchecked")
                                                 List<Map<String, String>> channels = (List<Map<String, String>>) processedEvent
@@ -211,17 +209,12 @@ public class EventConsumer {
                                                                 .source(agentContext.getSource())
                                                                 .correlationId(agentContext.getCorrelationId())
                                                                 .eventType(capture.getEvent().getEventType())
-                                                                .priority(NotificationPriority.valueOf(
-                                                                        processedEvent.get("priority").toString()))
+                                                                .priority(NotificationJob.NotificationPriority.NORMAL)
                                                                 .dispatchMode(NotificationJob.DispatchMode.EVENT);
 
-                                                        if (template != null) {
-                                                            jobBuilder.template(template.getTemplate());
-                                                        } else {
-                                                            throw new Exception("Cannot find template for given job");
-                                                        }
-
                                                         NotificationJob job = jobBuilder.build();
+                                                        generateTemplatesAndSchedules(capture, job);
+
                                                         if (eventTypeObj != null && eventTypeObj.equals("static")) {
                                                             // Validation check before dispatching
                                                             if (!capture.getEvent().isValidated()) {
@@ -231,6 +224,7 @@ public class EventConsumer {
                                                                         capture.getEvent().getId());
                                                                 continue;
                                                             }
+
                                                             if (template != null && !template.isValidated()) {
                                                                 logger.warn(
                                                                         "Skipping dispatch for event '{}' - template (ID: {}) not validated",
@@ -246,8 +240,6 @@ public class EventConsumer {
                                                             } catch (ValidationRequiredException e) {
                                                                 logger.error("Dispatch blocked: {}", e.getMessage());
                                                             }
-                                                        } else {
-                                                            generateTemplatesAndSchedules(capture, job);
                                                         }
                                                     }
                                                 }
@@ -295,7 +287,7 @@ public class EventConsumer {
                     tasks.add(templateCtx);
                 }
             }
-            return agentOrchestrator.executeTasksSequentially(tasks)
+            return agentOrchestrator.executeTasksInParallel(tasks)
                     .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
                     .subscribe(
                             events -> {
@@ -314,10 +306,17 @@ public class EventConsumer {
                                                     for (Part part : parts.get()) {
                                                         if (part.text().isPresent()) {
                                                             String json = part.text().get();
-                                                            // Parse as array of schedule objects
-                                                            List<Map<String, String>> schedules = mapper.readValue(json,
-                                                                    new TypeReference<List<Map<String, String>>>() {
-                                                                    });
+                                                            List<Map<String, String>> schedules;
+                                                            try {
+                                                                // Parse as array of schedule objects
+                                                                schedules = mapper.readValue(json,
+                                                                        new TypeReference<List<Map<String, String>>>() {
+                                                                        });
+                                                            } catch (Exception e) {
+                                                                logger.error("Error parsing schedule JSON: {}", json,
+                                                                        e);
+                                                                continue;
+                                                            }
 
                                                             for (Map<String, String> scheduleMap : schedules) {
                                                                 EventSchedule eventSchedule = new EventSchedule();
@@ -362,11 +361,17 @@ public class EventConsumer {
                                                         if (part.text().isPresent()) {
                                                             String json = part.text().get();
                                                             // Parse as array of template objects
-                                                            List<Map<String, String>> templateList = mapper.readValue(
-                                                                    json,
-                                                                    new TypeReference<List<Map<String, String>>>() {
-                                                                    });
-
+                                                            List<Map<String, String>> templateList;
+                                                            try {
+                                                                templateList = mapper.readValue(json,
+                                                                        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, String>>>() {
+                                                                        });
+                                                            } catch (Exception e) {
+                                                                logger.error(
+                                                                        "Failed to parse message templates from JSON: {}",
+                                                                        json, e);
+                                                                continue;
+                                                            }
                                                             for (Map<String, String> templateMap : templateList) {
                                                                 MessageTemplate messageTemplate = new MessageTemplate();
                                                                 messageTemplate.setChannel(templateMap.get("channel"));

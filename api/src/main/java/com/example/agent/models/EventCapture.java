@@ -50,12 +50,10 @@ public class EventCapture extends RawLog {
     @Transient
     private List<RuleResultDto> ruleResults; // results from rule executions
 
-    @Deprecated
     public Instant getOccuredAt() {
         return getTimestamp();
     }
 
-    @Deprecated
     public void setOccuredAt(Instant occuredAt) {
         setTimestamp(occuredAt);
     }

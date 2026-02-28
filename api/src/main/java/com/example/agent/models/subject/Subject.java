@@ -10,22 +10,18 @@ public abstract class Subject implements Serializable {
 
     protected final String subjectId;
     protected final Channel channel;
-    protected final String tenantId;
     protected final String correlationId;
     protected final Map<String, String> attributes;
 
     protected Subject(
             String subjectId,
             Channel channel,
-            String tenantId,
             String correlationId,
             Map<String, String> attributes) {
 
         this.subjectId = subjectId;
         this.channel = channel;
-        this.tenantId = tenantId;
-        this.correlationId =
-                correlationId != null ? correlationId : UUID.randomUUID().toString();
+        this.correlationId = correlationId != null ? correlationId : UUID.randomUUID().toString();
         this.attributes = attributes;
     }
 
@@ -37,10 +33,6 @@ public abstract class Subject implements Serializable {
         return channel;
     }
 
-    public String getTenantId() {
-        return tenantId;
-    }
-
     public String getCorrelationId() {
         return correlationId;
     }
@@ -50,5 +42,6 @@ public abstract class Subject implements Serializable {
     }
 
     public abstract String getAddress();
+
     public abstract String addressFingerprint();
 }

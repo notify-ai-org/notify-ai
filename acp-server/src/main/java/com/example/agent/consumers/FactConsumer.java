@@ -4,7 +4,6 @@ import com.example.agent.AgentOrchestrator;
 import com.example.agent.FactRepository;
 import com.example.agent.config.AgentRegistry;
 import com.example.agent.interfaces.MemoryAssembler;
-import com.example.agent.MemoryPageRepository;
 import com.example.agent.models.FactEntity;
 import com.example.agent.models.RawLog;
 import com.example.agent.records.Fact;
@@ -34,20 +33,17 @@ public class FactConsumer {
     private final AgentRegistry agentRegistry;
     private final FactRepository factRepository;
     private final MemoryAssembler pageAssembler;
-    private final MemoryPageRepository memoryStore;
     private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
     @Value("${agent.buffer.timeout:15s}")
     private Duration bufferTimeout;
 
     public FactConsumer(AgentOrchestrator orchestrator, AgentRegistry agentRegistry,
-            FactRepository factRepository, MemoryAssembler pageAssembler,
-            MemoryPageRepository memoryStore) {
+            FactRepository factRepository, MemoryAssembler pageAssembler) {
         this.orchestrator = orchestrator;
         this.agentRegistry = agentRegistry;
         this.factRepository = factRepository;
         this.pageAssembler = pageAssembler;
-        this.memoryStore = memoryStore;
     }
 
     @PreDestroy

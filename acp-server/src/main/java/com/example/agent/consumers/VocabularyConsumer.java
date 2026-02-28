@@ -1,8 +1,5 @@
 package com.example.agent.consumers;
 
-import com.example.agent.EventRepository;
-import com.example.agent.EventScheduleRepository;
-import com.example.agent.MessageTemplateRepository;
 import com.example.agent.RuleRepository;
 import com.example.agent.AgentOrchestrator;
 import com.example.agent.VocabularyRepository;
@@ -37,9 +34,6 @@ import java.util.stream.Collectors;
 public class VocabularyConsumer {
     private final ObjectMapper mapper = ObjectMapperFactory.create();
     private final VocabularyRepository repo;
-    private final EventRepository eventRepository;
-    private final EventScheduleRepository eventScheduleRepository;
-    private final MessageTemplateRepository messageTemplateRepository;
     private final RuleRepository ruleRepository;
     private final AgentOrchestrator agentOrchestrator;
     private final CompositeDisposable disposables = new CompositeDisposable();
@@ -55,29 +49,10 @@ public class VocabularyConsumer {
     private Duration bufferTimeout;
 
     public VocabularyConsumer(VocabularyRepository repo, AgentOrchestrator agentOrchestrator,
-            EventRepository eventRepository, EventScheduleRepository eventScheduleRepository,
-            MessageTemplateRepository messageTemplateRepository, RuleRepository ruleRepository) {
+            RuleRepository ruleRepository) {
         this.repo = repo;
         this.agentOrchestrator = agentOrchestrator;
-        this.eventRepository = eventRepository;
-        this.eventScheduleRepository = eventScheduleRepository;
-        this.messageTemplateRepository = messageTemplateRepository;
         this.ruleRepository = ruleRepository;
-    }
-
-    // @KafkaListener(topics = "${vocab.kafka-topic}", groupId = "vocab-adk-group")
-    // // Kafka disabled
-    @Transactional
-    public void onMessage(String raw) {
-        try {
-            // Parse the raw message into a JSON map
-            List<ClassModel> classes = mapper.readValue(raw, new TypeReference<List<ClassModel>>() {
-            });
-            processClasses(classes);
-        } catch (Exception e) {
-            // STEP 6️⃣: Let Kafka retry via Spring's error handler
-            throw new RuntimeException("Failed processing vocabulary event", e);
-        }
     }
 
     private void processClasses(List<ClassModel> classes) throws JsonProcessingException {

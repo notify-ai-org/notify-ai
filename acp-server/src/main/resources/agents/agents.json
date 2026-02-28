@@ -10,10 +10,9 @@
         "inputClass": "com.example.agent.models.EventCapture",
         "outputSchemaTitle": "EventProcessingResults",
         "outputSchemaDescription": "Wrapper object containing the list of processed event results",
-        "outputClass": "com.example.agent.models.dto.EventProcessingResultListDto",
-        "outputType": "OBJECT",
-        "tools": [],
-        "outputKey": "scheduleTrigger"
+        "outputClass": "com.example.agent.models.dto.EventProcessingResultDto",
+        "outputType": "ARRAY",
+        "tools": []
     },
     {
         "id": "EventScheduler",

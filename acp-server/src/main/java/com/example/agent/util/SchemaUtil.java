@@ -10,37 +10,63 @@ import java.time.temporal.Temporal;
 import java.util.*;
 
 /**
- * Utility to derive a GenAI/ADK {@link Schema} from a Java class using reflection.
+ * Utility to derive a GenAI/ADK {@link Schema} from a Java class using
+ * reflection.
  * This is intentionally conservative – it covers common scalar and collection
  * types and treats complex/nested objects as opaque OBJECTs.
  *
  * Usage:
- *  Schema input = SchemaUtil.schemaForClass(MyRequest.class, "MyRequest", "Request schema");
+ * Schema input = SchemaUtil.schemaForClass(MyRequest.class, "MyRequest",
+ * "Request schema");
  */
 public final class SchemaUtil {
 
-    private SchemaUtil() {}
+    private SchemaUtil() {
+    }
 
     public static Schema schemaForClass(Class<?> clazz, String title, String description) {
+        return schemaForClass(clazz, title, description, new HashSet<>());
+    }
+
+    private static Schema schemaForClass(Class<?> clazz, String title, String description, Set<Class<?>> visited) {
+        if (!visited.add(clazz)) {
+            // Cyclical reference detected, fallback to opaque OBJECT
+            return Schema.builder().type(Type.Known.OBJECT).build();
+        }
+
         Schema.Builder builder = Schema.builder()
-            .title(title != null ? title : clazz.getSimpleName())
-            .type(Type.Known.OBJECT)
-            .description(description != null ? description : ("Schema for " + clazz.getName()));
+                .title(title != null ? title : clazz.getSimpleName())
+                .type(Type.Known.OBJECT)
+                .description(description != null ? description : ("Schema for " + clazz.getName()));
 
         Map<String, Schema> props = new LinkedHashMap<>();
+        List<String> requiredFields = new ArrayList<>();
+
         for (Field f : clazz.getDeclaredFields()) {
             if (java.lang.reflect.Modifier.isStatic(f.getModifiers())) {
                 continue;
             }
             String name = f.getName();
-            Schema fieldSchema = schemaForType(f.getGenericType());
+            Schema fieldSchema = schemaForType(f.getGenericType(), visited);
             props.put(name, fieldSchema);
+
+            com.fasterxml.jackson.annotation.JsonProperty jsonProperty = f
+                    .getAnnotation(com.fasterxml.jackson.annotation.JsonProperty.class);
+            if (jsonProperty != null && jsonProperty.required()) {
+                requiredFields.add(name);
+            }
         }
         builder.properties(props);
+        if (!requiredFields.isEmpty()) {
+            builder.required(requiredFields);
+        }
+
+        visited.remove(clazz); // Remove to allow other paths to visit if needed (though keeping it might be
+                               // safer, removing follows tree path instead of graph)
         return builder.build();
     }
 
-    private static Schema schemaForType(java.lang.reflect.Type type) {
+    private static Schema schemaForType(java.lang.reflect.Type type, Set<Class<?>> visited) {
         if (type instanceof Class<?>) {
             Class<?> cls = (Class<?>) type;
             if (String.class.equals(cls) || Enum.class.isAssignableFrom(cls)) {
@@ -50,28 +76,28 @@ public final class SchemaUtil {
                 return Schema.builder().type(Type.Known.BOOLEAN).build();
             }
             if (Number.class.isAssignableFrom(cls)
-                || cls.equals(int.class) || cls.equals(long.class) || cls.equals(short.class)
-                || cls.equals(double.class) || cls.equals(float.class)) {
+                    || cls.equals(int.class) || cls.equals(long.class) || cls.equals(short.class)
+                    || cls.equals(double.class) || cls.equals(float.class)) {
                 return Schema.builder().type(Type.Known.NUMBER).build();
             }
             if (Temporal.class.isAssignableFrom(cls) || java.util.Date.class.isAssignableFrom(cls)) {
                 return Schema.builder()
-                    .type(Type.Known.STRING)
-                    .description("ISO-8601 timestamp")
-                    .build();
+                        .type(Type.Known.STRING)
+                        .description("ISO-8601 timestamp")
+                        .build();
             }
             if (Collection.class.isAssignableFrom(cls)) {
                 // Fallback when generic type information is not available
                 return Schema.builder()
-                    .type(Type.Known.ARRAY)
-                    .items(Schema.builder().type(Type.Known.OBJECT).build())
-                    .build();
+                        .type(Type.Known.ARRAY)
+                        .items(Schema.builder().type(Type.Known.OBJECT).build())
+                        .build();
             }
             if (Map.class.isAssignableFrom(cls)) {
                 return Schema.builder().type(Type.Known.OBJECT).build();
             }
-            // Complex / nested object – treat as opaque OBJECT
-            return Schema.builder().type(Type.Known.OBJECT).build();
+            // Complex / nested object – recursively build schema
+            return schemaForClass(cls, null, null, visited);
         }
 
         if (type instanceof ParameterizedType) {
@@ -79,12 +105,12 @@ public final class SchemaUtil {
             java.lang.reflect.Type raw = pt.getRawType();
             if (raw instanceof Class && Collection.class.isAssignableFrom((Class<?>) raw)) {
                 java.lang.reflect.Type[] args = pt.getActualTypeArguments();
-                Schema itemSchema = (args.length == 1) ? schemaForType(args[0])
+                Schema itemSchema = (args.length == 1) ? schemaForType(args[0], visited)
                         : Schema.builder().type(Type.Known.OBJECT).build();
                 return Schema.builder()
-                    .type(Type.Known.ARRAY)
-                    .items(itemSchema)
-                    .build();
+                        .type(Type.Known.ARRAY)
+                        .items(itemSchema)
+                        .build();
             }
             if (raw instanceof Class && Map.class.isAssignableFrom((Class<?>) raw)) {
                 // For Map<String, V> treat as object with arbitrary properties
@@ -99,4 +125,3 @@ public final class SchemaUtil {
         return Schema.builder().type(Type.Known.OBJECT).build();
     }
 }
-

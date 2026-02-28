@@ -31,42 +31,40 @@
     "durationMillis": 150,
     "serviceName": "order-service"
   },
-  "output": {
-    "result": "emitted",
-    "items": [
-      {
-        "eventName": "OrderPlaced",
-        "eventDescription": "A new order has been placed by the customer",
-        "eventType": "ORDER_PLACED",
-        "occurredAt": "2024-05-10T09:15:00Z",
-        "payload": {
-          "orderId": "1234567890",
-          "orderAmount": 100,
-          "orderStatus": "PLACED"
-        },
-        "channels": [
-          {
-            "channel": "EMAIL"
-          }
-        ],
-        "ruleExpressions": [
-          "order.status == 'PLACED'",
-          "order.amount > 0"
-        ],
-        "reasoning": {
-          "bulletReasons": [
-            "OrderPlaced is a significant business event that warrants customer notification",
-            "Order amount is above minimum threshold"
-          ],
-          "memoryUsed": [],
-          "factsUsed": []
-        },
-        "safetyChecks": {
-          "optOutRespected": true,
-          "dndRespected": true,
-          "quotaRespected": true
+  "output": [
+    {
+      "result": "emitted",
+      "eventName": "OrderPlaced",
+      "eventDescription": "A new order has been placed by the customer",
+      "eventType": "ORDER_PLACED",
+      "occurredAt": "2024-05-10T09:15:00Z",
+      "payload": {
+        "orderId": "1234567890",
+        "orderAmount": 100,
+        "orderStatus": "PLACED"
+      },
+      "channels": [
+        {
+          "channel": "EMAIL"
         }
+      ],
+      "ruleExpressions": [
+        "order.status == 'PLACED'",
+        "order.amount > 0"
+      ],
+      "reasoning": {
+        "bulletReasons": [
+          "OrderPlaced is a significant business event that warrants customer notification",
+          "Order amount is above minimum threshold"
+        ],
+        "memoryUsed": [],
+        "factsUsed": []
+      },
+      "safetyChecks": {
+        "optOutRespected": true,
+        "dndRespected": true,
+        "quotaRespected": true
       }
-    ]
-  }
+    }
+  ]
 }
