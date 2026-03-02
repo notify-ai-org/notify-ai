@@ -13,11 +13,11 @@ import com.example.agent.models.EventCapture;
 import com.example.agent.models.EventSchedule;
 import com.example.agent.models.MessageTemplate;
 import com.example.agent.models.NotificationJob;
-
+import com.example.agent.util.ObjectMapperFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.example.agent.config.ObjectMapperFactory;
+import com.google.adk.events.Event;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import com.example.agent.config.AgentRegistry;
@@ -148,14 +148,15 @@ public class EventConsumer {
                                 Part.fromText(
                                         "Process the following event capture and determine if it should be emitted:"),
                                 Part.fromText(inputJson)))
-                        .doOnNext(agentEvent -> {
+                        .flatMap(agentEvent -> {
+                            List<Flowable<com.google.adk.events.Event>> subFlows = new ArrayList<>();
                             if (agentEvent.content().isPresent()
                                     && agentEvent.content().get().parts().isPresent()
                                     && !agentEvent.content().get().parts().get().isEmpty()) {
                                 try {
                                     Optional<List<Part>> parts = agentEvent.content().get().parts();
                                     if (!parts.isPresent()) {
-                                        return;
+                                        return Flowable.<com.google.adk.events.Event>empty();
                                     }
                                     for (Part part : parts.get()) {
                                         if (part.text().isPresent()) {
@@ -213,34 +214,48 @@ public class EventConsumer {
                                                                 .dispatchMode(NotificationJob.DispatchMode.EVENT);
 
                                                         NotificationJob job = jobBuilder.build();
-                                                        generateTemplatesAndSchedules(capture, job);
+                                                        Flowable<com.google.adk.events.Event> subFlow = generateTemplatesAndSchedules(
+                                                                capture,
+                                                                job)
+                                                                .flatMapIterable(list -> list)
+                                                                .doOnNext(j -> {
+                                                                    if (eventTypeObj != null
+                                                                            && eventTypeObj.equals("static")) {
+                                                                        // Validation check before dispatching
+                                                                        if (!capture.getEvent().isValidated()) {
+                                                                            logger.warn(
+                                                                                    "Skipping dispatch for event '{}' (ID: {}) - not validated",
+                                                                                    capture.getEvent().getName(),
+                                                                                    capture.getEvent().getId());
+                                                                            return;
+                                                                        }
 
-                                                        if (eventTypeObj != null && eventTypeObj.equals("static")) {
-                                                            // Validation check before dispatching
-                                                            if (!capture.getEvent().isValidated()) {
-                                                                logger.warn(
-                                                                        "Skipping dispatch for event '{}' (ID: {}) - not validated",
-                                                                        capture.getEvent().getName(),
-                                                                        capture.getEvent().getId());
-                                                                continue;
-                                                            }
+                                                                        if (template != null
+                                                                                && !template.isValidated()) {
+                                                                            logger.warn(
+                                                                                    "Skipping dispatch for event '{}' - template (ID: {}) not validated",
+                                                                                    capture.getEvent().getName(),
+                                                                                    template.getId());
+                                                                            return;
+                                                                        }
 
-                                                            if (template != null && !template.isValidated()) {
-                                                                logger.warn(
-                                                                        "Skipping dispatch for event '{}' - template (ID: {}) not validated",
-                                                                        capture.getEvent().getName(), template.getId());
-                                                                continue;
-                                                            }
-
-                                                            try {
-                                                                notificationDispatcher.pushJob(job);
-                                                                notificationJobRepository.save(job);
-                                                                logger.info("Dispatched job for validated event '{}'",
-                                                                        capture.getEvent().getName());
-                                                            } catch (ValidationRequiredException e) {
-                                                                logger.error("Dispatch blocked: {}", e.getMessage());
-                                                            }
-                                                        }
+                                                                        try {
+                                                                            notificationDispatcher.pushJob(job);
+                                                                            notificationJobRepository.save(job);
+                                                                            logger.info(
+                                                                                    "Dispatched job for validated event '{}'",
+                                                                                    capture.getEvent().getName());
+                                                                        } catch (ValidationRequiredException e) {
+                                                                            logger.error("Dispatch blocked: {}",
+                                                                                    e.getMessage());
+                                                                        }
+                                                                    }
+                                                                }).doOnError(e -> {
+                                                                    throw new RuntimeException(
+                                                                            "Failed to generate templates and schedules",
+                                                                            e);
+                                                                });
+                                                        subFlows.add(subFlow);
                                                     }
                                                 }
 
@@ -252,15 +267,16 @@ public class EventConsumer {
                                     e.printStackTrace();
                                 }
                             }
+                            return Flowable.merge(subFlows);
                         }).onErrorResumeNext(error -> {
                             System.err.println("Agent call failed: " + error.getMessage());
-                            return Flowable.empty();
+                            return Flowable.<com.google.adk.events.Event>empty();
                         });
                 flows.add(flow);
             }
 
             if (flows.isEmpty()) {
-                return Flowable.empty();
+                return Flowable.<com.google.adk.events.Event>empty();
             }
             return Flowable.merge(flows);
 
@@ -270,7 +286,7 @@ public class EventConsumer {
         }
     }
 
-    private io.reactivex.rxjava3.disposables.Disposable generateTemplatesAndSchedules(EventCapture capture,
+    private Flowable<List<com.google.adk.events.Event>> generateTemplatesAndSchedules(EventCapture capture,
             NotificationJob job) {
         try {
             List<AgentTaskContext> tasks = new ArrayList<>();
@@ -289,7 +305,7 @@ public class EventConsumer {
             }
             return agentOrchestrator.executeTasksInParallel(tasks)
                     .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
-                    .subscribe(
+                    .doOnNext(
                             events -> {
                                 for (com.google.adk.events.Event agentEvent : events) {
                                     if (agentEvent.content().isPresent()
@@ -386,19 +402,25 @@ public class EventConsumer {
                                                     }
                                                     break;
                                                 default:
-                                                    System.out.println("Unknown agent source: " + agentEvent.author());
+                                                    throw new RuntimeException(
+                                                            "Unknown agent source: " + agentEvent.author());
                                             }
                                         } catch (Exception e) {
                                             System.err.println("Error parsing agent output: " + e.getMessage());
                                             e.printStackTrace();
+                                            throw e;
                                         }
                                     }
                                 }
-                            }, error -> System.err.println("Agent call failed: " + error.getMessage()));
+                            })
+                    .onErrorResumeNext(error -> {
+                        System.err.println("Agent call failed: " + error.getMessage());
+                        return Flowable.empty();
+                    });
         } catch (JsonProcessingException e) {
             System.err.println("Error generating templates and schedules: " + e.getMessage());
             e.printStackTrace();
-            return null;
+            return Flowable.empty();
         }
     }
 

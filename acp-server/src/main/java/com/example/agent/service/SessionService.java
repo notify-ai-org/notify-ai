@@ -2,9 +2,9 @@ package com.example.agent.service;
 
 import com.example.agent.AgentSessionRepository;
 import com.example.agent.models.AgentSessionEntity;
+import com.example.agent.util.ObjectMapperFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.example.agent.config.ObjectMapperFactory;
 import com.google.adk.events.Event;
 import com.google.adk.sessions.BaseSessionService;
 import com.google.adk.sessions.GetSessionConfig;

@@ -13,12 +13,12 @@
     {
       "channel": "EMAIL",
       "subject": "customer",
-      "template": "Dear Customer, your order (Order ID: ORD-10001) placed on 2024-05-10 has been received.\n       The order amount is $299.99."
+      "template": "Dear Customer, your order (Order ID: {{payload.orderId}}) placed on {{occuredAt}} has been received.\n       The order amount is ${{payload.orderAmount}}."
     },
     {
       "channel": "SMS",
       "subject": "customer",
-      "template": "Order ORD-10001 has been created on 2024-05-10. Total: $299.99."
+      "template": "Order {{payload.orderId}} has been created on {{occuredAt}}. Total: ${{payload.orderAmount}}."
     }
   ]
 }

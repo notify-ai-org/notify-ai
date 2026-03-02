@@ -7,9 +7,9 @@ import com.example.agent.interfaces.MemoryAssembler;
 import com.example.agent.models.FactEntity;
 import com.example.agent.models.RawLog;
 import com.example.agent.records.Fact;
+import com.example.agent.util.ObjectMapperFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.example.agent.config.ObjectMapperFactory;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 

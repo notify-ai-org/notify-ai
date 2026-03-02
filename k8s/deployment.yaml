@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vocab-agent
+  labels:
+    app: vocab-agent
+spec:
+  replicas: 2 # Scale as needed
+  selector:
+    matchLabels:
+      app: vocab-agent
+  template:
+    metadata:
+      labels:
+        app: vocab-agent
+    spec:
+      containers:
+        - name: vocab-agent
+          # Replace with your actual image name and registry, e.g., your-dockerhub-user/vocab-agent:1.0.0
+          image: vocab-agent:latest 
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          # Optional: Add Liveness and Readiness probes to ensure the app is healthy
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness # Assuming Spring Boot Actuator is enabled
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness # Assuming Spring Boot Actuator is enabled
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          env:
+            # Add any environment variables your app needs (e.g., DB credentials, Kafka brokers)
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vocab-agent-service
+  labels:
+    app: vocab-agent
+spec:
+  # Use ClusterIP for internal access, or change to LoadBalancer/NodePort to expose externally
+  type: ClusterIP 
+  selector:
+    app: vocab-agent
+  ports:
+    - protocol: TCP
+      port: 80        # Port exposed inside the cluster
+      targetPort: 8080 # Port the container is listening on

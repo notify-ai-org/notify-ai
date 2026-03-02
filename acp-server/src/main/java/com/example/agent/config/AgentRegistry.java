@@ -1,6 +1,7 @@
 package com.example.agent.config;
 
 import com.example.agent.AgentOrchestrator;
+import com.example.agent.util.ObjectMapperFactory;
 import com.example.agent.util.SchemaUtil;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;

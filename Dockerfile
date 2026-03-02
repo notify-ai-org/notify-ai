@@ -1,0 +1,36 @@
+# Stage 1: Build the application using Maven
+FROM maven:3.9.6-eclipse-temurin-17 AS builder
+
+WORKDIR /app
+
+# Copy the parent pom and module poms to cache dependencies
+COPY pom.xml .
+COPY annotations/pom.xml annotations/
+COPY api/pom.xml api/
+COPY acp-server/pom.xml acp-server/
+COPY client/pom.xml client/
+COPY engine/pom.xml engine/
+
+# Download dependencies offline to optimize build time
+RUN mvn dependency:go-offline -B
+
+# Copy the rest of the source code
+COPY . .
+
+# Build the project, skipping tests to speed up the process
+RUN mvn clean package -DskipTests
+
+# Stage 2: Create the runtime image using GraalVM JDK
+FROM ghcr.io/graalvm/jdk-community:17
+
+WORKDIR /app
+
+# Copy the built jar from the builder stage
+# The spring-boot-maven-plugin repackages the jar to be executable
+COPY --from=builder /app/acp-server/target/vocabulary-agent-acp-server-*-SNAPSHOT.jar app.jar
+
+# Expose the port the application runs on
+EXPOSE 8080
+
+# Run the application
+ENTRYPOINT ["java", "-jar", "app.jar"]
