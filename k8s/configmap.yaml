@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vocab-agent-config
+  labels:
+    app: vocab-agent
+data:
+  # ─── Database ──────────────────────────────────────────────────────────────
+  DB_HOST: "localhost"           # Replace with your Cloud SQL or Postgres host
+  DB_PORT: "5432"
+  DB_NAME: "agent"
+
+  # ─── Redis ─────────────────────────────────────────────────────────────────
+  REDIS_HOST: "redis-19139.crce263.ap-south-1-1.ec2.cloud.redislabs.com"
+  REDIS_PORT: "19139"
+  REDIS_USERNAME: "default"
+  REDIS_VECTOR_DIM: "3072"
+
+  # ─── Kafka ─────────────────────────────────────────────────────────────────
+  KAFKA_BOOTSTRAP: "localhost:9092"  # Replace with your managed Kafka endpoint
+  KAFKA_GROUP_ID: "vocab-adk-group"
+
+  # ─── OpenAI ────────────────────────────────────────────────────────────────
+  OPENAI_API_BASE_URL: "https://api.openai.com/v1"
+  OPENAI_API_TIMEOUT: "30s"
+  OPENAI_API_CONNECTION_TIMEOUT: "10s"
+  OPENAI_MODEL: "gpt-4o-mini"
+
+  # ─── Vocab ─────────────────────────────────────────────────────────────────
+  VOCAB_TOPIC: "vocabulary-raw"
+  VOCAB_OPENAI_MAX_TOKENS: "160"
+  VOCAB_DESCRIPTION_MAX_LENGTH: "512"
+
+  # ─── Embedding ─────────────────────────────────────────────────────────────
+  EMBEDDING_MAX_BATCH_SIZE: "10"
+  EMBEDDING_MAX_WAIT: "100ms"
+  EMBEDDING_SCHEMA_VERSION: "v1"
+  EMBEDDING_CACHE_TTL: "24h"
+
+  # ─── Agent Memory ──────────────────────────────────────────────────────────
+  AGENT_MEMORY_WINDOW_SIZE: "1h"
+  AGENT_MEMORY_INACTIVITY_TIMEOUT: "30m"
+  AGENT_MEMORY_MAX_FACTS: "50"
+
+  # ─── Agent Buffer ──────────────────────────────────────────────────────────
+  AGENT_BUFFER_TIMEOUT: "15s"
+
+  # ─── Auth ──────────────────────────────────────────────────────────────────
+  ACP_JWT_REQUIRED_SCOPE: "agent:invoke"
+  ACP_AUTH_SKIP_PATHS: "/api/client/register,/api/auth/token/refresh,/actuator/health,/actuator/info"
+
+  # ─── Spring ────────────────────────────────────────────────────────────────
+  SPRING_PROFILES_ACTIVE: "dev"
+
+---
+# Sensitive values should be stored in a Kubernetes Secret, not ConfigMap.
+# Create this Secret manually (do NOT commit to Git):
+#
+# kubectl create secret generic vocab-agent-secrets \
+#   --from-literal=DB_USER=<your-db-user> \
+#   --from-literal=DB_PASSWORD=<your-db-password> \
+#   --from-literal=REDIS_PASSWORD=<your-redis-password> \
+#   --from-literal=OPENAI_API_KEY=<your-openai-key> \
+#   --from-literal=ANTHROPIC_API_KEY=<your-anthropic-key> \
+#   --from-literal=ACP_JWT_SECRET=<your-jwt-secret-min-32-chars>

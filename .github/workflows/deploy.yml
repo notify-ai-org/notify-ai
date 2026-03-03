@@ -1,0 +1,77 @@
+name: Build and Deploy to GKE
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  PROJECT_ID: newagent-rnun
+  GKE_CLUSTER: vocab-agent-cluster
+  GKE_ZONE: us-central1-a
+  IMAGE: vocab-agent
+  REGISTRY: gcr.io
+
+jobs:
+  build-and-deploy:
+    name: Build, Push, and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Authenticate to Google Cloud using a Service Account key
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      # Set up the gcloud CLI
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      # Configure Docker to use gcloud for GCR authentication
+      - name: Configure Docker to use gcloud credentials
+        run: gcloud auth configure-docker gcr.io --quiet
+
+      # Set up QEMU for multi-platform builds (ARM -> AMD64)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      # Set up Docker Buildx for multi-platform support
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the image targeting linux/amd64 for GKE compatibility
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:latest
+            ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Install the GKE auth plugin and get cluster credentials
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ env.GKE_CLUSTER }}
+          location: ${{ env.GKE_ZONE }}
+
+      # Update the image in the deployment to use the new SHA-tagged image
+      - name: Update deployment image
+        run: |
+          kubectl set image deployment/vocab-agent \
+            vocab-agent=${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/${{ env.IMAGE }}:${{ github.sha }}
+
+      # Wait for the rollout to complete
+      - name: Verify rollout
+        run: kubectl rollout status deployment/vocab-agent --timeout=120s
+
+      - name: Show running pods
+        run: kubectl get pods -l app=vocab-agent
