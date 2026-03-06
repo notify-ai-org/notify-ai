@@ -12,6 +12,9 @@ import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
+
+import com.example.agent.annotations.ManagedConfiguration;
+import com.example.agent.annotations.ManagedConfiguration.ConfigSource;
 import org.springframework.dao.annotation.PersistenceExceptionTranslationPostProcessor;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
@@ -53,27 +56,35 @@ import java.util.concurrent.TimeUnit;
 public class Config {
 
     @Value("${redis.host}")
+    @ManagedConfiguration(key = "redis.host", source = ConfigSource.CONFIG_MAP)
     private String redisHost;
 
     @Value("${redis.port}")
+    @ManagedConfiguration(key = "redis.port", source = ConfigSource.CONFIG_MAP)
     private int redisPort;
 
     @Value("${redis.username}")
+    @ManagedConfiguration(key = "redis.username", source = ConfigSource.CONFIG_MAP)
     private String redisUsername;
 
     @Value("${redis.password}")
+    @ManagedConfiguration(key = "redis.password", source = ConfigSource.CONFIG_MAP)
     private String redisPassword;
 
     @Value("${openai.api.base-url:https://api.openai.com/v1}")
+    @ManagedConfiguration(key = "openai.api.base-url")
     private String baseUrl;
 
     @Value("${openai.api.key}")
+    @ManagedConfiguration(key = "openai.api.key")
     private String apiKey;
 
     @Value("${openai.api.timeout:30s}")
+    @ManagedConfiguration(key = "openai.api.timeout")
     private Duration timeout;
 
     @Value("${openai.api.connection-timeout:10s}")
+    @ManagedConfiguration(key = "openai.api.connection-timeout")
     private Duration connectionTimeout;
 
     @Bean
@@ -128,12 +139,24 @@ public class Config {
     // --------------------
     // DataSource: HikariCP
     // --------------------
+    @Value("${spring.datasource.url:jdbc:postgresql://localhost:5432/vocabdb}")
+    @ManagedConfiguration(key = "spring.datasource.url", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
+    private String dbUrl;
+
+    @Value("${spring.datasource.username:postgres}")
+    @ManagedConfiguration(key = "spring.datasource.username", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
+    private String dbUser;
+
+    @Value("${spring.datasource.password:postgres}")
+    @ManagedConfiguration(key = "spring.datasource.password", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
+    private String dbPassword;
+
     @Bean
     public DataSource dataSource() {
         HikariConfig hikariConfig = new HikariConfig();
-        hikariConfig.setJdbcUrl("jdbc:postgresql://localhost:5432/agent"); // change to your DB
-        hikariConfig.setUsername("rohannaik");
-        hikariConfig.setPassword("Msdian-77");
+        hikariConfig.setJdbcUrl(dbUrl);
+        hikariConfig.setUsername(dbUser);
+        hikariConfig.setPassword(dbPassword);
 
         // Optional Hikari settings
         hikariConfig.setDriverClassName("org.postgresql.Driver");

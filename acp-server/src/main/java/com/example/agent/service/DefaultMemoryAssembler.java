@@ -6,6 +6,7 @@ import com.example.agent.interfaces.MemoryAssembler;
 import com.example.agent.records.*;
 import com.example.agent.util.ObjectMapperFactory;
 import com.example.agent.AgentOrchestrator;
+import com.example.agent.annotations.ManagedConfiguration;
 import com.example.agent.config.AgentRegistry;
 import com.example.agent.models.dto.MemorySummarizationRequestDto;
 import com.example.agent.models.dto.MemorySummarizationResponseDto;
@@ -23,9 +24,14 @@ import java.util.stream.Collectors;
 @Service
 public class DefaultMemoryAssembler implements MemoryAssembler {
 
-    private final Duration windowSize;
-    private final Duration inactivityTimeout;
-    private final int maxFactsPerPage;
+    @ManagedConfiguration(key = "agent.memory.window-size")
+    private Duration windowSize;
+
+    @ManagedConfiguration(key = "agent.memory.inactivity-timeout")
+    private Duration inactivityTimeout;
+
+    @ManagedConfiguration(key = "agent.memory.max-facts")
+    private int maxFactsPerPage;
 
     private final EmbeddingService embeddingService;
 

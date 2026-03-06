@@ -18,6 +18,7 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import com.example.agent.AbstractNotificationConnector;
+import com.example.agent.annotations.ManagedConfiguration;
 import com.example.agent.models.NotificationJob;
 import com.example.agent.models.subject.Subject;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -32,22 +33,23 @@ public class WebhookConnector extends AbstractNotificationConnector {
     private final RestTemplate webhookRestTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-
     @Override
     public String channel() {
         return "webhook";
     }
-    
+
+    @ManagedConfiguration(key = "notification.webhook.enabled")
     private boolean enabled = true;
+
+    @ManagedConfiguration(key = "notification.webhook.defaultTimeoutMs")
     private int defaultTimeoutMs = 5000;
 
     @Override
-    public void send(NotificationJob job,Subject subject) {
+    public void send(NotificationJob job, Subject subject) {
 
         validate(job);
 
-        Map<String, String> attrs =
-                job.getAttributes() == null ? Map.of() : job.getAttributes();
+        Map<String, String> attrs = job.getAttributes() == null ? Map.of() : job.getAttributes();
 
         try {
             String body = buildBody(job);
@@ -56,29 +58,24 @@ public class WebhookConnector extends AbstractNotificationConnector {
 
             HttpEntity<String> entity = new HttpEntity<>(body, headers);
 
-            ResponseEntity<String> response =
-                    webhookRestTemplate.exchange(
-                            job.getTarget(),
-                            method,
-                            entity,
-                            String.class
-                    );
+            ResponseEntity<String> response = webhookRestTemplate.exchange(
+                    job.getTarget(),
+                    method,
+                    entity,
+                    String.class);
 
             if (!isSuccess(response.getStatusCode(), attrs)) {
                 throw new RuntimeException(
-                        "Webhook delivery failed, status=" + response.getStatusCodeValue()
-                );
+                        "Webhook delivery failed, status=" + response.getStatusCodeValue());
             }
 
         } catch (RestClientException ex) {
             // Timeouts, IO, DNS, connection refused
             throw new RuntimeException(
-                    "Webhook request failed for notificationId=" + job.getId(), ex
-            );
+                    "Webhook request failed for notificationId=" + job.getId(), ex);
         } catch (Exception ex) {
             throw new RuntimeException(
-                    "Webhook send failed for notificationId=" + job.getId(), ex
-            );
+                    "Webhook send failed for notificationId=" + job.getId(), ex);
         }
     }
 
@@ -147,11 +144,9 @@ public class WebhookConnector extends AbstractNotificationConnector {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(
-                new SecretKeySpec(
-                    secret.getBytes(StandardCharsets.UTF_8),
-                    "HmacSHA256"
-                )
-            );
+                    new SecretKeySpec(
+                            secret.getBytes(StandardCharsets.UTF_8),
+                            "HmacSHA256"));
             byte[] raw = mac.doFinal(body.getBytes(StandardCharsets.UTF_8));
             return "sha256=" + HexFormat.of().formatHex(raw);
         } catch (Exception e) {
@@ -166,4 +161,3 @@ public class WebhookConnector extends AbstractNotificationConnector {
     }
 
 }
-

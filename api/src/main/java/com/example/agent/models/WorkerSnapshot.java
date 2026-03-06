@@ -24,6 +24,10 @@ public class WorkerSnapshot {
     @Column(name = "job_id")
     private String jobId;
 
+    /** JPA requires a no-args constructor */
+    protected WorkerSnapshot() {
+    }
+
     public WorkerSnapshot(
             String workerId,
             Instant lastActiveAt,

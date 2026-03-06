@@ -12,6 +12,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Component;
 
@@ -26,6 +28,8 @@ import jakarta.annotation.PreDestroy;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 
+import com.example.agent.annotations.ManagedConfiguration;
+
 @Component
 @RequiredArgsConstructor
 public class DispatcherWorkerPool implements Runnable {
@@ -33,16 +37,28 @@ public class DispatcherWorkerPool implements Runnable {
     @Data
     public class DispatcherProperties {
 
+        @ManagedConfiguration(key = "dispatcher.min-workers")
         private int minWorkers = 2;
+
+        @ManagedConfiguration(key = "dispatcher.max-workers")
         private int maxWorkers = 20;
+
+        @ManagedConfiguration(key = "dispatcher.idle-worker-ttl-seconds")
         private int idleWorkerTtlSeconds = 30;
+
+        @ManagedConfiguration(key = "dispatcher.poll-batch-size")
         private int pollBatchSize = 10;
 
-        // Configurable flush interval (ms) and buffer size
-        private long logFlushIntervalMs = 5000; // e.g., configurable via @Value or DispatcherProperties
-        private int logBufferSize = 50; // e.g., configurable via @Value or DispatcherProperties
+        @ManagedConfiguration(key = "dispatcher.log-flush-interval-ms")
+        private long logFlushIntervalMs = 5000;
 
+        @ManagedConfiguration(key = "dispatcher.log-buffer-size")
+        private int logBufferSize = 50;
+
+        @ManagedConfiguration(key = "dispatcher.retry-max-attempts")
         private int retryMaxAttempts = 5;
+
+        @ManagedConfiguration(key = "dispatcher.retry-backoff-millis")
         private long retryBackoffMillis = 2000;
     }
 
@@ -69,6 +85,8 @@ public class DispatcherWorkerPool implements Runnable {
     private final NotificationAttemptLogRepository logRepo;
 
     private final Map<String, ConnectorMetrics> metricsMap = new HashMap<>();
+
+    private static final Logger logger = LoggerFactory.getLogger(DispatcherWorkerPool.class);
 
     @PostConstruct
     public void init() {
@@ -103,9 +121,12 @@ public class DispatcherWorkerPool implements Runnable {
             throw new RuntimeException("No available worker found within timeout");
         }
 
+        logger.debug("Available worker: {} for job: {}", availableWorker.workerId, job.getId());
+
         // set the notification job in the worker
         // notify the waiting worker thread
         if (!availableWorker.assignJob(job)) {
+            logger.debug("Failed to assign job to worker: {} for job: {}", availableWorker.workerId, job.getId());
             throw new RuntimeException("Failed to assign job to worker");
         }
     }
@@ -140,6 +161,7 @@ public class DispatcherWorkerPool implements Runnable {
 
         while (workers.size() < required) {
             NotificationWorker worker = context.getBean(NotificationWorker.class);
+            worker.setLogBuffer(logBuffer);
             workers.add(worker);
             executor.submit(worker);
         }
@@ -152,7 +174,11 @@ public class DispatcherWorkerPool implements Runnable {
         // Use iterator to safely remove from workers list during iteration
         workers.removeIf(worker -> {
             if (worker.isAvailable()) {
-                long idleMillis = java.time.Duration.between(worker.getLastActiveAt(), now).toMillis();
+                Instant lastActive = worker.getLastActiveAt();
+                if (lastActive == null) {
+                    return false; // Cannot determine idle time
+                }
+                long idleMillis = java.time.Duration.between(lastActive, now).toMillis();
                 // Only remove workers if above minWorkers
                 if (idleMillis >= properties.idleWorkerTtlSeconds * 1000L
                         && workers.size() > properties.getMinWorkers()) {
@@ -182,26 +208,30 @@ public class DispatcherWorkerPool implements Runnable {
                     metricsMap.put(worker.getWorkerId(), worker.getMetrics());
 
                     // Save worker snapshot
+                    NotificationJob currentJob = worker.getCurrentJob();
+                    Instant lastActive = worker.getLastActiveAt() != null ? worker.getLastActiveAt() : Instant.now();
+
                     WorkerSnapshot snapshot = workerSnapshotRepository.findByWorkerId(worker.getWorkerId())
                             .orElse(new WorkerSnapshot(
                                     worker.getWorkerId(),
-                                    worker.getLastActiveAt(),
+                                    lastActive,
                                     worker.getStatus().toString(),
-                                    worker.getCurrentJob().getId()));
+                                    currentJob == null ? null : currentJob.getId()));
+
+                    // Always update fields in case we retrieved an existing snapshot
+                    snapshot.setLastActiveAt(lastActive);
+                    snapshot.setStatus(worker.getStatus().toString());
+                    snapshot.setJobId(currentJob == null ? null : currentJob.getId());
 
                     workerSnapshotRepository.save(snapshot);
                 }
-                if (logBuffer.get().size() < properties.getLogBufferSize())
-                    return;
                 List<NotificationAttemptLog> toFlush = logBuffer.getAndSet(new ArrayList<>());
                 if (!toFlush.isEmpty()) {
                     logRepo.saveAll(toFlush);
                 }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
             } catch (Throwable t) {
                 // Optionally log error
+                logger.error("Error in DispatcherWorkerPool", t);
             }
         }
     }

@@ -15,6 +15,9 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+
+import com.example.agent.annotations.ManagedConfiguration;
+import com.example.agent.annotations.ManagedConfiguration.ConfigSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import jakarta.servlet.FilterChain;
@@ -45,8 +48,10 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
     private final String[] skipPaths;
 
     @Value("${acp.auth.jwt.secret:wsws}")
+    @ManagedConfiguration(key = "acp.auth.jwt.secret", source = ConfigSource.CONFIG_MAP)
     String secret = "secretmdkemdokp4i98985908606805609706ktk0509i05968905087096870698";
     @Value("${acp.auth.jwt.required-scope:agent:invoke}")
+    @ManagedConfiguration(key = "acp.auth.jwt.required-scope", source = ConfigSource.CONFIG_MAP)
     String requiredScope = "invoke";
 
     public AgentAuthenticationFilter(

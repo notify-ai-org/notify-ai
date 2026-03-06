@@ -15,6 +15,8 @@ public class EventSchedule extends BaseEntity {
 
     private String description;
 
+    private String triggerType;
+
     private Instant scheduledAt; // exact time (if delayed)
 
     private String cronExpression; // for recurring

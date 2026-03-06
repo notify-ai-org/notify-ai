@@ -100,7 +100,13 @@ public class AgentWrapper {
                 logger.info(String.format("Agent %s transitioned from %s to %s: %s",
                         agentId, previousStage, newStage, reason));
 
-                persistLog(AgentLog.LogType.STAGE_CHANGE, previousStage, newStage, reason, metadata, null);
+                // Only log when a job starts or fails — not on every lifecycle transition
+                if (newStage == AgentStage.RUNNING || newStage == AgentStage.FAILED) {
+                    AgentLog.LogType logType = (newStage == AgentStage.RUNNING)
+                            ? AgentLog.LogType.TASK_STARTED
+                            : AgentLog.LogType.TASK_FAILED;
+                    persistLog(logType, previousStage, newStage, reason, metadata, null);
+                }
                 persistSnapshot();
                 return true;
             } else {

@@ -2,7 +2,9 @@ package com.example.agent.config;
 
 import jakarta.persistence.EntityManagerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import com.example.agent.annotations.ManagedConfiguration;
 import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -29,13 +31,25 @@ import java.util.Map;
 @Configuration
 public class JpaConfig {
 
+    @Value("${spring.datasource.url:jdbc:postgresql://localhost:5432/vocabdb}")
+    @ManagedConfiguration(key = "spring.datasource.url", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
+    private String dbUrl;
+
+    @Value("${spring.datasource.username:postgres}")
+    @ManagedConfiguration(key = "spring.datasource.username", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
+    private String dbUser;
+
+    @Value("${spring.datasource.password:postgres}")
+    @ManagedConfiguration(key = "spring.datasource.password", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
+    private String dbPassword;
+
     @Bean
     @ConditionalOnMissingBean(DataSource.class)
     public DataSource dataSource() {
         HikariConfig hikariConfig = new HikariConfig();
-        hikariConfig.setJdbcUrl("jdbc:postgresql://localhost:5432/engine");
-        hikariConfig.setUsername("rohannaik");
-        hikariConfig.setPassword("Msdian-77");
+        hikariConfig.setJdbcUrl(dbUrl);
+        hikariConfig.setUsername(dbUser);
+        hikariConfig.setPassword(dbPassword);
 
         hikariConfig.setDriverClassName("org.postgresql.Driver");
         hikariConfig.setMaximumPoolSize(10);

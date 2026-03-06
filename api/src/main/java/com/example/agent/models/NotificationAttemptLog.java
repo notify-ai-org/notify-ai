@@ -1,7 +1,6 @@
 package com.example.agent.models;
 
 import jakarta.persistence.Entity;
-import jakarta.persistence.Lob;
 import lombok.Data;
 import lombok.ToString;
 import lombok.EqualsAndHashCode;
@@ -16,7 +15,6 @@ public class NotificationAttemptLog extends RawLog {
 
     private String eventType;
 
-    @Lob
     private String error;
 
     private String result;

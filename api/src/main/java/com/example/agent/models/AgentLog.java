@@ -43,6 +43,8 @@ public class AgentLog {
 
     public enum LogType {
         STAGE_CHANGE,
-        EVENT_EMITTED
+        EVENT_EMITTED,
+        TASK_STARTED,
+        TASK_FAILED
     }
 }

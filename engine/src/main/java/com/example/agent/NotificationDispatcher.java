@@ -6,6 +6,7 @@ import java.util.List;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
+import org.quartz.CalendarIntervalScheduleBuilder;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.Job;
 import org.quartz.JobBuilder;
@@ -13,6 +14,7 @@ import org.quartz.JobDetail;
 import org.quartz.JobExecutionContext;
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
+import org.quartz.SimpleScheduleBuilder;
 import org.quartz.Trigger;
 import org.quartz.TriggerBuilder;
 import org.quartz.TriggerListener;
@@ -127,7 +129,7 @@ public class NotificationDispatcher {
                             notificationJobRepo,
                             deadLetterManager));
 
-            // Load and schedule jobs
+            // Load and schedule all persisted EventSchedules
             List<EventSchedule> schedules = eventScheduleRepository.findAll();
             for (EventSchedule schedule : schedules) {
                 scheduleJob(schedule);
@@ -224,8 +226,16 @@ public class NotificationDispatcher {
                     .forJob(job);
 
             if (schedule.getCronExpression() != null && !schedule.getCronExpression().isEmpty()) {
-                triggerBuilder.withSchedule(CronScheduleBuilder.cronSchedule(schedule.getCronExpression()));
-            } else if (schedule.getScheduledAt() != null) {
+                if (schedule.getTriggerType().equals("CRON")) {
+                    triggerBuilder.withSchedule(CronScheduleBuilder.cronSchedule(schedule.getCronExpression()));
+                } else if (schedule.getTriggerType().equals("SIMPLE")) {
+                    triggerBuilder.withSchedule(SimpleScheduleBuilder.simpleSchedule()
+                            .withIntervalInMilliseconds(Long.parseLong(schedule.getCronExpression()))
+                            .repeatForever());
+                }
+            }
+
+            if (schedule.getScheduledAt() != null) {
                 triggerBuilder.startAt(java.util.Date.from(schedule.getScheduledAt()));
             } else {
                 // Default to immediate if no schedule info (or handle as error)

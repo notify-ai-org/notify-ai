@@ -1,6 +1,7 @@
 package com.example.agent.connectors;
 
 import com.example.agent.AbstractNotificationConnector;
+import com.example.agent.annotations.ManagedConfiguration;
 import com.example.agent.models.ConnectorMetrics;
 import com.example.agent.models.NotificationJob;
 import com.example.agent.models.subject.Subject;
@@ -18,15 +19,17 @@ import java.util.concurrent.atomic.AtomicReference;
 @Component
 @RequiredArgsConstructor
 public class TwilioSmsConnector extends AbstractNotificationConnector {
-
+    @ManagedConfiguration(key = "twilio.accountSid")
     private String accountSid;
+    @ManagedConfiguration(key = "twilio.authToken")
     private String authToken;
-    private String fromNumber;   // Twilio phone number
+    @ManagedConfiguration(key = "twilio.fromNumber")
+    private String fromNumber; // Twilio phone number
+    @ManagedConfiguration(key = "twilio.enabled")
     private boolean enabled = true;
 
     private static final String ATTR_MEDIA_URL = "mediaUrl"; // optional MMS
     private static final String ATTR_STATUS_CALLBACK = "statusCallback";
-
 
     @Override
     public void init(AtomicReference<ConnectorMetrics> metrics) {
@@ -34,7 +37,7 @@ public class TwilioSmsConnector extends AbstractNotificationConnector {
         if (accountSid == null || authToken == null) {
             throw new IllegalStateException("Twilio credentials not configured");
         }
-        Twilio.init(accountSid,authToken);
+        Twilio.init(accountSid, authToken);
     }
 
     @Override
@@ -43,7 +46,7 @@ public class TwilioSmsConnector extends AbstractNotificationConnector {
     }
 
     @Override
-    public void send(NotificationJob job,Subject subject) {
+    public void send(NotificationJob job, Subject subject) {
 
         Objects.requireNonNull(job, "job");
         if (job.getTarget() == null || job.getTarget().isBlank()) {
@@ -56,21 +59,18 @@ public class TwilioSmsConnector extends AbstractNotificationConnector {
             throw new IllegalArgumentException("SMS content is empty");
         }
 
-        Map<String, String> attrs =
-                job.getAttributes() == null ? Map.of() : job.getAttributes();
+        Map<String, String> attrs = job.getAttributes() == null ? Map.of() : job.getAttributes();
 
         try {
             MessageCreator creator = Message.creator(
                     new PhoneNumber(normalize(subject.getAddress())),
                     new PhoneNumber(fromNumber),
-                    content
-            );
+                    content);
 
             // Optional MMS
             if (attrs.containsKey(ATTR_MEDIA_URL)) {
                 creator.setMediaUrl(
-                        java.util.List.of(java.net.URI.create(attrs.get(ATTR_MEDIA_URL)))
-                );
+                        java.util.List.of(java.net.URI.create(attrs.get(ATTR_MEDIA_URL))));
             }
 
             // Optional delivery callback
@@ -87,8 +87,7 @@ public class TwilioSmsConnector extends AbstractNotificationConnector {
             // Treat queued/accepted as success
             if (message.getErrorCode() != null) {
                 throw new RuntimeException(
-                        "Twilio SMS failed: " + message.getErrorMessage()
-                );
+                        "Twilio SMS failed: " + message.getErrorMessage());
             }
 
         } catch (ApiException apiEx) {
@@ -97,8 +96,7 @@ public class TwilioSmsConnector extends AbstractNotificationConnector {
         } catch (Exception ex) {
             throw new RuntimeException(
                     "Twilio SMS send failed for notificationId=" + job.getId(),
-                    ex
-            );
+                    ex);
         }
     }
 
@@ -107,12 +105,10 @@ public class TwilioSmsConnector extends AbstractNotificationConnector {
         String n = number.trim();
         if (!n.startsWith("+")) {
             throw new IllegalArgumentException(
-                    "Phone number must be in E.164 format: " + number
-            );
+                    "Phone number must be in E.164 format: " + number);
         }
         return n;
     }
-
 
     @Override
     public void close() {

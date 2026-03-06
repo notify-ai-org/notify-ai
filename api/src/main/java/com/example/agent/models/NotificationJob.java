@@ -3,6 +3,7 @@ package com.example.agent.models;
 import lombok.Builder;
 import lombok.Data;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import com.example.agent.models.subject.Subject;
@@ -16,9 +17,11 @@ import jakarta.persistence.Transient;
 @Builder
 public class NotificationJob {
 
-    /* ================================
+    /*
+     * ================================
      * 1. Identity & Idempotency
-     * ================================ */
+     * ================================
+     */
 
     /**
      * Globally unique notification identifier.
@@ -40,9 +43,11 @@ public class NotificationJob {
      */
     private int schemaVersion;
 
-    /* ================================
+    /*
+     * ================================
      * 2. Source & Intent
-     * ================================ */
+     * ================================
+     */
 
     /**
      * Originating system or service.
@@ -66,23 +71,24 @@ public class NotificationJob {
      */
     private String correlationId;
 
-    /* ================================
+    /*
+     * ================================
      * 3. Dispatch Semantics
-     * ================================ */
+     * ================================
+     */
 
     /**
-     * EVENT  -> dispatched immediately
+     * EVENT -> dispatched immediately
      * SCHEDULED -> dispatched at scheduledAt
      */
     private DispatchMode dispatchMode;
 
     public enum DispatchMode {
-        EVENT,        // immediate
+        EVENT, // immediate
         RETRY,
         RECONCILE,
-        SCHEDULED     // time-based
+        SCHEDULED // time-based
     }
-    
 
     /**
      * Used only when dispatchMode == SCHEDULED.
@@ -101,10 +107,11 @@ public class NotificationJob {
         CRITICAL
     }
 
-
-    /* ================================
+    /*
+     * ================================
      * 5. Channel & Payload
-     * ================================ */
+     * ================================
+     */
 
     /**
      * Channel identifier.
@@ -131,16 +138,19 @@ public class NotificationJob {
     /**
      * Channel-specific attributes.
      * Example:
-     *  - email.subject
-     *  - sms.statusCallback
-     *  - webhook.secret
+     * - email.subject
+     * - sms.statusCallback
+     * - webhook.secret
      */
     @Transient
-    private Map<String, String> attributes;
+    @Builder.Default
+    private Map<String, String> attributes = new HashMap<>();
 
-    /* ================================
+    /*
+     * ================================
      * 6. Observability & Safety
-     * ================================ */
+     * ================================
+     */
 
     /**
      * Worker or dispatcher instance that last processed this job.
@@ -151,6 +161,5 @@ public class NotificationJob {
      * Optional checksum/hash of payload for tamper detection.
      */
     private String payloadHash;
-
 
 }

@@ -9,6 +9,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.example.agent.annotations.ManagedConfiguration;
+
 public class LogToMemoryAgentWorker implements Runnable {
 
     private final BlockingQueue<RawLog> queue;
@@ -16,8 +18,11 @@ public class LogToMemoryAgentWorker implements Runnable {
 
     private final FactConsumer factExtractor;
 
-    private final int maxBatchSize;
-    private final long flushDelayMs;
+    @ManagedConfiguration(key = "agent.log-worker.max-batch-size")
+    private int maxBatchSize;
+
+    @ManagedConfiguration(key = "agent.log-worker.flush-delay-ms")
+    private long flushDelayMs;
 
     public LogToMemoryAgentWorker(
             BlockingQueue<RawLog> queue,

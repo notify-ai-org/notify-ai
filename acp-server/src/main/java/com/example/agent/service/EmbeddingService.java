@@ -9,6 +9,8 @@ import com.example.agent.records.MemoryPage;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import com.example.agent.annotations.ManagedConfiguration;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -24,15 +26,19 @@ public class EmbeddingService {
     private final EmbeddingCache embeddingCache;
 
     @Value("${embedding.max-batch-size:10}")
+    @ManagedConfiguration(key = "embedding.max-batch-size")
     private int maxBatchSize;
 
     @Value("${embedding.max-wait:100ms}")
+    @ManagedConfiguration(key = "embedding.max-wait")
     private Duration maxWait;
 
     @Value("${embedding.schema-version:v1}")
+    @ManagedConfiguration(key = "embedding.schema-version")
     private String schemaVersion;
 
     @Value("${embedding.cache-ttl:24h}")
+    @ManagedConfiguration(key = "embedding.cache-ttl")
     private Duration cacheTtl;
 
     private final reactor.core.publisher.Sinks.Many<Pending> sink = reactor.core.publisher.Sinks.many().unicast()

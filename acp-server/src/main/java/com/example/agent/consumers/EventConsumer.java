@@ -9,6 +9,7 @@ import com.example.agent.MessageTemplateRepository;
 import com.example.agent.NotificationDispatcher;
 import com.example.agent.NotificationJobRepository;
 import com.example.agent.models.AgentContext;
+import com.example.agent.models.CaptureStatus;
 import com.example.agent.models.EventCapture;
 import com.example.agent.models.EventSchedule;
 import com.example.agent.models.MessageTemplate;
@@ -17,9 +18,9 @@ import com.example.agent.util.ObjectMapperFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.adk.events.Event;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
+
 import com.example.agent.config.AgentRegistry;
 import com.example.agent.exceptions.ValidationRequiredException;
 import org.slf4j.Logger;
@@ -30,6 +31,9 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+
+import com.example.agent.annotations.ManagedConfiguration;
+import com.example.agent.annotations.ManagedConfiguration.ConfigSource;
 // import org.springframework.kafka.annotation.KafkaListener; // Kafka disabled
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -59,6 +63,7 @@ public class EventConsumer {
 
     // Configurable timeout or backpressure parameters
     @Value("${agent.buffer.timeout:15s}")
+    @ManagedConfiguration(key = "agent.buffer.timeout", source = ConfigSource.CONFIG_MAP)
     private Duration bufferTimeout;
 
     public EventConsumer(
@@ -132,6 +137,7 @@ public class EventConsumer {
                 }
 
                 capture.setId(null);
+                capture.setStatus(CaptureStatus.PROCESSING);
                 eventCaptureRepository.save(capture);
 
                 // Build a clean input payload aligned to the agent's inputSchema (EventCapture
@@ -242,6 +248,7 @@ public class EventConsumer {
                                                                         try {
                                                                             notificationDispatcher.pushJob(job);
                                                                             notificationJobRepository.save(job);
+                                                                            capture.setStatus(CaptureStatus.DISPATCHED);
                                                                             logger.info(
                                                                                     "Dispatched job for validated event '{}'",
                                                                                     capture.getEvent().getName());

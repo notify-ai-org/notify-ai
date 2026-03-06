@@ -45,6 +45,13 @@ vocab:
   openai-max-tokens: 160
   description-max-length: 512
 
+agent:
+  orchestrator:
+    core-pool-size: ${AGENT_CORE_POOL_SIZE:10}         # agents permanently kept alive
+    max-pool-size: ${AGENT_MAX_POOL_SIZE:20}           # burst ceiling
+    idle-timeout-seconds: ${AGENT_IDLE_TIMEOUT:300}    # 5 min idle → evict overflow agent
+    cleanup-interval-seconds: ${AGENT_CLEANUP_INTERVAL:60}
+
 openai:
   api:
     base-url: ${OPENAI_API_BASE_URL:https://api.openai.com/v1}
@@ -88,6 +95,7 @@ executors:
 
 logging:
   level:
+    com.example.agent: 'DEBUG'
     org.hibernate.SQL: 'OFF'
     org.hibernate.type.descriptor.sql.BasicBinder: 'OFF'
     org.hibernate.orm.jdbc.bind: 'OFF'

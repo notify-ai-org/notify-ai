@@ -251,7 +251,7 @@ public class NotificationWorker implements Runnable {
         logEntry.setTemplate(job.getTemplate());
         logEntry.setPriority(job.getPriority());
         logEntry.setLastProcessedBy(workerId);
-        logEntry.setTarget(subject.getAddress());
+        logEntry.setTarget(subject == null ? "" : subject.getAddress());
         logBuffer.get().add(logEntry);
     }
 

@@ -20,6 +20,9 @@ import jakarta.annotation.PreDestroy;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.example.agent.annotations.ManagedConfiguration;
+import com.example.agent.annotations.ManagedConfiguration.ConfigSource;
+
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
@@ -36,6 +39,7 @@ public class FactConsumer {
     private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
     @Value("${agent.buffer.timeout:15s}")
+    @ManagedConfiguration(key = "agent.buffer.timeout", source = ConfigSource.CONFIG_MAP)
     private Duration bufferTimeout;
 
     public FactConsumer(AgentOrchestrator orchestrator, AgentRegistry agentRegistry,

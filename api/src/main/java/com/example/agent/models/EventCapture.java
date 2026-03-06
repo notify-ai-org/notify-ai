@@ -43,6 +43,10 @@ public class EventCapture extends RawLog {
 
     private String serviceName; // service name
 
+    /** Lifecycle status of this capture. */
+    @Enumerated(EnumType.STRING)
+    private CaptureStatus status;
+
     // Subject and Rule execution results
     @Transient
     private SubjectResultDto subjectResult; // result from subject supplier

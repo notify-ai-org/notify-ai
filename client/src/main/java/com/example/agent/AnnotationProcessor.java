@@ -2,6 +2,7 @@ package com.example.agent;
 
 import com.example.agent.annotations.*;
 import com.example.agent.models.metadata.*;
+
 import org.reflections.Reflections;
 import org.reflections.scanners.Scanners;
 import org.reflections.util.ConfigurationBuilder;
@@ -12,7 +13,8 @@ import java.util.*;
 
 /**
  * Scans the client codebase for @EnableNotify and the configured base package,
- * then records @Event, @Rule, @Callback, @Vocabulary, @Model, @VocabularySupplier,
+ * then
+ * records @Event, @Rule, @Callback, @Vocabulary, @Model, @VocabularySupplier,
  * and @SubjectSupplier with their mappings to fields, methods, or classes.
  */
 public class AnnotationProcessor {
@@ -27,7 +29,8 @@ public class AnnotationProcessor {
 
     public AnnotationProcessor(String basePackage) {
         this.basePackage = basePackage == null || basePackage.isEmpty()
-            ? "com.example" : basePackage;
+                ? "com.example"
+                : basePackage;
     }
 
     /**
@@ -35,10 +38,9 @@ public class AnnotationProcessor {
      */
     public void process() {
         Reflections reflections = new Reflections(
-            new ConfigurationBuilder()
-                .forPackages(basePackage)
-                .setScanners(Scanners.TypesAnnotated, Scanners.MethodsAnnotated, Scanners.FieldsAnnotated)
-        );
+                new ConfigurationBuilder()
+                        .forPackages(basePackage)
+                        .setScanners(Scanners.TypesAnnotated, Scanners.MethodsAnnotated, Scanners.FieldsAnnotated));
 
         // @Model classes and @Vocabulary fields
         Set<Class<?>> modelClasses = reflections.getTypesAnnotatedWith(Model.class);
@@ -49,8 +51,15 @@ public class AnnotationProcessor {
         // @Event, @Rule, @Callback, @VocabularySupplier, @SubjectSupplier on methods
         Set<Method> methods = reflections.getMethodsAnnotatedWith(Event.class);
         for (Method m : methods) {
-            Event a = m.getAnnotation(Event.class);
-            events.add(new EventMetadata(a.key(), a.description(), a.version(), m, m.getDeclaringClass()));
+            com.example.agent.annotations.Event a = m.getAnnotation(com.example.agent.annotations.Event.class);
+            com.example.agent.models.Event event = new com.example.agent.models.Event();
+            event.setName(a.key());
+            event.setDescription(a.description());
+            event.setEventType(a.eventType());
+            event.setPreferredTimeWindow(a.preferredTimeWindow());
+            event.setScheduleIntent(a.scheduleIntent());
+            event.setPriority(a.priority());
+            events.add(new EventMetadata(event, a.version(), m, m.getDeclaringClass()));
         }
 
         methods = reflections.getMethodsAnnotatedWith(Rule.class);
@@ -68,7 +77,8 @@ public class AnnotationProcessor {
         methods = reflections.getMethodsAnnotatedWith(VocabularySupplier.class);
         for (Method m : methods) {
             VocabularySupplier a = m.getAnnotation(VocabularySupplier.class);
-            vocabularySuppliers.add(new VocabularySupplierMetadata(a.event(), a.description(), m, m.getDeclaringClass()));
+            vocabularySuppliers
+                    .add(new VocabularySupplierMetadata(a.event(), a.description(), m, m.getDeclaringClass()));
         }
 
         methods = reflections.getMethodsAnnotatedWith(SubjectSupplier.class);
@@ -84,7 +94,8 @@ public class AnnotationProcessor {
 
         List<VocabularyFieldMetadata> fields = new ArrayList<>();
         for (Field f : modelClass.getDeclaredFields()) {
-            if (!f.isAnnotationPresent(Vocabulary.class)) continue;
+            if (!f.isAnnotationPresent(Vocabulary.class))
+                continue;
             Vocabulary v = f.getAnnotation(Vocabulary.class);
             String name = (v.name() == null || v.name().isEmpty()) ? f.getName() : v.name();
             fields.add(new VocabularyFieldMetadata(name, v.description(), f, modelClass));
@@ -92,10 +103,27 @@ public class AnnotationProcessor {
         models.add(new ModelMetadata(modelClass, description, fields));
     }
 
-    public List<EventMetadata> getEvents() { return Collections.unmodifiableList(events); }
-    public List<RuleMetadata> getRules() { return Collections.unmodifiableList(rules); }
-    public List<CallbackMetadata> getCallbacks() { return Collections.unmodifiableList(callbacks); }
-    public List<VocabularySupplierMetadata> getVocabularySuppliers() { return Collections.unmodifiableList(vocabularySuppliers); }
-    public List<SubjectSupplierMetadata> getSubjectSuppliers() { return Collections.unmodifiableList(subjectSuppliers); }
-    public List<ModelMetadata> getModels() { return Collections.unmodifiableList(models); }
+    public List<EventMetadata> getEvents() {
+        return Collections.unmodifiableList(events);
+    }
+
+    public List<RuleMetadata> getRules() {
+        return Collections.unmodifiableList(rules);
+    }
+
+    public List<CallbackMetadata> getCallbacks() {
+        return Collections.unmodifiableList(callbacks);
+    }
+
+    public List<VocabularySupplierMetadata> getVocabularySuppliers() {
+        return Collections.unmodifiableList(vocabularySuppliers);
+    }
+
+    public List<SubjectSupplierMetadata> getSubjectSuppliers() {
+        return Collections.unmodifiableList(subjectSuppliers);
+    }
+
+    public List<ModelMetadata> getModels() {
+        return Collections.unmodifiableList(models);
+    }
 }

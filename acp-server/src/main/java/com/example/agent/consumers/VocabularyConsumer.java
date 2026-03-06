@@ -18,6 +18,9 @@ import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
+import com.example.agent.annotations.ManagedConfiguration;
+import com.example.agent.annotations.ManagedConfiguration.ConfigSource;
 // import org.springframework.kafka.annotation.KafkaListener; // Kafka disabled
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -46,6 +49,7 @@ public class VocabularyConsumer {
 
     // Configurable timeout or backpressure parameters
     @Value("${agent.buffer.timeout:15s}")
+    @ManagedConfiguration(key = "agent.buffer.timeout", source = ConfigSource.CONFIG_MAP)
     private Duration bufferTimeout;
 
     public VocabularyConsumer(VocabularyRepository repo, AgentOrchestrator agentOrchestrator,

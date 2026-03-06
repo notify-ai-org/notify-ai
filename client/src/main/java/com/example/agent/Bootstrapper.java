@@ -3,7 +3,9 @@ package com.example.agent;
 import com.example.agent.config.NotifyProperties;
 import com.example.agent.models.ClassModel;
 import com.example.agent.models.ClientRegistrationDto;
+import com.example.agent.models.EventCapture;
 import com.example.agent.models.TokenRefreshDto;
+import com.example.agent.models.metadata.EventMetadata;
 import com.example.agent.models.metadata.RuleMetadata;
 
 import jakarta.annotation.PreDestroy;
@@ -12,12 +14,14 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
 /**
  * Bootstraps the Notification Engine SDK: runs AnnotationProcessor and
- * VocabularyManager, collects client metadata and client id, initializes Buffer,
+ * VocabularyManager, collects client metadata and client id, initializes
+ * Buffer,
  * registers with acp-server, obtains token, enqueues vocabulary/rules into the
  * Buffer, starts the Dispatcher, and handles graceful shutdown.
  */
@@ -37,13 +41,13 @@ public class Bootstrapper {
     private Thread dispatcherThread;
 
     public Bootstrapper(NotifyProperties props,
-                        AnnotationProcessor annotationProcessor,
-                        VocabularyManager vocabularyManager,
-                        Buffer buffer,
-                        AcpServerClient acpClient,
-                        TokenHolder tokenHolder,
-                        InvokeManager invokeManager,
-                        MetricsManager metricsManager) {
+            AnnotationProcessor annotationProcessor,
+            VocabularyManager vocabularyManager,
+            Buffer buffer,
+            AcpServerClient acpClient,
+            TokenHolder tokenHolder,
+            InvokeManager invokeManager,
+            MetricsManager metricsManager) {
         this.props = props;
         this.annotationProcessor = annotationProcessor;
         this.vocabularyManager = vocabularyManager;
@@ -55,7 +59,8 @@ public class Bootstrapper {
     }
 
     /**
-     * Called by Spring initMethod. Runs scanning, registration, enqueue, and starts Dispatcher.
+     * Called by Spring initMethod. Runs scanning, registration, enqueue, and starts
+     * Dispatcher.
      */
     public void bootstrap() {
         annotationProcessor.process();
@@ -76,8 +81,23 @@ public class Bootstrapper {
             // acp-server may not have /api/client/register; continue without auth
         }
 
+        List<EventMetadata> events = annotationProcessor.getEvents();
+        if (!events.isEmpty()) {
+            events.forEach(
+                    (event) -> {
+                        EventCapture dto = new EventCapture();
+                        dto.setEvent(event.getEvent());
+                        dto.getEvent().setEventType("USER");
+                        dto.setOccuredAt(Instant.now());
+                        dto.setPayload(vocabularyManager.toFlattenedMap(event));
+                        dto.setServiceName(event.getDeclaringClass().getSimpleName());
+                        buffer.addEventCapture(dto);
+                    });
+        }
+
         List<ClassModel> vocab = vocabularyManager.toClassModelDtoList();
-        if (!vocab.isEmpty()) buffer.addVocabulary(vocab);
+        if (!vocab.isEmpty())
+            buffer.addVocabulary(vocab);
 
         for (RuleMetadata r : annotationProcessor.getRules()) {
             String ev = (r.getEvent() != null && !r.getEvent().isEmpty()) ? r.getEvent() : "*";
@@ -92,11 +112,15 @@ public class Bootstrapper {
 
     private String getOrCreateClientId() {
         String path = props.getClientIdPath();
-        Path p = (path != null && !path.isEmpty()) ? Paths.get(path) : Paths.get(System.getProperty("java.io.tmpdir"), "notify-client-id.txt");
+        Path p = (path != null && !path.isEmpty()) ? Paths.get(path)
+                : Paths.get(System.getProperty("java.io.tmpdir"), "notify-client-id.txt");
         try {
-            if (Files.exists(p)) return Files.readString(p).trim();
-            String id = props.getApplicationName() + "-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-            if (p.getParent() != null) Files.createDirectories(p.getParent());
+            if (Files.exists(p))
+                return Files.readString(p).trim();
+            String id = props.getApplicationName() + "-"
+                    + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+            if (p.getParent() != null)
+                Files.createDirectories(p.getParent());
             Files.writeString(p, id);
             return id;
         } catch (IOException e) {
@@ -106,29 +130,47 @@ public class Bootstrapper {
 
     private void refreshToken() {
         String ref = tokenHolder.getRefreshToken();
-        if (ref == null || ref.isEmpty()) return;
+        if (ref == null || ref.isEmpty())
+            return;
         try {
             TokenRefreshDto.Request req = new TokenRefreshDto.Request();
             req.setClientId(clientId);
             req.setRefreshToken(ref);
             TokenRefreshDto.Response resp = acpClient.refreshToken(req);
             tokenHolder.setToken(resp.getToken(), resp.getExpiresInMs());
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
     }
 
     @PreDestroy
     public void shutdown() {
-        if (dispatcher != null) dispatcher.stop();
+        if (dispatcher != null)
+            dispatcher.stop();
         if (dispatcherThread != null) {
-            try { dispatcherThread.join(5_000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            try {
+                dispatcherThread.join(5_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
         }
         if (metricsManager != null && acpClient != null) {
             metricsManager.sendToAcpServer(acpClient, tokenHolder != null ? tokenHolder.getToken() : null);
         }
     }
 
-    public Buffer getBuffer() { return buffer; }
-    public InvokeManager getInvokeManager() { return invokeManager; }
-    public MetricsManager getMetricsManager() { return metricsManager; }
-    public AnnotationProcessor getAnnotationProcessor() { return annotationProcessor; }
+    public Buffer getBuffer() {
+        return buffer;
+    }
+
+    public InvokeManager getInvokeManager() {
+        return invokeManager;
+    }
+
+    public MetricsManager getMetricsManager() {
+        return metricsManager;
+    }
+
+    public AnnotationProcessor getAnnotationProcessor() {
+        return annotationProcessor;
+    }
 }

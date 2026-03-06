@@ -3,14 +3,13 @@ package com.example.agent.connectors;
 import org.springframework.stereotype.Component;
 
 import com.example.agent.AbstractNotificationConnector;
+import com.example.agent.annotations.ManagedConfiguration;
 import com.example.agent.models.NotificationJob;
 import com.example.agent.models.subject.EmailSubject;
 import com.example.agent.models.subject.Subject;
 
 import jakarta.mail.internet.InternetAddress;
 import jakarta.mail.internet.MimeMessage;
-
-import java.util.Map;
 
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
@@ -36,9 +35,16 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
 
     private final JavaMailSender mailSender = new JavaMailSenderImpl();
 
-    private String from;              // default from
-    private String fromName;          // optional personal name
+    @ManagedConfiguration(key = "notification.smtp.from")
+    private String from; // default from
+
+    @ManagedConfiguration(key = "notification.smtp.fromName")
+    private String fromName; // optional personal name
+
+    @ManagedConfiguration(key = "notification.smtp.defaultHtml")
     private boolean defaultHtml = true;
+
+    @ManagedConfiguration(key = "notification.smtp.subjectPrefix")
     private String subjectPrefix = ""; // optional "[App] "
 
     @Override
@@ -47,9 +53,9 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
     }
 
     @Override
-    public void send(NotificationJob job,Subject subject) {
+    public void send(NotificationJob job, Subject subject) {
 
-        if(!(subject instanceof EmailSubject)){
+        if (!(subject instanceof EmailSubject)) {
             return;
         }
 
@@ -63,7 +69,7 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
         Map<String, String> attrs = job.getAttributes() == null ? Map.of() : job.getAttributes();
 
         String address = normalizeSubject(subject.getAddress());
-        boolean isHtml = parseBoolean(attrs.get(ATTR_IS_HTML),defaultHtml);
+        boolean isHtml = parseBoolean(attrs.get(ATTR_IS_HTML), defaultHtml);
 
         String[] to = parseAddresses(emailSubject.getAddress());
         String[] cc = parseAddresses(emailSubject.getCc());
@@ -77,8 +83,7 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
             MimeMessageHelper helper = new MimeMessageHelper(
                     message,
                     false,
-                    StandardCharsets.UTF_8.name()
-            );
+                    StandardCharsets.UTF_8.name());
 
             // From
             InternetAddress fromAddr = buildFromAddress();
@@ -86,8 +91,10 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
 
             // To/Cc/Bcc
             helper.setTo(to);
-            if (cc.length > 0) helper.setCc(cc);
-            if (bcc.length > 0) helper.setBcc(bcc);
+            if (cc.length > 0)
+                helper.setCc(cc);
+            if (bcc.length > 0)
+                helper.setBcc(bcc);
 
             // Reply-To
             if (replyTo != null && !replyTo.isBlank()) {
@@ -144,14 +151,16 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
     }
 
     private boolean parseBoolean(String raw, boolean defaultVal) {
-        if (raw == null) return defaultVal;
-        return raw.equalsIgnoreCase("true") || 
-            raw.equalsIgnoreCase("1") || 
-            raw.equalsIgnoreCase("yes");
+        if (raw == null)
+            return defaultVal;
+        return raw.equalsIgnoreCase("true") ||
+                raw.equalsIgnoreCase("1") ||
+                raw.equalsIgnoreCase("yes");
     }
 
     private String[] parseAddresses(String raw) {
-        if (raw == null || raw.isBlank()) return new String[0];
+        if (raw == null || raw.isBlank())
+            return new String[0];
 
         // Split by comma/semicolon, trim, filter empties
         return Stream.of(raw.split("[,;]"))
@@ -168,14 +177,15 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
         try {
             String addr = from.getAddress();
             int at = addr.lastIndexOf('@');
-            if (at > 0 && at < addr.length() - 1) return addr.substring(at + 1);
-        } catch (Exception ignored) {}
+            if (at > 0 && at < addr.length() - 1)
+                return addr.substring(at + 1);
+        } catch (Exception ignored) {
+        }
         return "local";
     }
 
     @Override
-    public void close() {}
+    public void close() {
+    }
 
 }
-
-

@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 
@@ -80,26 +81,26 @@ public class TestNotificationController {
                                 ? requestParams.get("template").toString()
                                 : "Dummy Email Payload Test: $test_var";
 
-                NotificationJob job = NotificationJob.builder()
-                                .id(UUID.randomUUID().toString())
-                                .dispatchMode(DispatchMode.EVENT)
-                                .channel(channel)
-                                .target(target)
-                                .template(template)
-                                .source("test-endpoint-email")
-                                .eventName("test_event_email_" + System.currentTimeMillis())
-                                .eventType("test")
-                                .priority(NotificationPriority.NORMAL)
-                                .build();
-
                 try {
-                        notificationDispatcher.pushJob(job, 0);
+                        for (int i = 0; i <= 1000; i++) {
+                                NotificationJob job = NotificationJob.builder()
+                                                .id(UUID.randomUUID().toString())
+                                                .dispatchMode(DispatchMode.EVENT)
+                                                .channel(channel)
+                                                .target(target)
+                                                .template(template)
+                                                .subjects(new ArrayList<>())
+                                                .source("test-endpoint-email")
+                                                .eventName("test_event_email_" + System.currentTimeMillis())
+                                                .eventType("test")
+                                                .priority(NotificationPriority.NORMAL)
+                                                .build();
+                                notificationDispatcher.pushJob(job, 0);
+                        }
+
                         return ResponseEntity.accepted().body(Map.of(
                                         "status", "SUCCESS",
-                                        "message", "Dispatched dummy EMAIL notification job",
-                                        "jobId", job.getId(),
-                                        "channel", job.getChannel(),
-                                        "target", job.getTarget()));
+                                        "message", "Dispatched dummy EMAIL notification jobs"));
                 } catch (Exception e) {
                         return ResponseEntity.internalServerError().body(Map.of(
                                         "status", "ERROR",

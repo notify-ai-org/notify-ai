@@ -44,36 +44,45 @@ public class DefaultPromptAssembler implements PromptAssembler {
         // 1) Task
         sb.append("## Task\n");
         sb.append("- decisionType: ").append(req.decisionType()).append("\n");
-
         sb.append("- entities: ").append(req.entities()).append("\n");
         sb.append("- event: ").append(req.eventRef()).append("\n\n");
 
-        // 2) Facts
-        sb.append("## Deterministic Facts (use these first)\n");
-        sb.append(limitToCap(formatFacts(bundle.facts()), caps.factsTokens)).append("\n\n");
+        // 2) Facts (omit section if empty)
+        String facts = limitToCap(formatFacts(bundle.facts()), caps.factsTokens);
+        if (!facts.isBlank()) {
+            sb.append("## Deterministic Facts (use these first)\n").append(facts).append("\n\n");
+        }
 
-        // 3) Procedural rules
-        sb.append("## Procedural Rules\n");
-        sb.append(limitToCap(formatPages(bundle.pages(), PageType.PROCEDURAL), caps.proceduralTokens)).append("\n\n");
+        // 3) Procedural rules (omit section if empty)
+        String procedural = limitToCap(formatPages(bundle.pages(), PageType.PROCEDURAL), caps.proceduralTokens);
+        if (!procedural.isBlank()) {
+            sb.append("## Procedural Rules\n").append(procedural).append("\n\n");
+        }
 
-        // 4) Semantic memory
-        sb.append("## Semantic Memory\n");
-        sb.append(limitToCap(formatPages(bundle.pages(), PageType.SEMANTIC), caps.semanticTokens)).append("\n\n");
+        // 4) Semantic memory (omit section if empty)
+        String semantic = limitToCap(formatPages(bundle.pages(), PageType.SEMANTIC), caps.semanticTokens);
+        if (!semantic.isBlank()) {
+            sb.append("## Semantic Memory\n").append(semantic).append("\n\n");
+        }
 
-        // 5) Episodic memory
-        sb.append("## Episodic Memory\n");
-        sb.append(limitToCap(formatPages(bundle.pages(), PageType.EPISODIC), caps.episodicTokens)).append("\n\n");
+        // 5) Episodic memory (omit section if empty)
+        String episodic = limitToCap(formatPages(bundle.pages(), PageType.EPISODIC), caps.episodicTokens);
+        if (!episodic.isBlank()) {
+            sb.append("## Episodic Memory\n").append(episodic).append("\n\n");
+        }
 
-        // 6) Tool receipts (already stripped)
-        sb.append("## Tool Receipts (summaries only)\n");
-        sb.append(limitToCap(formatToolReceipts(bundle.toolReceipts()), caps.toolTokens)).append("\n\n");
+        // 6) Tool receipts (omit section if empty)
+        String toolReceipts = limitToCap(formatToolReceipts(bundle.toolReceipts()), caps.toolTokens);
+        if (!toolReceipts.isBlank()) {
+            sb.append("## Tool Receipts (summaries only)\n").append(toolReceipts).append("\n\n");
+        }
 
         return sb.toString();
     }
 
     private String formatFacts(List<Fact> facts) {
         if (facts == null || facts.isEmpty())
-            return "- (none)\n";
+            return "";
         StringBuilder sb = new StringBuilder();
         for (Fact f : facts) {
             sb.append("- [").append(f.factId()).append("] ")
@@ -90,7 +99,7 @@ public class DefaultPromptAssembler implements PromptAssembler {
                 : pages.stream().filter(p -> p.pageType() == type).toList();
 
         if (filtered.isEmpty())
-            return "- (none)\n";
+            return "";
 
         StringBuilder sb = new StringBuilder();
         for (MemoryPage p : filtered) {
@@ -106,7 +115,7 @@ public class DefaultPromptAssembler implements PromptAssembler {
 
     private String formatToolReceipts(List<ToolReceipt> receipts) {
         if (receipts == null || receipts.isEmpty())
-            return "- (none)\n";
+            return "";
         StringBuilder sb = new StringBuilder();
         for (ToolReceipt r : receipts) {
             sb.append("- ").append(r.toolName())
@@ -183,17 +192,32 @@ public class DefaultPromptAssembler implements PromptAssembler {
         // Minimal rebuild for budget enforcement. (In real implementation, call
         // buildUser with request too.)
         StringBuilder sb = new StringBuilder();
-        sb.append("## Deterministic Facts\n")
-                .append(limitToCap(formatFacts(bundle.facts()), caps.factsTokens)).append("\n\n");
-        sb.append("## Procedural Rules\n")
-                .append(limitToCap(formatPages(bundle.pages(), PageType.PROCEDURAL), caps.proceduralTokens))
-                .append("\n\n");
-        sb.append("## Semantic Memory\n")
-                .append(limitToCap(formatPages(bundle.pages(), PageType.SEMANTIC), caps.semanticTokens)).append("\n\n");
-        sb.append("## Episodic Memory\n")
-                .append(limitToCap(formatPages(bundle.pages(), PageType.EPISODIC), caps.episodicTokens)).append("\n\n");
-        sb.append("## Tool Receipts\n")
-                .append(limitToCap(formatToolReceipts(bundle.toolReceipts()), caps.toolTokens)).append("\n\n");
+
+        String facts = limitToCap(formatFacts(bundle.facts()), caps.factsTokens);
+        if (!facts.isBlank()) {
+            sb.append("## Deterministic Facts\n").append(facts).append("\n\n");
+        }
+
+        String procedural = limitToCap(formatPages(bundle.pages(), PageType.PROCEDURAL), caps.proceduralTokens);
+        if (!procedural.isBlank()) {
+            sb.append("## Procedural Rules\n").append(procedural).append("\n\n");
+        }
+
+        String semantic = limitToCap(formatPages(bundle.pages(), PageType.SEMANTIC), caps.semanticTokens);
+        if (!semantic.isBlank()) {
+            sb.append("## Semantic Memory\n").append(semantic).append("\n\n");
+        }
+
+        String episodic = limitToCap(formatPages(bundle.pages(), PageType.EPISODIC), caps.episodicTokens);
+        if (!episodic.isBlank()) {
+            sb.append("## Episodic Memory\n").append(episodic).append("\n\n");
+        }
+
+        String toolReceipts = limitToCap(formatToolReceipts(bundle.toolReceipts()), caps.toolTokens);
+        if (!toolReceipts.isBlank()) {
+            sb.append("## Tool Receipts\n").append(toolReceipts).append("\n\n");
+        }
+
         return sb.toString();
     }
 
