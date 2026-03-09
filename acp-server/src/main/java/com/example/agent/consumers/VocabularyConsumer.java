@@ -12,11 +12,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
+import com.example.agent.exceptions.AgentApplicationException;
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import com.example.agent.annotations.ManagedConfiguration;
@@ -119,8 +119,7 @@ public class VocabularyConsumer {
                     "message", "Vocabulary processing initiated for " + classes.size() + " classes",
                     "status", "PROCESSING")));
         } catch (Exception e) {
-            return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage(), "status", "ERROR")));
+            throw new AgentApplicationException("Error creating vocabulary", e);
         }
     }
 
@@ -229,6 +228,7 @@ public class VocabularyConsumer {
                             } catch (Exception e) {
                                 System.err.println("Error parsing rule processor output: " + e.getMessage());
                                 e.printStackTrace();
+                                throw new AgentApplicationException("Error parsing rule processor output", e);
                             }
                         }
                     }).onErrorResumeNext(error -> {
@@ -237,7 +237,8 @@ public class VocabularyConsumer {
                     });
         } catch (Exception e) {
             System.err.println("Error invoking rule processor agent: " + e.getMessage());
-            return io.reactivex.rxjava3.core.Flowable.error(e);
+            return io.reactivex.rxjava3.core.Flowable
+                    .error(new AgentApplicationException("Error invoking rule processor agent", e));
         }
     }
 }

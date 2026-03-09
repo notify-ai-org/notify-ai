@@ -10,6 +10,7 @@ import reactor.core.publisher.Mono;
 import com.example.agent.AgentContextHolder;
 import com.example.agent.models.AgentContext;
 import com.google.genai.types.Content;
+import com.example.agent.exceptions.AgentApplicationException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +33,7 @@ public class DocumentConsumer {
                 }
             } catch (Exception e) {
                 log.error("Error processing document", e);
+                throw new AgentApplicationException("Error processing document", e);
             }
         });
     }

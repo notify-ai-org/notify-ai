@@ -199,7 +199,7 @@ public class DispatcherWorkerPool implements Runnable {
 
     @Override
     public void run() {
-        while (true) {
+        while (!Thread.currentThread().isInterrupted()) {
             try {
                 Thread.sleep(5000);
                 removeIdleWorkers();
@@ -229,6 +229,10 @@ public class DispatcherWorkerPool implements Runnable {
                 if (!toFlush.isEmpty()) {
                     logRepo.saveAll(toFlush);
                 }
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt(); // Restore interrupted status
+                logger.info("DispatcherWorkerPool interrupted, shutting down");
+                break;
             } catch (Throwable t) {
                 // Optionally log error
                 logger.error("Error in DispatcherWorkerPool", t);

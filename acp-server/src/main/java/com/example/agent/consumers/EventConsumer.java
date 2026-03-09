@@ -23,6 +23,7 @@ import com.google.genai.types.Part;
 
 import com.example.agent.config.AgentRegistry;
 import com.example.agent.exceptions.ValidationRequiredException;
+import com.example.agent.exceptions.AgentApplicationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,7 +96,7 @@ public class EventConsumer {
                             error -> System.err.println("Error processing events: " + error.getMessage()));
         } catch (Exception e) {
             // STEP 6️⃣: Let Kafka retry via Spring's error handler
-            throw new RuntimeException("Failed processing vocabulary event", e);
+            throw new AgentApplicationException("Failed processing vocabulary event", e);
         }
     }
 
@@ -258,7 +259,7 @@ public class EventConsumer {
                                                                         }
                                                                     }
                                                                 }).doOnError(e -> {
-                                                                    throw new RuntimeException(
+                                                                    throw new AgentApplicationException(
                                                                             "Failed to generate templates and schedules",
                                                                             e);
                                                                 });
@@ -272,6 +273,7 @@ public class EventConsumer {
                                 } catch (Exception e) {
                                     System.err.println("Error parsing agent output: " + e.getMessage());
                                     e.printStackTrace();
+                                    throw new AgentApplicationException("Error parsing agent output", e);
                                 }
                             }
                             return Flowable.merge(subFlows);
@@ -289,7 +291,7 @@ public class EventConsumer {
 
         } catch (Exception e) {
             System.err.println("Error invoking agent for events: " + e.getMessage());
-            return Flowable.error(e);
+            return Flowable.error(new AgentApplicationException("Error invoking agent for events", e));
         }
     }
 
@@ -338,7 +340,8 @@ public class EventConsumer {
                                                             } catch (Exception e) {
                                                                 logger.error("Error parsing schedule JSON: {}", json,
                                                                         e);
-                                                                continue;
+                                                                throw new AgentApplicationException(
+                                                                        "Error parsing schedule JSON", e);
                                                             }
 
                                                             for (Map<String, String> scheduleMap : schedules) {
@@ -393,7 +396,9 @@ public class EventConsumer {
                                                                 logger.error(
                                                                         "Failed to parse message templates from JSON: {}",
                                                                         json, e);
-                                                                continue;
+                                                                throw new AgentApplicationException(
+                                                                        "Failed to parse message templates from JSON",
+                                                                        e);
                                                             }
                                                             for (Map<String, String> templateMap : templateList) {
                                                                 MessageTemplate messageTemplate = new MessageTemplate();
@@ -409,13 +414,13 @@ public class EventConsumer {
                                                     }
                                                     break;
                                                 default:
-                                                    throw new RuntimeException(
+                                                    throw new AgentApplicationException(
                                                             "Unknown agent source: " + agentEvent.author());
                                             }
                                         } catch (Exception e) {
                                             System.err.println("Error parsing agent output: " + e.getMessage());
                                             e.printStackTrace();
-                                            throw e;
+                                            throw new AgentApplicationException("Error parsing agent output", e);
                                         }
                                     }
                                 }
@@ -427,7 +432,7 @@ public class EventConsumer {
         } catch (JsonProcessingException e) {
             System.err.println("Error generating templates and schedules: " + e.getMessage());
             e.printStackTrace();
-            return Flowable.empty();
+            throw new AgentApplicationException("Error generating templates and schedules", e);
         }
     }
 

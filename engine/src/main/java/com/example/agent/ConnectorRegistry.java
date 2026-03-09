@@ -2,7 +2,7 @@ package com.example.agent;
 
 import java.util.*;
 
-import com.example.agent.models.ConnectorProperties;
+import com.example.agent.config.ConnectorProperties;
 import com.example.agent.interfaces.NotificationConnector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.core.env.Environment;
 import lombok.RequiredArgsConstructor;
 
 @Component
@@ -19,7 +20,7 @@ public class ConnectorRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(ConnectorRegistry.class);
 
-    private final ConnectorProperties connectorProperties = new ConnectorProperties();
+    private final Environment environment;
     private final AutowireCapableBeanFactory beanFactory;
 
     /**
@@ -33,7 +34,7 @@ public class ConnectorRegistry {
         return holder.pick();
     }
 
-    public ConnectorProperties.ChannelConfig getConfig(String channel) {
+    public com.example.agent.interfaces.ChannelConfig getConfig(String channel) {
         Objects.requireNonNull(channel, "channel");
         ChannelHolder holder = holders.get(channel);
         if (holder == null) {
@@ -45,7 +46,7 @@ public class ConnectorRegistry {
     /**
      * Called by reloader when config changes.
      */
-    void hotReloadAll(Map<String, ConnectorProperties.ChannelConfig> newConfigMap) {
+    void hotReloadAll(Map<String, ConnectorProperties.ChannelConfigImpl> newConfigMap) {
         // Update existing holders, do not eagerly create new channels.
         newConfigMap.forEach((channel, cfg) -> {
             ChannelHolder existing = holders.get(channel);
@@ -64,21 +65,32 @@ public class ConnectorRegistry {
     }
 
     private ChannelHolder initHolderLazy(String channel) {
-        ConnectorProperties.ChannelConfig cfg = connectorProperties.getChannel().get(channel);
-        if (cfg == null) {
+        String baseProp = "connector.channel." + channel;
+        String clazz = environment.getProperty(baseProp + ".clazz");
+
+        if (clazz == null) {
             throw new IllegalArgumentException("No connector configured for channel: " + channel);
         }
+
+        ConnectorProperties.ChannelConfigImpl cfg = new ConnectorProperties.ChannelConfigImpl();
+        cfg.setClazz(clazz);
+        cfg.setInstances(environment.getProperty(baseProp + ".instances", Integer.class, 1));
+        cfg.setDelay(environment.getProperty(baseProp + ".delay", Long.class, 0L));
+        cfg.setMaxAttempts(environment.getProperty(baseProp + ".maxAttempts", Integer.class, 0));
+        cfg.setBackOffMultiplier(environment.getProperty(baseProp + ".backOffMultiplier", Integer.class, 0));
+
         ChannelHolder holder = new ChannelHolder();
         holder.reloadIfChanged(cfg, beanFactory, channel);
-        log.info("Lazy-initialized connector channel {}", channel);
+        log.info("Lazy-initialized connector channel {} with manual config", channel);
         return holder;
     }
 
     /**
-     * Holds active connector instances for a channel and swaps them atomically on reload.
+     * Holds active connector instances for a channel and swaps them atomically on
+     * reload.
      */
     static final class ChannelHolder {
-        private final AtomicReference<ConnectorProperties.ChannelConfig> activeCfg = new AtomicReference<>();
+        private final AtomicReference<com.example.agent.interfaces.ChannelConfig> activeCfg = new AtomicReference<>();
         private final AtomicReference<List<NotificationConnector>> activeInstances = new AtomicReference<>(List.of());
         private final AtomicInteger rr = new AtomicInteger(0);
 
@@ -91,15 +103,15 @@ public class ConnectorRegistry {
             return list.get(i);
         }
 
-        public ConnectorProperties.ChannelConfig getActiveConfig() {
+        public com.example.agent.interfaces.ChannelConfig getActiveConfig() {
             return activeCfg.get();
         }
 
-        void reloadIfChanged(ConnectorProperties.ChannelConfig newCfg,
-                             AutowireCapableBeanFactory beanFactory,
-                             String channel) {
+        void reloadIfChanged(com.example.agent.interfaces.ChannelConfig newCfg,
+                AutowireCapableBeanFactory beanFactory,
+                String channel) {
 
-            ConnectorProperties.ChannelConfig cur = activeCfg.get();
+            com.example.agent.interfaces.ChannelConfig cur = activeCfg.get();
 
             if (cur != null
                     && Objects.equals(cur.getClazz(), newCfg.getClazz())
@@ -115,16 +127,15 @@ public class ConnectorRegistry {
             }
 
             List<NotificationConnector> built = ConnectorBuilder.buildInstances(
-                    beanFactory, newCfg.getClazz(), newCfg.getInstances()
-            );
+                    beanFactory, newCfg.getClazz(), newCfg.getInstances());
 
             activeInstances.set(built);
             activeCfg.set(cloneCfg(newCfg));
             rr.set(0);
         }
 
-        private ConnectorProperties.ChannelConfig cloneCfg(ConnectorProperties.ChannelConfig cfg) {
-            ConnectorProperties.ChannelConfig c = new ConnectorProperties.ChannelConfig();
+        private com.example.agent.interfaces.ChannelConfig cloneCfg(com.example.agent.interfaces.ChannelConfig cfg) {
+            ConnectorProperties.ChannelConfigImpl c = new ConnectorProperties.ChannelConfigImpl();
             c.setClazz(cfg.getClazz());
             c.setInstances(cfg.getInstances());
             return c;
@@ -144,8 +155,7 @@ public class ConnectorRegistry {
                 }
 
                 @SuppressWarnings("unchecked")
-                Class<? extends NotificationConnector> typed =
-                        (Class<? extends NotificationConnector>) clazz;
+                Class<? extends NotificationConnector> typed = (Class<? extends NotificationConnector>) clazz;
 
                 return (List<NotificationConnector>) java.util.stream.IntStream.range(0, instances)
                         .mapToObj(i -> beanFactory.createBean(typed))
@@ -156,6 +166,5 @@ public class ConnectorRegistry {
             }
         }
     }
-
 
 }

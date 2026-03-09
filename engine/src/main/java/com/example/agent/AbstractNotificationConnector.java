@@ -6,13 +6,14 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.example.agent.models.ConnectorMetrics;
-import com.example.agent.models.ConnectorProperties.ChannelConfig;
+import com.example.agent.interfaces.ChannelConfig;
 import com.example.agent.interfaces.NotificationConnector;
 import com.example.agent.models.NotificationJob;
+import com.example.agent.config.ConnectorProperties.ChannelConfigImpl;
 
 public abstract class AbstractNotificationConnector implements NotificationConnector {
 
-    protected ChannelConfig configuration = new ChannelConfig();
+    protected ChannelConfig configuration = new ChannelConfigImpl();
 
     private DeadLetterManagerImpl deadLetterManager;
 
@@ -30,7 +31,6 @@ public abstract class AbstractNotificationConnector implements NotificationConne
         this.metrics = metrics;
         logs.add("Initialized connector for " + channel());
     }
-    
 
     protected void retryWithBackoff(NotificationJob job, Runnable action) {
         long delay = configuration.getDelay();
@@ -49,22 +49,22 @@ public abstract class AbstractNotificationConnector implements NotificationConne
                 if (attempt == maxAttempts) {
                     metrics.get().markFailed();
                     deadLetterManager.enqueue(
-                        job,
-                        ex,
-                        attempt,
-                        firstAttemptAt,
-                        Instant.now(),
-                        "worker-" + Thread.currentThread().getName(),
-                        "dispatcher-1",
-                        null,
-                        job.getTemplate()
-                    );
+                            job,
+                            ex,
+                            attempt,
+                            firstAttemptAt,
+                            Instant.now(),
+                            "worker-" + Thread.currentThread().getName(),
+                            "dispatcher-1",
+                            null,
+                            job.getTemplate());
                     throw ex;
                 }
 
                 try {
                     Thread.sleep(delay);
-                } catch (InterruptedException ignored) {}
+                } catch (InterruptedException ignored) {
+                }
 
                 delay *= backOffMultiplier;
             }

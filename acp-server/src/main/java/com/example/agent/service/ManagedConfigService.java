@@ -82,7 +82,7 @@ public class ManagedConfigService implements BeanPostProcessor {
     // -----------------------------------------------------------------------
 
     @PostConstruct
-    public void refreshAll() {
+    public void refreshAll() throws Exception {
         // 1. Seed missing DB-sourced keys with their current default values
         seedDefaults();
 
@@ -101,7 +101,7 @@ public class ManagedConfigService implements BeanPostProcessor {
      * reads the field's current (default) value and persists it so that an
      * operator can later modify it through the config service.
      */
-    private void seedDefaults() {
+    private void seedDefaults() throws Exception {
         for (Map.Entry<String, List<FieldTarget>> entry : registry.entrySet()) {
             String key = entry.getKey();
 
@@ -131,6 +131,7 @@ public class ManagedConfigService implements BeanPostProcessor {
                 log.info("Seeded default config: {}={}", key, serialized);
             } catch (Exception e) {
                 log.warn("Failed to seed default for key '{}': {}", key, e.getMessage());
+                throw e;
             }
         }
     }
@@ -143,7 +144,7 @@ public class ManagedConfigService implements BeanPostProcessor {
      * Refresh a single config key from the database and apply it to all
      * registered field targets.
      */
-    public void refresh(String key) {
+    public void refresh(String key) throws Exception {
         Optional<ConfigEntry> entry = configEntryRepository.findById(key);
         if (entry.isPresent()) {
             applyValue(key, entry.get().getConfigValue());
@@ -163,7 +164,7 @@ public class ManagedConfigService implements BeanPostProcessor {
      * Call this after a K8s ConfigMap change triggers Spring Actuator
      * {@code /actuator/refresh}, or from a REST endpoint / event listener.
      */
-    public void refreshConfigMapKeys() {
+    public void refreshConfigMapKeys() throws Exception {
         log.info("Refreshing all CONFIG_MAP-sourced managed configuration keys");
 
         for (Map.Entry<String, List<FieldTarget>> entry : registry.entrySet()) {
@@ -189,6 +190,7 @@ public class ManagedConfigService implements BeanPostProcessor {
                                 target.bean.getClass().getSimpleName(),
                                 target.field.getName(),
                                 e.getMessage());
+                        throw e;
                     }
                 }
             }
@@ -202,7 +204,7 @@ public class ManagedConfigService implements BeanPostProcessor {
     // Uncomment when Kafka is enabled:
     // @KafkaListener(topics = "${config.kafka-topic:config-updates}", groupId =
     // "config-refresh-group")
-    public void onConfigChangeEvent(String message) {
+    public void onConfigChangeEvent(String message) throws Exception {
         try {
             // Expected payload: a JSON string with a "key" field, or "ALL" for full refresh
             // Simple parsing: if message is "ALL", refresh everything; otherwise treat as
@@ -217,6 +219,7 @@ public class ManagedConfigService implements BeanPostProcessor {
             }
         } catch (Exception e) {
             log.error("Failed to process config change event: {}", message, e);
+            throw e;
         }
     }
 
@@ -224,7 +227,7 @@ public class ManagedConfigService implements BeanPostProcessor {
     // Internals
     // -----------------------------------------------------------------------
 
-    private void applyValue(String key, String rawValue) {
+    private void applyValue(String key, String rawValue) throws Exception {
         List<FieldTarget> targets = registry.get(key);
         if (targets == null || targets.isEmpty()) {
             log.trace("No registered targets for config key '{}'", key);
@@ -245,6 +248,7 @@ public class ManagedConfigService implements BeanPostProcessor {
                         target.bean.getClass().getSimpleName(),
                         target.field.getName(),
                         e.getMessage());
+                throw e;
             }
         }
     }

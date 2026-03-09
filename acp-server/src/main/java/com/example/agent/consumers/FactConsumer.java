@@ -12,6 +12,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.types.Content;
 import com.google.genai.types.Part;
+import com.example.agent.exceptions.AgentApplicationException;
 
 import io.reactivex.rxjava3.disposables.CompositeDisposable;
 import io.reactivex.rxjava3.disposables.Disposable;
@@ -108,7 +109,7 @@ public class FactConsumer {
             compositeDisposable.add(d);
 
         } catch (Exception e) {
-            throw new RuntimeException("Fact extraction initiation failed", e);
+            throw new AgentApplicationException("Fact extraction initiation failed", e);
         }
     }
 
@@ -165,6 +166,7 @@ public class FactConsumer {
             }
         } catch (Exception e) {
             e.printStackTrace();
+            throw new AgentApplicationException("Error persisting facts from JSON", e);
         }
         return result;
     }

@@ -82,7 +82,7 @@ public class TestNotificationController {
                                 : "Dummy Email Payload Test: $test_var";
 
                 try {
-                        for (int i = 0; i <= 1000; i++) {
+                        for (int i = 0; i <= 10; i++) {
                                 NotificationJob job = NotificationJob.builder()
                                                 .id(UUID.randomUUID().toString())
                                                 .dispatchMode(DispatchMode.EVENT)

@@ -2,8 +2,8 @@ package com.example.agent.interfaces;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.example.agent.interfaces.ChannelConfig;
 import com.example.agent.models.ConnectorMetrics;
-import com.example.agent.models.ConnectorProperties.ChannelConfig;
 import com.example.agent.models.NotificationJob;
 import com.example.agent.models.subject.Subject;
 

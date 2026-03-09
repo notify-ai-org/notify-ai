@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    include: engine
   main:
     allow-bean-definition-overriding: true
   autoconfigure:
@@ -63,11 +65,7 @@ embedding:
   max-batch-size: ${EMBEDDING_MAX_BATCH_SIZE:10}
   max-wait: ${EMBEDDING_MAX_WAIT:100ms}
   schema-version: ${EMBEDDING_SCHEMA_VERSION:v1}
-connector:
-  channel:
-    WEBHOOK:
-      clazz: "com.example.agent.connectors.WebhookConnector"
-      instances: 1
+
 #  auth:
 #    jwt:
 #      secret: ${ACP_JWT_SECRET:changeme-at-least-32-characters-long-secret-key}
@@ -97,5 +95,19 @@ logging:
   level:
     com.example.agent: 'DEBUG'
     org.hibernate.SQL: 'OFF'
-    org.hibernate.type.descriptor.sql.BasicBinder: 'OFF'
     org.hibernate.orm.jdbc.bind: 'OFF'
+
+notification:
+  smtp:
+    from: ${SMTP_FROM:noreply@example.com}
+    fromName: ${SMTP_FROM_NAME:Vocab Agent}
+    defaultHtml: true
+
+connector:
+  channel:
+    WEBHOOK:
+      clazz: "com.example.agent.connectors.WebhookConnector"
+      instances: 1
+    EMAIL:
+      clazz: "com.example.agent.connectors.SmtpEmailConnector"
+      instances: 1

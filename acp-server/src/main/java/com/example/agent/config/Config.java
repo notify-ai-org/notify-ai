@@ -51,7 +51,7 @@ import java.util.concurrent.TimeUnit;
 @EnableJpaRepositories(basePackages = "com.example.agent", // your repository package
         entityManagerFactoryRef = "entityManagerFactory", transactionManagerRef = "transactionManager")
 @EntityScan(basePackages = "com.example.agent.models")
-@EnableConfigurationProperties(ExecutorProperties.class)
+@EnableConfigurationProperties({ ExecutorProperties.class, ConnectorProperties.class })
 @EnableWebSecurity
 public class Config {
 

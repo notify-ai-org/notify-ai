@@ -49,7 +49,7 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
 
     @Override
     public String channel() {
-        return "email";
+        return "EMAIL";
     }
 
     @Override
