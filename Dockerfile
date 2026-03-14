@@ -10,6 +10,8 @@ COPY api/pom.xml api/
 COPY acp-server/pom.xml acp-server/
 COPY client/pom.xml client/
 COPY engine/pom.xml engine/
+COPY examples/ecommerce-app/pom.xml examples/ecommerce-app/
+COPY examples/banking-app/pom.xml examples/banking-app/
 
 # Download dependencies offline to optimize build time
 RUN mvn dependency:go-offline -B
