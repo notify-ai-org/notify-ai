@@ -18,6 +18,8 @@
         <module>acp-server</module>
         <module>client</module>
         <module>engine</module>
+        <module>examples/ecommerce-app</module>
+        <module>examples/banking-app</module>
     </modules>
     
     <properties>

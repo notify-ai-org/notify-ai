@@ -62,9 +62,6 @@ public class SmtpEmailConnector extends AbstractNotificationConnector {
         EmailSubject emailSubject = (EmailSubject) subject;
 
         Objects.requireNonNull(job, "job");
-        if (job.getTarget() == null || job.getTarget().isBlank()) {
-            throw new IllegalArgumentException("Email target (recipient) is missing");
-        }
 
         Map<String, String> attrs = job.getAttributes() == null ? Map.of() : job.getAttributes();
 

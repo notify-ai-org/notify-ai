@@ -28,9 +28,7 @@ public class DeadLetterManagerImpl implements DeadLetterManager {
 
     private NotificationDispatcher notificationDispatcher;
 
-
     private final ObjectMapper mapper = new ObjectMapper();
-
 
     @Override
     public Page<DeadLetterRecord> listPending(Pageable pageable) {
@@ -63,33 +61,31 @@ public class DeadLetterManagerImpl implements DeadLetterManager {
 
         // Persist FIRST (source of truth)
         enqueue(
-            job,
-            failureInfo,
-            attemptCount,
-            firstAttemptAt,
-            lastAttemptAt,
-            workerId,
-            dispatcherInstanceId,
-            resolvedVocabulary,
-            renderedContent
-        );
+                job,
+                failureInfo,
+                attemptCount,
+                firstAttemptAt,
+                lastAttemptAt,
+                workerId,
+                dispatcherInstanceId,
+                resolvedVocabulary,
+                renderedContent);
 
     }
 
     public Long enqueue(NotificationJob job,
-        FailureInfo fi,
-        int attemptCount,
-        Instant firstAttemptAt,
-        Instant lastAttemptAt,
-        String workerId,
-        String dispatcherInstanceId,
-        Map<String, Object> resolvedVocabulary,
-        String renderedContent) {
+            FailureInfo fi,
+            int attemptCount,
+            Instant firstAttemptAt,
+            Instant lastAttemptAt,
+            String workerId,
+            String dispatcherInstanceId,
+            Map<String, Object> resolvedVocabulary,
+            String renderedContent) {
 
         DeadLetterRecord r = new DeadLetterRecord();
         r.setNotificationId(job.getId());
         r.setChannel(job.getChannel());
-        r.setTarget(job.getTarget());
         r.setAttemptCount(attemptCount);
         r.setFirstAttemptAt(firstAttemptAt);
         r.setLastAttemptAt(lastAttemptAt);
@@ -119,7 +115,6 @@ public class DeadLetterManagerImpl implements DeadLetterManager {
         return repo.save(r).getId();
     }
 
-
     @Override
     @Transactional
     public void replay(long id, String actor) {
@@ -131,7 +126,7 @@ public class DeadLetterManagerImpl implements DeadLetterManager {
 
         NotificationJob job = deserializeJob(r.getOriginalJobPayload());
 
-        notificationDispatcher.pushJob(job,Integer.MIN_VALUE,2000);
+        notificationDispatcher.pushJob(job, Integer.MIN_VALUE, 2000);
 
         r.setReplayStatus(ReplayStatus.REPLAYED);
         r.setReplayedAt(Instant.now());
@@ -182,7 +177,7 @@ public class DeadLetterManagerImpl implements DeadLetterManager {
         }
 
         if (t instanceof HttpStatusCodeException) {
-            HttpStatusCode code = ((HttpStatusCodeException)t).getStatusCode();
+            HttpStatusCode code = ((HttpStatusCodeException) t).getStatusCode();
             if (code.is5xxServerError() || code.value() == 429) {
                 return FailureInfo.builder()
                         .category(FailureCategory.TRANSIENT)
@@ -240,7 +235,8 @@ public class DeadLetterManagerImpl implements DeadLetterManager {
         int limit = 50;
         for (StackTraceElement el : t.getStackTrace()) {
             sb.append(el).append("\n");
-            if (--limit == 0) break;
+            if (--limit == 0)
+                break;
         }
         return sb.toString();
     }

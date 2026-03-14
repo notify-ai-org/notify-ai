@@ -32,7 +32,7 @@ public abstract class AbstractNotificationConnector implements NotificationConne
         logs.add("Initialized connector for " + channel());
     }
 
-    protected void retryWithBackoff(NotificationJob job, Runnable action) {
+    protected void retryWithBackoff(NotificationJob job, Runnable action) throws InterruptedException {
         long delay = configuration.getDelay();
         int maxAttempts = configuration.getMaxAttempts();
         int backOffMultiplier = configuration.getBackOffMultiplier();
@@ -64,6 +64,7 @@ public abstract class AbstractNotificationConnector implements NotificationConne
                 try {
                     Thread.sleep(delay);
                 } catch (InterruptedException ignored) {
+                    throw ignored;
                 }
 
                 delay *= backOffMultiplier;

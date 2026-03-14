@@ -56,7 +56,7 @@ metadata:
     app: vocab-agent
 spec:
   # Use ClusterIP for internal access, or change to LoadBalancer/NodePort to expose externally
-  type: ClusterIP 
+  type: LoadBalancer
   selector:
     app: vocab-agent
   ports:

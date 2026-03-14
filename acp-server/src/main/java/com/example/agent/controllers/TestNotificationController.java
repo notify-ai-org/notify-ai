@@ -31,10 +31,6 @@ public class TestNotificationController {
                                 ? requestParams.get("channel").toString()
                                 : "WEBHOOK";
 
-                String target = (requestParams != null && requestParams.containsKey("target"))
-                                ? requestParams.get("target").toString()
-                                : "http://localhost:8080/dummy";
-
                 String template = (requestParams != null && requestParams.containsKey("template"))
                                 ? requestParams.get("template").toString()
                                 : "Dummy Webhook Payload Test: $test_var";
@@ -43,7 +39,6 @@ public class TestNotificationController {
                                 .id(UUID.randomUUID().toString())
                                 .dispatchMode(DispatchMode.EVENT)
                                 .channel(channel)
-                                .target(target)
                                 .template(template)
                                 .source("test-endpoint")
                                 .eventName("test_event_" + System.currentTimeMillis())
@@ -60,8 +55,7 @@ public class TestNotificationController {
                                         "status", "SUCCESS",
                                         "message", "Dispatched dummy notification job",
                                         "jobId", job.getId(),
-                                        "channel", job.getChannel(),
-                                        "target", job.getTarget()));
+                                        "channel", job.getChannel()));
                 } catch (Exception e) {
                         return ResponseEntity.internalServerError().body(Map.of(
                                         "status", "ERROR",
@@ -87,7 +81,6 @@ public class TestNotificationController {
                                                 .id(UUID.randomUUID().toString())
                                                 .dispatchMode(DispatchMode.EVENT)
                                                 .channel(channel)
-                                                .target(target)
                                                 .template(template)
                                                 .subjects(new ArrayList<>())
                                                 .source("test-endpoint-email")
@@ -124,7 +117,6 @@ public class TestNotificationController {
                                 .id(UUID.randomUUID().toString())
                                 .dispatchMode(DispatchMode.EVENT)
                                 .channel(channel)
-                                .target(target)
                                 .template(template)
                                 .source("test-endpoint-sms")
                                 .eventName("test_event_sms_" + System.currentTimeMillis())
@@ -138,8 +130,7 @@ public class TestNotificationController {
                                         "status", "SUCCESS",
                                         "message", "Dispatched dummy SMS notification job",
                                         "jobId", job.getId(),
-                                        "channel", job.getChannel(),
-                                        "target", job.getTarget()));
+                                        "channel", job.getChannel()));
                 } catch (Exception e) {
                         return ResponseEntity.internalServerError().body(Map.of(
                                         "status", "ERROR",

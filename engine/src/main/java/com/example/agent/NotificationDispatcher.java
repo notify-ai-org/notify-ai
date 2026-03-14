@@ -110,7 +110,7 @@ public class NotificationDispatcher {
                     notificationJobRepo.delete(job);
                 } catch (Exception e) {
                     // Optionally log or track failed deletions
-                    e.printStackTrace();
+                    throw e;
                 }
             }
         }
@@ -205,8 +205,9 @@ public class NotificationDispatcher {
      * Only schedules the job if the EventSchedule has been validated.
      * 
      * @param schedule The event schedule to register
+     * @throws SchedulerException
      */
-    public void scheduleJob(EventSchedule schedule) {
+    public void scheduleJob(EventSchedule schedule) throws SchedulerException {
         // Validation check: Only schedule validated schedules
         if (!schedule.isValidated()) {
             logger.warn("Skipping scheduling for EventSchedule '{}' (ID: {}) - not validated. "
@@ -247,16 +248,16 @@ public class NotificationDispatcher {
                     schedule.getEventName(), schedule.getId());
         } catch (SchedulerException e) {
             logger.error("Failed to schedule EventSchedule '{}': {}", schedule.getId(), e.getMessage());
-            e.printStackTrace();
+            throw e;
         }
     }
 
     @PreDestroy
-    public void shutdown() {
+    public void shutdown() throws SchedulerException {
         try {
             quartzScheduler.shutdown();
         } catch (SchedulerException e) {
-            e.printStackTrace();
+            throw e;
         }
         workerPool.shutdown();
     }
@@ -305,6 +306,7 @@ public class NotificationDispatcher {
                 } catch (ValidationRequiredException e) {
                     logger.error("Cannot dispatch job for schedule '{}': {}",
                             schedule.getId(), e.getMessage());
+                    throw e;
                 }
             }
 

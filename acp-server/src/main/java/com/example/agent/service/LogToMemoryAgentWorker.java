@@ -9,12 +9,17 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.example.agent.annotations.ManagedConfiguration;
 
 public class LogToMemoryAgentWorker implements Runnable {
 
     private final BlockingQueue<RawLog> queue;
     private final AtomicBoolean running = new AtomicBoolean(true);
+
+    private static final Logger log = LoggerFactory.getLogger(LogToMemoryAgentWorker.class);
 
     private final FactConsumer factExtractor;
 
@@ -63,7 +68,7 @@ public class LogToMemoryAgentWorker implements Runnable {
                 break;
             } catch (Exception e) {
                 // never die
-                // log.error("LogToMemoryAgentWorker loop error", e);
+                log.error("LogToMemoryAgentWorker loop error", e);
             }
         }
 
@@ -72,6 +77,7 @@ public class LogToMemoryAgentWorker implements Runnable {
             try {
                 processBatch(batch);
             } catch (Exception ignored) {
+                log.error("LogToMemoryAgentWorker drain error", ignored);
             }
         }
     }

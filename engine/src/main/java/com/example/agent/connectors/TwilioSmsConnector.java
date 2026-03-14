@@ -49,10 +49,6 @@ public class TwilioSmsConnector extends AbstractNotificationConnector {
     public void send(NotificationJob job, Subject subject) {
 
         Objects.requireNonNull(job, "job");
-        if (job.getTarget() == null || job.getTarget().isBlank()) {
-            throw new IllegalArgumentException("SMS target (phone number) is missing");
-        }
-
         String content = job.getTemplate();
 
         if (content == null || content.isBlank()) {

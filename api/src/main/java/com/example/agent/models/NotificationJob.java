@@ -120,20 +120,9 @@ public class NotificationJob {
     private String channel;
 
     /**
-     * Target address.
-     * Example: email address, phone number, webhook URL.
-     */
-    private String target;
-
-    /**
      * Template identifier or raw template.
      */
     private String template;
-
-    /**
-     * Callback URL used to fetch vocabulary values.
-     */
-    private String callbackUrl;
 
     /**
      * Channel-specific attributes.

@@ -59,7 +59,7 @@ public class WebhookConnector extends AbstractNotificationConnector {
             HttpEntity<String> entity = new HttpEntity<>(body, headers);
 
             ResponseEntity<String> response = webhookRestTemplate.exchange(
-                    job.getTarget(),
+                    subject.getAddress(),
                     method,
                     entity,
                     String.class);
@@ -84,9 +84,6 @@ public class WebhookConnector extends AbstractNotificationConnector {
     private void validate(NotificationJob job) {
         if (job == null) {
             throw new IllegalArgumentException("job is null");
-        }
-        if (job.getTarget() == null || job.getTarget().isBlank()) {
-            throw new IllegalArgumentException("Webhook URL missing");
         }
     }
 

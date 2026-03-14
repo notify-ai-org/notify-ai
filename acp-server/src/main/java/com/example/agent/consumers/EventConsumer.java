@@ -14,6 +14,7 @@ import com.example.agent.models.EventCapture;
 import com.example.agent.models.EventSchedule;
 import com.example.agent.models.MessageTemplate;
 import com.example.agent.models.NotificationJob;
+import com.example.agent.models.subject.Subject;
 import com.example.agent.util.ObjectMapperFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -207,6 +208,18 @@ public class EventConsumer {
                                                                 .orElse(null);
 
                                                         AgentContext agentContext = AgentContextHolder.getContext();
+                                                        // Get the subjects if present in capture
+                                                        List<Subject> subjects = capture.getSubjectResult() != null
+                                                                ? capture.getSubjectResult().getSubjects()
+                                                                : null;
+
+                                                        // Get additional attributes
+                                                        Map<String, String> attributes = new java.util.HashMap<>();
+                                                        if (capture.getPayload() != null) {
+                                                            capture.getPayload().forEach(
+                                                                    (k, v) -> attributes.put(k, String.valueOf(v)));
+                                                        }
+
                                                         // Create notification job
                                                         NotificationJob.NotificationJobBuilder jobBuilder = NotificationJob
                                                                 .builder()
@@ -217,8 +230,15 @@ public class EventConsumer {
                                                                 .source(agentContext.getSource())
                                                                 .correlationId(agentContext.getCorrelationId())
                                                                 .eventType(capture.getEvent().getEventType())
+                                                                .eventName(capture.getEvent().getName())
                                                                 .priority(NotificationJob.NotificationPriority.NORMAL)
-                                                                .dispatchMode(NotificationJob.DispatchMode.EVENT);
+                                                                .dispatchMode(NotificationJob.DispatchMode.EVENT)
+                                                                .subjects(subjects)
+                                                                .attributes(attributes);
+
+                                                        if (template != null) {
+                                                            jobBuilder.template(template.getTemplate());
+                                                        }
 
                                                         NotificationJob job = jobBuilder.build();
                                                         Flowable<com.google.adk.events.Event> subFlow = generateTemplatesAndSchedules(
@@ -272,7 +292,6 @@ public class EventConsumer {
                                     }
                                 } catch (Exception e) {
                                     System.err.println("Error parsing agent output: " + e.getMessage());
-                                    e.printStackTrace();
                                     throw new AgentApplicationException("Error parsing agent output", e);
                                 }
                             }
@@ -311,6 +330,8 @@ public class EventConsumer {
                     AgentTaskContext templateCtx = generateMessageTemplatesWithAgent(capture);
                     tasks.add(templateCtx);
                 }
+            } else {
+                logger.info("Templates already exist for event: {}", capture.getEvent().getName());
             }
             return agentOrchestrator.executeTasksInParallel(tasks)
                     .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
