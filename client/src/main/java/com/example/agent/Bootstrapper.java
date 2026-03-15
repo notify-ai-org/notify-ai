@@ -87,7 +87,7 @@ public class Bootstrapper {
                     (event) -> {
                         EventCapture dto = new EventCapture();
                         dto.setEvent(event.getEvent());
-                        dto.getEvent().setEventType("USER");
+                        dto.getEvent().setEventType("REGISTER");
                         dto.setOccuredAt(Instant.now());
                         dto.setPayload(vocabularyManager.toFlattenedMap(event));
                         dto.setServiceName(event.getDeclaringClass().getSimpleName());

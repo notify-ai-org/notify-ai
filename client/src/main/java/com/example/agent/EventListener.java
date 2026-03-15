@@ -7,6 +7,8 @@ import com.example.agent.models.dto.SubjectResultDto;
 import com.example.agent.models.metadata.RuleMetadata;
 import com.example.agent.models.subject.Subject;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -41,7 +43,9 @@ public class EventListener {
         this.buffer = buffer;
         this.invokeManager = invokeManager;
         this.metricsManager = metricsManager != null ? metricsManager : new MetricsManager();
-        this.mapper = new ObjectMapper();
+        this.mapper = new ObjectMapper()
+                .registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
         this.vocabularyManager = vocabularyManager;
     }
 

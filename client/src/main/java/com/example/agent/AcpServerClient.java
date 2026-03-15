@@ -5,6 +5,8 @@ import com.example.agent.models.EventCapture;
 import com.example.agent.models.ClientRegistrationDto;
 import com.example.agent.models.TokenRefreshDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -29,7 +31,9 @@ public class AcpServerClient {
         this.httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
-        this.mapper = new ObjectMapper();
+        this.mapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     }
 
     public String getBaseUrl() { return baseUrl; }

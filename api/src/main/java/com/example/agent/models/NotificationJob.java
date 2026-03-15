@@ -2,6 +2,8 @@ package com.example.agent.models;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -15,6 +17,8 @@ import jakarta.persistence.Transient;
 @Entity
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class NotificationJob {
 
     /*

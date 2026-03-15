@@ -27,37 +27,33 @@ public class OrderController {
     public ResponseEntity<Map<String, Object>> placeOrder(@RequestBody OrderPayload payload) {
         OrderPayload result = orderService.placeOrder(payload);
         return ResponseEntity.ok(Map.of(
-            "status", "ORDER_PLACED",
-            "orderId", result.getOrderId(),
-            "amount", result.getAmount()
-        ));
+                "status", "ORDER_PLACED",
+                "orderId", result.getOrderId(),
+                "amount", result.getAmount()));
     }
 
     @PostMapping("/payment-failed")
     public ResponseEntity<Map<String, Object>> paymentFailed(@RequestBody OrderPayload payload) {
         orderService.reportPaymentFailed(payload);
         return ResponseEntity.ok(Map.of(
-            "status", "PAYMENT_FAILED",
-            "orderId", payload.getOrderId()
-        ));
+                "status", "PAYMENT_FAILED",
+                "orderId", payload.getOrderId()));
     }
 
     @PostMapping("/ship")
     public ResponseEntity<Map<String, Object>> shipOrder(@RequestBody ShipmentPayload payload) {
         orderService.shipOrder(payload);
         return ResponseEntity.ok(Map.of(
-            "status", "ORDER_SHIPPED",
-            "orderId", payload.getOrderId(),
-            "trackingNumber", payload.getTrackingNumber()
-        ));
+                "status", "ORDER_SHIPPED",
+                "orderId", payload.getOrderId(),
+                "trackingNumber", payload.getTrackingNumber()));
     }
 
     @PostMapping("/abandon-cart")
     public ResponseEntity<Map<String, Object>> abandonCart(@RequestBody CartPayload payload) {
         orderService.abandonCart(payload);
         return ResponseEntity.ok(Map.of(
-            "status", "ABANDONED_CART",
-            "cartId", payload.getCartId()
-        ));
+                "status", "ABANDONED_CART",
+                "cartId", payload.getCartId()));
     }
 }

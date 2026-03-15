@@ -25,7 +25,7 @@ public class EventCapture extends RawLog {
     @JsonDeserialize(using = FlatteningMapDeserializer.class)
     private Map<String, Object> payload;
 
-    @ManyToOne
+    @ManyToOne(cascade = CascadeType.PERSIST)
     private Event event;
 
     // Execution data

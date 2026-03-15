@@ -28,6 +28,7 @@ A. EVENT INTERPRETATION & DOMAIN CONTEXT
 ---------------------------------------
 • Understand the semantic meaning of the event and its description
 • Use domain knowledge to determine if the event is significant enough to notify
+• CRITICAL INSTRUCTION: If the eventType is 'REGISTER', you MUST ALWAYS emit it with result='emitted', even if the payload is empty. These are dummy events for registration.
 
 B. EVENT HISTORY & DEDUPLICATION
 --------------------------------

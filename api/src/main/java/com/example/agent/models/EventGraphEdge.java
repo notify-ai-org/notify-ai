@@ -5,7 +5,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.EnumType;
 
-
 //@Entity
 public class EventGraphEdge {
     @Id
@@ -17,4 +16,3 @@ public class EventGraphEdge {
     private Rule conditionExpr; // e.g., "payment.status == SUCCESS"
 
 }
-

@@ -361,8 +361,7 @@ public class EventConsumer {
                                                             } catch (Exception e) {
                                                                 logger.error("Error parsing schedule JSON: {}", json,
                                                                         e);
-                                                                throw new AgentApplicationException(
-                                                                        "Error parsing schedule JSON", e);
+                                                                continue;
                                                             }
 
                                                             for (Map<String, String> scheduleMap : schedules) {
@@ -417,9 +416,7 @@ public class EventConsumer {
                                                                 logger.error(
                                                                         "Failed to parse message templates from JSON: {}",
                                                                         json, e);
-                                                                throw new AgentApplicationException(
-                                                                        "Failed to parse message templates from JSON",
-                                                                        e);
+                                                                continue;
                                                             }
                                                             for (Map<String, String> templateMap : templateList) {
                                                                 MessageTemplate messageTemplate = new MessageTemplate();
