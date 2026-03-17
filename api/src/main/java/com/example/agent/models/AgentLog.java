@@ -3,26 +3,23 @@ package com.example.agent.models;
 import com.example.agent.enums.AgentStage;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-
-import java.time.Instant;
+import lombok.ToString;
+import lombok.experimental.SuperBuilder;
 
 @Entity
 @Table(name = "agent_logs")
 @Data
-@Builder
+@EqualsAndHashCode(callSuper = true)
+@ToString(callSuper = true)
+@SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AgentLog {
-    @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private String id;
+public class AgentLog extends RawLog {
 
     private String agentId;
-
-    private Instant timestamp;
 
     @Enumerated(EnumType.STRING)
     private LogType type;
@@ -48,3 +45,4 @@ public class AgentLog {
         TASK_FAILED
     }
 }
+

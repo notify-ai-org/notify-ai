@@ -129,7 +129,7 @@ public class EventConsumer {
 
     private Flowable<com.google.adk.events.Event> processEventsWithAgent(List<EventCapture> captures) {
         try {
-            List<Flowable<com.google.adk.events.Event>> flows = new java.util.ArrayList<>();
+            Flowable<com.google.adk.events.Event> flows = Flowable.empty();
             for (EventCapture capture : captures) {
                 if (capture == null || capture.getEvent() == null) {
                     throw new RuntimeException("Event capture is required with an eventName");
@@ -300,13 +300,10 @@ public class EventConsumer {
                             System.err.println("Agent call failed: " + error.getMessage());
                             return Flowable.<com.google.adk.events.Event>empty();
                         });
-                flows.add(flow);
+                flows = flows.concatWith(flow);
             }
 
-            if (flows.isEmpty()) {
-                return Flowable.<com.google.adk.events.Event>empty();
-            }
-            return Flowable.merge(flows);
+            return flows;
 
         } catch (Exception e) {
             System.err.println("Error invoking agent for events: " + e.getMessage());

@@ -12,7 +12,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.agent.enums.AgentStage;
-import com.example.agent.service.LogToMemoryAgentWorker;
 import com.example.agent.service.SessionService;
 import com.example.agent.util.CentralExecutorRegistry;
 import com.google.adk.agents.LlmAgent;
@@ -55,9 +54,6 @@ class AgentOrchestratorTest {
     private CentralExecutorRegistry executorRegistry;
 
     @Mock
-    private LogToMemoryAgentWorker logToMemoryAgentWorker;
-
-    @Mock
     private StatefulRedisConnection<String, String> redisConnection;
 
     private AgentOrchestrator orchestrator;
@@ -66,7 +62,7 @@ class AgentOrchestratorTest {
     @BeforeEach
     void setUp() {
         orchestrator = new AgentOrchestrator(snapshotRepo, logRepo, sessionService,
-                executorRegistry, logToMemoryAgentWorker, redisConnection);
+                executorRegistry, redisConnection);
         mockAgent = mock(LlmAgent.class);
     }
 
@@ -80,8 +76,8 @@ class AgentOrchestratorTest {
         when(mockAgent.name()).thenReturn("Test Agent");
 
         // Act
-        String id1 = orchestrator.registerAgent(mockAgent);
-        String id2 = orchestrator.registerAgent(mockAgent);
+        String id1 = orchestrator.registerAgent("TypeA", mockAgent);
+        String id2 = orchestrator.registerAgent("TypeB", mockAgent);
 
         // Assert
         assertNotNull(id1);
@@ -95,8 +91,8 @@ class AgentOrchestratorTest {
         when(mockAgent.name()).thenReturn("Test Agent");
 
         // Act
-        String id1 = orchestrator.registerAgent(mockAgent);
-        String id2 = orchestrator.registerAgent(mockAgent);
+        String id1 = orchestrator.registerAgent("SameType", mockAgent);
+        String id2 = orchestrator.registerAgent("SameType", mockAgent);
 
         // Assert — both unique IDs exist in the pool
         assertNotEquals(id1, id2);
@@ -109,7 +105,7 @@ class AgentOrchestratorTest {
         when(mockAgent.name()).thenReturn("Test Agent");
 
         // Act
-        String id = orchestrator.registerAgent(mockAgent);
+        String id = orchestrator.registerAgent("TestType", mockAgent);
 
         // Assert
         Map<String, Map<String, Object>> states = orchestrator.getAllAgentStates();
@@ -128,7 +124,7 @@ class AgentOrchestratorTest {
     void testPauseAgent_shouldSucceedOnReadyAgent() {
         // Arrange
         when(mockAgent.name()).thenReturn("Test Agent");
-        String id = orchestrator.registerAgent(mockAgent);
+        String id = orchestrator.registerAgent("TypeA", mockAgent);
 
         // Act
         boolean result = orchestrator.pauseAgent(id, "Maintenance");
@@ -143,7 +139,7 @@ class AgentOrchestratorTest {
     void testResumeAgent_shouldSucceedOnPausedAgent() {
         // Arrange
         when(mockAgent.name()).thenReturn("Test Agent");
-        String id = orchestrator.registerAgent(mockAgent);
+        String id = orchestrator.registerAgent("TypeA", mockAgent);
         orchestrator.pauseAgent(id, "Maintenance");
 
         // Act
@@ -159,7 +155,7 @@ class AgentOrchestratorTest {
     void testResumeAgent_shouldFailOnNonPausedAgent() {
         // Arrange
         when(mockAgent.name()).thenReturn("Test Agent");
-        String id = orchestrator.registerAgent(mockAgent);
+        String id = orchestrator.registerAgent("TypeA", mockAgent);
 
         // Act — agent is in READY, not PAUSED
         boolean result = orchestrator.resumeAgent(id, "Should not work");
@@ -186,10 +182,10 @@ class AgentOrchestratorTest {
         // Arrange — fill 20 agent slots (maxPoolSize default = 20)
         when(mockAgent.name()).thenReturn("Agent");
         for (int i = 0; i < 20; i++) {
-            orchestrator.registerAgent(mockAgent);
+            orchestrator.registerAgent("Type" + i, mockAgent);
         }
 
         // Act & Assert — 21st registration should throw
-        assertThrows(IllegalStateException.class, () -> orchestrator.registerAgent(mockAgent));
+        assertThrows(IllegalStateException.class, () -> orchestrator.registerAgent("FullType", mockAgent));
     }
 }

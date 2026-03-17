@@ -41,6 +41,7 @@ public class AgentWrapper {
     private static final Logger logger = Logger.getLogger(AgentWrapper.class.getName());
 
     private final String agentId;
+    private final String agentType;
     private final BaseAgent agent;
     private final AtomicReference<AgentStage> currentStage;
     private final Map<String, Object> agentState;
@@ -58,10 +59,11 @@ public class AgentWrapper {
     private final StatefulRedisConnection<String, String> redisConnection;
     private final ReentrantLock lock = new ReentrantLock();
 
-    public AgentWrapper(String agentId, BaseAgent agent, AgentSnapshotRepository snapshotRepo,
+    public AgentWrapper(String agentId, String agentType, BaseAgent agent, AgentSnapshotRepository snapshotRepo,
             AgentLogRepository logRepo, StatefulRedisConnection<String, String> redisConnection,
             SessionService sessionService) {
         this.agentId = agentId;
+        this.agentType = agentType;
         this.agent = agent;
         this.currentStage = new AtomicReference<>(AgentStage.CREATED);
         this.agentState = new ConcurrentHashMap<>();
@@ -236,6 +238,10 @@ public class AgentWrapper {
         return agentId;
     }
 
+    public String getAgentType() {
+        return agentType;
+    }
+
     public BaseAgent getAgent() {
         return agent;
     }
@@ -295,6 +301,7 @@ public class AgentWrapper {
             AgentSnapshot snapshot = new AgentSnapshot(
                     agentId,
                     agent.name(),
+                    agentType,
                     currentStage.get(),
                     createdAt,
                     lastActivityAt,
@@ -310,6 +317,7 @@ public class AgentWrapper {
                     Map<String, String> hash = new HashMap<>();
                     hash.put("agentId", agentId);
                     hash.put("agentName", agent.name());
+                    hash.put("agentType", agentType);
                     hash.put("stage", currentStage.get().name());
                     hash.put("createdAt", createdAt.toString());
                     hash.put("lastActivityAt", lastActivityAt.toString());

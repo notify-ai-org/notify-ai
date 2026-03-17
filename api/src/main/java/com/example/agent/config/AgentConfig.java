@@ -17,6 +17,15 @@ public class AgentConfig {
     private List<String> tools;
     private String outputKey;
     private String model;
+    private int instances = 1;
+
+    public int getInstances() {
+        return instances;
+    }
+
+    public void setInstances(int instances) {
+        this.instances = instances;
+    }
 
     public String getModel() {
         return model;

@@ -1,105 +1,131 @@
 package com.example.agent.service;
 
+import com.example.agent.AgentLogRepository;
+import com.example.agent.EventCaptureRepository;
+import com.example.agent.EventExecutionLogRepository;
+import com.example.agent.NotificationAttemptLogRepository;
 import com.example.agent.consumers.FactConsumer;
 import com.example.agent.models.RawLog;
+
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.example.agent.annotations.ManagedConfiguration;
-
-public class LogToMemoryAgentWorker implements Runnable {
-
-    private final BlockingQueue<RawLog> queue;
-    private final AtomicBoolean running = new AtomicBoolean(true);
+/**
+ * Periodically pulls unprocessed logs from the database (agent logs, event
+ * captures, event execution logs, notification attempt logs) in batches and
+ * feeds them to the FactConsumer for LLM-based fact extraction.
+ *
+ * Runs on a configurable fixed-delay interval
+ * (agent.log-worker.interval-ms, default 10000ms).
+ */
+@Service
+public class LogToMemoryAgentWorker {
 
     private static final Logger log = LoggerFactory.getLogger(LogToMemoryAgentWorker.class);
 
+    private final EventCaptureRepository eventCaptureRepository;
+    private final AgentLogRepository agentLogRepository;
+    private final NotificationAttemptLogRepository notificationAttemptLogRepository;
+    private final EventExecutionLogRepository eventExecutionLogRepository;
     private final FactConsumer factExtractor;
 
-    @ManagedConfiguration(key = "agent.log-worker.max-batch-size")
-    private int maxBatchSize;
-
-    @ManagedConfiguration(key = "agent.log-worker.flush-delay-ms")
-    private long flushDelayMs;
+    private final int maxBatchSize;
 
     public LogToMemoryAgentWorker(
-            BlockingQueue<RawLog> queue,
+            EventCaptureRepository eventCaptureRepository,
+            AgentLogRepository agentLogRepository,
+            NotificationAttemptLogRepository notificationAttemptLogRepository,
+            EventExecutionLogRepository eventExecutionLogRepository,
             FactConsumer factExtractor,
-            int maxBatchSize,
-            long flushDelayMs) {
-
-        this.queue = queue;
+            int maxBatchSize) {
+        this.eventCaptureRepository = eventCaptureRepository;
+        this.agentLogRepository = agentLogRepository;
+        this.notificationAttemptLogRepository = notificationAttemptLogRepository;
+        this.eventExecutionLogRepository = eventExecutionLogRepository;
         this.factExtractor = factExtractor;
         this.maxBatchSize = maxBatchSize;
-        this.flushDelayMs = flushDelayMs;
     }
 
-    @Override
+    /**
+     * Scheduled method that runs on a configurable interval.
+     * Pulls unprocessed logs from all repositories, merges them into
+     * a single batch (up to maxBatchSize), and feeds to the fact extractor.
+     */
+    @Scheduled(fixedDelayString = "${agent.log-worker.interval-ms:10000}")
+    @Transactional
     public void run() {
-        List<RawLog> batch = new ArrayList<>(maxBatchSize);
-        long lastFlush = System.currentTimeMillis();
+        try {
+            int remaining = maxBatchSize;
+            List<RawLog> batch = new ArrayList<>(maxBatchSize);
+            Pageable page;
 
-        while (running.get()) {
-            try {
-                RawLog item = queue.poll(200, TimeUnit.MILLISECONDS);
-                long now = System.currentTimeMillis();
-
-                if (item != null)
-                    batch.add(item);
-
-                boolean sizeFlush = batch.size() >= maxBatchSize;
-                boolean timeFlush = !batch.isEmpty() && (now - lastFlush) >= flushDelayMs;
-
-                if (sizeFlush || timeFlush) {
-                    processBatch(batch);
-                    batch.clear();
-                    lastFlush = now;
-                }
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                break;
-            } catch (Exception e) {
-                // never die
-                log.error("LogToMemoryAgentWorker loop error", e);
+            // 1. Pull agent logs
+            if (remaining > 0) {
+                page = PageRequest.of(0, remaining);
+                var agentLogs = agentLogRepository.findByProcessedFalseOrderByTimestampAsc(page);
+                batch.addAll(agentLogs);
+                remaining -= agentLogs.size();
             }
-        }
 
-        // drain on shutdown
-        if (!batch.isEmpty()) {
-            try {
-                processBatch(batch);
-            } catch (Exception ignored) {
-                log.error("LogToMemoryAgentWorker drain error", ignored);
+            // 2. Pull event captures
+            if (remaining > 0) {
+                page = PageRequest.of(0, remaining);
+                var eventCaptures = eventCaptureRepository.findByProcessedFalseOrderByTimestampAsc(page);
+                batch.addAll(eventCaptures);
+                remaining -= eventCaptures.size();
             }
+
+            // 3. Pull event execution logs
+            if (remaining > 0) {
+                page = PageRequest.of(0, remaining);
+                var executionLogs = eventExecutionLogRepository.findByProcessedFalseOrderByTimestampAsc(page);
+                batch.addAll(executionLogs);
+                remaining -= executionLogs.size();
+            }
+
+            // 4. Pull notification attempt logs
+            if (remaining > 0) {
+                page = PageRequest.of(0, remaining);
+                var notificationLogs = notificationAttemptLogRepository
+                        .findByProcessedFalseOrderByTimestampAsc(page);
+                batch.addAll(notificationLogs);
+            }
+
+            if (batch.isEmpty()) {
+                return; // nothing to process
+            }
+
+            log.info("LogToMemoryAgentWorker: processing batch of {} logs", batch.size());
+
+            // Feed to fact extractor
+            factExtractor.extractFacts(batch);
+
+            // Mark all as processed
+            Instant now = Instant.now();
+            for (RawLog rawLog : batch) {
+                rawLog.setProcessed(true);
+                rawLog.setProcessedAt(now);
+            }
+
+            // Persist updated flags (each repo handles its own type)
+            // We can use saveAll on the individual repos, but since RawLog
+            // is abstract and each subtype has its own table, we rely on the
+            // @Transactional flush. The entities are already managed within
+            // the transaction, so the dirty-check will persist the updates.
+
+            log.info("LogToMemoryAgentWorker: marked {} logs as processed", batch.size());
+
+        } catch (Exception e) {
+            log.error("LogToMemoryAgentWorker: error processing batch", e);
         }
-    }
-
-    public void shutdown() {
-        running.set(false);
-    }
-
-    private void processBatch(List<RawLog> rawBatch) {
-        // Filter out null entries
-        List<RawLog> cleaned = rawBatch.stream()
-                .filter(Objects::nonNull)
-                .toList();
-
-        if (cleaned.isEmpty())
-            return;
-
-        // Trigger asynchronous LLM-based fact extraction
-        factExtractor.extractFacts(cleaned);
-
-        // Note: As fact extraction is now asynchronous, page assembly and
-        // persistence must be handled in the FactConsumer completion or a separate
-        // process.
     }
 }

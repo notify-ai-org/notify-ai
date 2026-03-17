@@ -28,7 +28,6 @@ import org.springframework.security.web.SecurityFilterChain;
 
 import com.example.agent.auth.AgentAuthenticationFilter;
 import com.example.agent.consumers.FactConsumer;
-import com.example.agent.models.RawLog;
 import com.example.agent.service.LogToMemoryAgentWorker;
 import com.example.agent.util.CentralExecutorRegistry.ExecutorProperties;
 import com.zaxxer.hikari.HikariConfig;
@@ -43,8 +42,6 @@ import javax.sql.DataSource;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
@@ -53,6 +50,7 @@ import java.util.concurrent.TimeUnit;
 @EntityScan(basePackages = "com.example.agent.models")
 @EnableConfigurationProperties({ ExecutorProperties.class, ConnectorProperties.class })
 @EnableWebSecurity
+@org.springframework.scheduling.annotation.EnableScheduling
 public class Config {
 
     @Value("${redis.host}")
@@ -214,15 +212,14 @@ public class Config {
     }
 
     @Bean
-    public BlockingQueue<RawLog> rawLogQueue() {
-        return new LinkedBlockingQueue<>(10000);
-    }
-
-    @Bean
     public LogToMemoryAgentWorker logToMemoryAgentWorker(
-            BlockingQueue<RawLog> queue,
+            com.example.agent.EventCaptureRepository eventCaptureRepo,
+            com.example.agent.AgentLogRepository agentLogRepo,
+            com.example.agent.NotificationAttemptLogRepository notificationLogRepo,
+            com.example.agent.EventExecutionLogRepository executionLogRepo,
             @Lazy FactConsumer factConsumer) {
-        // Default values: batch size 50, flush delay 5 seconds
-        return new LogToMemoryAgentWorker(queue, factConsumer, 50, 5000);
+        return new LogToMemoryAgentWorker(
+                eventCaptureRepo, agentLogRepo, notificationLogRepo, executionLogRepo,
+                factConsumer, 50);
     }
 }

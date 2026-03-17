@@ -12,6 +12,8 @@ public class AgentSnapshot {
 
     private String agentName;
 
+    private String agentType;
+
     @Enumerated(EnumType.STRING)
     private AgentStage currentStage;
 
@@ -27,10 +29,11 @@ public class AgentSnapshot {
     public AgentSnapshot() {
     }
 
-    public AgentSnapshot(String agentId, String agentName, AgentStage currentStage, Instant createdAt,
+    public AgentSnapshot(String agentId, String agentName, String agentType, AgentStage currentStage, Instant createdAt,
             Instant lastActivityAt, String currentTaskId, String agentStateJson) {
         this.agentId = agentId;
         this.agentName = agentName;
+        this.agentType = agentType;
         this.currentStage = currentStage;
         this.createdAt = createdAt;
         this.lastActivityAt = lastActivityAt;
@@ -52,6 +55,14 @@ public class AgentSnapshot {
 
     public void setAgentName(String agentName) {
         this.agentName = agentName;
+    }
+
+    public String getAgentType() {
+        return agentType;
+    }
+
+    public void setAgentType(String agentType) {
+        this.agentType = agentType;
     }
 
     public AgentStage getCurrentStage() {

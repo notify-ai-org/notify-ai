@@ -119,10 +119,15 @@ public class AgentRegistry {
                             .generateContentConfig(generateContentConfig)
                             .build();
 
-                    String id = agentOrchestrator.registerAgent(agent);
-                    registry.put(config.getId(), id);
-                    System.out.println("Registered agent: " + config.getId() + " (" + config.getName()
-                            + ") with System ID: " + id);
+                    int instanceCount = config.getInstances() > 0 ? config.getInstances() : 1;
+
+                    for (int i = 0; i < instanceCount; i++) {
+                        String id = agentOrchestrator.registerAgent(config.getId(), agent);
+                        System.out.println("Registered instance " + (i + 1) + "/" + instanceCount + " for agent: "
+                                + config.getId() + " (" + config.getName() + ") with System ID: " + id);
+                    }
+
+                    registry.put(config.getId(), config.getId()); // Map functional ID to functional ID (type)
 
                 } catch (Exception e) {
                     System.err.println("Failed to load agent: " + config.getName() + " Error: " + e.getMessage());
