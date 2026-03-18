@@ -202,7 +202,7 @@ public class Config {
     // --------------------
     private Map<String, Object> hibernateProperties() {
         Map<String, Object> props = new HashMap<>();
-        props.put("hibernate.hbm2ddl.auto", "update"); // or validate, create, none
+        props.put("hibernate.hbm2ddl.auto", "create"); // or validate, create, none
         props.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"); // change if using another DB
         props.put("hibernate.show_sql", false);
         props.put("hibernate.format_sql", false);

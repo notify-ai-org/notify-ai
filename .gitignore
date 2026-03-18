@@ -4,6 +4,8 @@
 /acp-server/target
 /engine/target
 /client/target
+/examples/ecommerce-app/target
+/examples/banking-app/target
 
 
 

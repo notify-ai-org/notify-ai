@@ -21,22 +21,10 @@ import io.lettuce.core.api.StatefulRedisConnection;
 /**
  * Unit tests for AgentOrchestrator.
  *
- * Because AgentOrchestrator's constructor requires a StatefulRedisConnection
- * and launches
- * background timers, we cannot unit-test it without either:
- * (a) a running Redis instance, or
- * (b) mocking the connection.
- *
- * These tests therefore focus on the public-facing API behaviour that
- * can be exercised synchronously without a live Redis connection:
- * registerAgent, getAllAgentStates, pauseAgent, resumeAgent, and
- * terminateAgent.
- *
- * Note: The AgentWrapper constructor calls persistSnapshot(), which tolerates
- * null snapshotRepo/logRepo (guarded by null-checks). The
- * StatefulRedisConnection
- * may fail to connect, but the test assertions
- * run before any background timer fires, so we should be fine.
+ * These tests focus on the public-facing API behaviour that
+ * can be exercised without a live Redis connection:
+ * registerAgent, getAllAgentStates, pauseAgent, resumeAgent,
+ * executeTaskWithAgent (enqueue), and queue depth.
  */
 @ExtendWith(MockitoExtension.class)
 class AgentOrchestratorTest {
@@ -117,7 +105,7 @@ class AgentOrchestratorTest {
     }
 
     // -----------------------------------------------------------------------
-    // pauseAgent / resumeAgent / terminateAgent tests
+    // pauseAgent / resumeAgent tests
     // -----------------------------------------------------------------------
 
     @Test
@@ -187,5 +175,68 @@ class AgentOrchestratorTest {
 
         // Act & Assert — 21st registration should throw
         assertThrows(IllegalStateException.class, () -> orchestrator.registerAgent("FullType", mockAgent));
+    }
+
+    // -----------------------------------------------------------------------
+    // Task queue tests
+    // -----------------------------------------------------------------------
+
+    @Test
+    void testEnqueueTask_shouldNotThrowWhenNoAgentAvailable() {
+        // Act — enqueue a task when no agents are registered; should not throw
+        String taskId = orchestrator.executeTaskWithAgent("NonExistentType", null,
+                com.google.genai.types.Content.fromParts(
+                        com.google.genai.types.Part.fromText("test")),
+                flowable -> {
+                });
+
+        // Assert
+        assertNotNull(taskId);
+        assertEquals(1, orchestrator.getQueueDepth());
+    }
+
+    @Test
+    void testEnqueueTask_shouldIncrementQueueDepth() {
+        // Act
+        orchestrator.executeTaskWithAgent("TypeA", null,
+                com.google.genai.types.Content.fromParts(
+                        com.google.genai.types.Part.fromText("task1")),
+                flowable -> {
+                });
+        orchestrator.executeTaskWithAgent("TypeA", null,
+                com.google.genai.types.Content.fromParts(
+                        com.google.genai.types.Part.fromText("task2")),
+                flowable -> {
+                });
+
+        // Assert
+        assertEquals(2, orchestrator.getQueueDepth());
+    }
+
+    @Test
+    void testEnqueueTask_shouldGenerateTaskIdWhenNull() {
+        // Act
+        String taskId = orchestrator.executeTask(null,
+                com.google.genai.types.Content.fromParts(
+                        com.google.genai.types.Part.fromText("test")),
+                flowable -> {
+                });
+
+        // Assert
+        assertNotNull(taskId);
+        assertFalse(taskId.isBlank());
+    }
+
+    @Test
+    void testEnqueueTask_shouldPreserveExplicitTaskId() {
+        // Act
+        String taskId = orchestrator.executeTask("my-explicit-task-id",
+                com.google.genai.types.Content.fromParts(
+                        com.google.genai.types.Part.fromText("test")),
+                flowable -> {
+                });
+
+        // Assert
+        assertEquals("my-explicit-task-id", taskId);
     }
 }

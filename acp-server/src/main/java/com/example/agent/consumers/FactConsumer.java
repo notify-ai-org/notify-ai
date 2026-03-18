@@ -14,10 +14,6 @@ import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import com.example.agent.exceptions.AgentApplicationException;
 
-import io.reactivex.rxjava3.disposables.CompositeDisposable;
-import io.reactivex.rxjava3.disposables.Disposable;
-import jakarta.annotation.PreDestroy;
-
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -37,7 +33,6 @@ public class FactConsumer {
     private final AgentRegistry agentRegistry;
     private final FactRepository factRepository;
     private final MemoryAssembler pageAssembler;
-    private final CompositeDisposable compositeDisposable = new CompositeDisposable();
 
     @Value("${agent.buffer.timeout:15s}")
     @ManagedConfiguration(key = "agent.buffer.timeout", source = ConfigSource.CONFIG_MAP)
@@ -51,14 +46,10 @@ public class FactConsumer {
         this.pageAssembler = pageAssembler;
     }
 
-    @PreDestroy
-    public void onDestroy() {
-        compositeDisposable.dispose();
-    }
-
     /**
      * Primary entry point for extracting facts from a batch of raw logs.
-     * Feeds the logs into the Log-to-Facts agent and persists resulting facts.
+     * Enqueues the logs for the Log-to-Facts agent. Results are processed
+     * asynchronously via callback when an agent becomes available.
      */
     public void extractFacts(List<? extends RawLog> logs) {
         if (logs == null || logs.isEmpty()) {
@@ -88,25 +79,25 @@ public class FactConsumer {
                     Part.fromText("Extract facts from the following raw logs."),
                     Part.fromText(mapper.writeValueAsString(payload)));
 
-            Disposable d = orchestrator.executeTaskWithAgent(agentId, null, null, prompt)
-                    .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
-                    .subscribe(events -> {
-                        for (com.google.adk.events.Event agentEvent : events) {
-                            agentEvent.content().flatMap(Content::parts).ifPresent(parts -> {
-                                for (Part part : parts) {
-                                    part.text().ifPresent(json -> {
-                                        List<Fact> facts = persistFactsFromJson(json, tenantId, sourceType,
-                                                correlationId);
-                                        if (!facts.isEmpty()) {
-                                            pageAssembler.buildPages(facts);
-                                        }
-                                    });
-                                }
-                            });
-                        }
-                    }, Throwable::printStackTrace);
-
-            compositeDisposable.add(d);
+            // Enqueue the task — results delivered asynchronously via callback
+            orchestrator.executeTaskWithAgent(agentId, null, prompt, flowable -> {
+                flowable.buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
+                        .subscribe(events -> {
+                            for (com.google.adk.events.Event agentEvent : events) {
+                                agentEvent.content().flatMap(Content::parts).ifPresent(parts -> {
+                                    for (Part part : parts) {
+                                        part.text().ifPresent(json -> {
+                                            List<Fact> facts = persistFactsFromJson(json, tenantId, sourceType,
+                                                    correlationId);
+                                            if (!facts.isEmpty()) {
+                                                pageAssembler.buildPages(facts);
+                                            }
+                                        });
+                                    }
+                                });
+                            }
+                        }, Throwable::printStackTrace);
+            });
 
         } catch (Exception e) {
             throw new AgentApplicationException("Fact extraction initiation failed", e);

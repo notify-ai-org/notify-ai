@@ -155,8 +155,17 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
             String agentId = agentRegistry.get(AgentRegistry.MEMORY_SUMMARIZER_AGENT_ID);
             Content prompt = Content.fromParts(Part.fromText(mapper.writeValueAsString(request)));
 
-            com.google.adk.events.Event event = orchestrator.executeTaskWithAgent(agentId, null, null, prompt)
-                    .blockingFirst();
+            // Use CompletableFuture to bridge the callback to a blocking call
+            java.util.concurrent.CompletableFuture<com.google.adk.events.Event> future =
+                    new java.util.concurrent.CompletableFuture<>();
+
+            orchestrator.executeTaskWithAgent(agentId, null, prompt, flowable -> {
+                flowable.firstElement().subscribe(
+                        future::complete,
+                        future::completeExceptionally);
+            });
+
+            com.google.adk.events.Event event = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
 
             if (event.content().isPresent() && event.content().get().parts().isPresent()) {
                 List<Part> parts = event.content().get().parts().get();
