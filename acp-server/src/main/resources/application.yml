@@ -29,6 +29,9 @@ spring:
       hibernate:
         show_sql: false
         format_sql: false
+  quartz:
+    properties:
+      org.quartz.threadPool.threadCount: 2
   ai:
     openai:
       api-key: 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
@@ -87,6 +90,11 @@ executors:
     core: 2
     max: 4
     queue: 200
+
+  dispatcher:
+    core: 4
+    max: 20
+    queue: 1000
 
   scheduler:
     threads: 2

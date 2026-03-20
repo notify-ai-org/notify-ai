@@ -29,7 +29,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import com.example.agent.auth.AgentAuthenticationFilter;
 import com.example.agent.consumers.FactConsumer;
 import com.example.agent.service.LogToMemoryAgentWorker;
+import com.example.agent.util.CentralExecutorRegistry;
 import com.example.agent.util.CentralExecutorRegistry.ExecutorProperties;
+import com.example.agent.util.CentralExecutorRegistry.ExecutorType;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
@@ -42,6 +44,7 @@ import javax.sql.DataSource;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @Configuration
@@ -221,5 +224,11 @@ public class Config {
         return new LogToMemoryAgentWorker(
                 eventCaptureRepo, agentLogRepo, notificationLogRepo, executionLogRepo,
                 factConsumer, 50);
+    }
+
+    @Bean
+    @org.springframework.context.annotation.Primary
+    public ExecutorService dispatcherExecutor(CentralExecutorRegistry registry) {
+        return registry.get(ExecutorType.DISPATCHER);
     }
 }

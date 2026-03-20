@@ -21,6 +21,9 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  quartz:
+    properties:
+      org.quartz.threadPool.threadCount: 2
 
 vocab:
   kafka-topic: ${VOCAB_TOPIC:vocabulary-raw}

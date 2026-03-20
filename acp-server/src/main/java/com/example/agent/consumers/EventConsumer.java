@@ -3,12 +3,14 @@ package com.example.agent.consumers;
 import com.example.agent.AgentContextHolder;
 import com.example.agent.AgentOrchestrator;
 import com.example.agent.EventCaptureRepository;
+import com.example.agent.EventRepository;
 import com.example.agent.EventScheduleRepository;
 import com.example.agent.MessageTemplateRepository;
 import com.example.agent.NotificationDispatcher;
 import com.example.agent.NotificationJobRepository;
 import com.example.agent.models.AgentContext;
 import com.example.agent.models.CaptureStatus;
+import com.example.agent.models.Event;
 import com.example.agent.models.EventCapture;
 import com.example.agent.models.EventSchedule;
 import com.example.agent.models.MessageTemplate;
@@ -54,6 +56,7 @@ public class EventConsumer {
     private final NotificationDispatcher notificationDispatcher;
     private final NotificationJobRepository notificationJobRepository;
     private final AgentRegistry agentRegistry;
+    private final EventRepository eventRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(EventConsumer.class);
 
@@ -67,7 +70,7 @@ public class EventConsumer {
             EventScheduleRepository eventScheduleRepository, MessageTemplateRepository messageTemplateRepository,
             AgentOrchestrator agentOrchestrator,
             NotificationDispatcher notificationDispatcher, NotificationJobRepository notificationJobRepository,
-            AgentRegistry agentRegistry) {
+            AgentRegistry agentRegistry, EventRepository eventRepository) {
         this.eventCaptureRepository = eventCaptureRepository;
         this.eventScheduleRepository = eventScheduleRepository;
         this.messageTemplateRepository = messageTemplateRepository;
@@ -75,6 +78,7 @@ public class EventConsumer {
         this.notificationDispatcher = notificationDispatcher;
         this.notificationJobRepository = notificationJobRepository;
         this.agentRegistry = agentRegistry;
+        this.eventRepository = eventRepository;
     }
 
     @Transactional
@@ -122,6 +126,20 @@ public class EventConsumer {
 
             capture.setId(null);
             capture.setStatus(CaptureStatus.PROCESSING);
+
+            // Persist the Event if it doesn't already exist
+            Event event = capture.getEvent();
+            if (event.getName() != null) {
+                Event existing = eventRepository.findByName(event.getName()).orElse(null);
+                if (existing != null) {
+                    existing.setEventType(event.getEventType());
+                    capture.setEvent(existing);
+                } else {
+                    event.setStatus(Event.EventStatus.NEW);
+                    eventRepository.save(event);
+                }
+            }
+
             eventCaptureRepository.save(capture);
 
             try {
@@ -246,18 +264,31 @@ public class EventConsumer {
     private void enqueueScheduleAndTemplateGeneration(EventCapture capture, NotificationJob job,
             Object eventTypeObj, MessageTemplate template) {
         try {
-            // Enqueue schedule generation
-            enqueueScheduleGeneration(capture, job, eventTypeObj, template);
+            if (template == null && !"deferred".equals(capture.getEvent().getEventType())) {
+                // Generate templates, then enqueue schedule generation
+                enqueueTemplateGeneration(capture, job, eventTypeObj, () -> {
+                    try {
+                        List<MessageTemplate> newTemplates = messageTemplateRepository
+                                .findByEventType(capture.getEvent().getName());
+                        MessageTemplate newTemplate = newTemplates.stream()
+                                .filter(t -> t.getChannel().equalsIgnoreCase(job.getChannel()))
+                                .findFirst()
+                                .orElse(null);
+                        
+                        if (newTemplate != null) {
+                            job.setTemplate(newTemplate.getTemplate());
+                        }
 
-            // Enqueue template generation if needed
-            List<MessageTemplate> templates = messageTemplateRepository
-                    .findByEventType(capture.getEvent().getName());
-            if (templates.isEmpty()) {
-                if (!"deferred".equals(capture.getEvent().getEventType())) {
-                    enqueueTemplateGeneration(capture, job, eventTypeObj, template);
-                }
+                        enqueueScheduleGeneration(capture, job, eventTypeObj, newTemplate);
+                    } catch (Exception e) {
+                        logger.error("Error enqueuing schedule generation after template generation: " + e.getMessage(), e);
+                    }
+                });
             } else {
-                logger.info("Templates already exist for event: {}", capture.getEvent().getName());
+                if (template != null) {
+                    logger.info("Templates already exist for event: {}", capture.getEvent().getName());
+                }
+                enqueueScheduleGeneration(capture, job, eventTypeObj, template);
             }
         } catch (Exception e) {
             logger.error("Error enqueuing schedule/template generation: " + e.getMessage(), e);
@@ -284,7 +315,7 @@ public class EventConsumer {
     }
 
     private void enqueueTemplateGeneration(EventCapture capture, NotificationJob job,
-            Object eventTypeObj, MessageTemplate template) throws JsonProcessingException {
+            Object eventTypeObj, Runnable onComplete) throws JsonProcessingException {
         StringBuilder sb = new StringBuilder();
         sb.append("Generate message templates for the following event:\n\n");
         Map<String, Object> payload = new java.util.HashMap<>();
@@ -298,7 +329,7 @@ public class EventConsumer {
         agentOrchestrator.executeTaskWithAgent(
                 agentRegistry.get(AgentRegistry.MESSAGE_TEMPLATE_AGENT_ID),
                 null, prompt,
-                flowable -> handleTemplateResult(flowable, capture));
+                flowable -> handleTemplateResult(flowable, capture, onComplete));
     }
 
     /**
@@ -382,7 +413,7 @@ public class EventConsumer {
      * Handle template generation agent result.
      */
     private void handleTemplateResult(io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> flowable,
-            EventCapture capture) {
+            EventCapture capture, Runnable onComplete) {
         flowable.subscribe(agentEvent -> {
             if (agentEvent.content().isEmpty()
                     || agentEvent.content().get().parts().isEmpty()
@@ -414,6 +445,13 @@ public class EventConsumer {
             }
         }, error -> {
             logger.error("Template generation agent failed: " + error.getMessage(), error);
+            if (onComplete != null) {
+                onComplete.run();
+            }
+        }, () -> {
+            if (onComplete != null) {
+                onComplete.run();
+            }
         });
     }
 

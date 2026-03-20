@@ -23,6 +23,7 @@ public class CentralExecutorRegistry implements DisposableBean {
                 IO, // DB, Redis, HTTP calls
                 LLM, // log→fact, summarization
                 SCHEDULER, // cron / delayed tasks
+                DISPATCHER, // notification workers
                 KAFKA, // heavy Kafka consumers
                 RETRY // backoff / DLQ replays
         }
@@ -38,6 +39,7 @@ public class CentralExecutorRegistry implements DisposableBean {
                         Config cpu,
                         Config io,
                         Config llm,
+                        Config dispatcher,
                         SchedulerConfig scheduler) {
         }
 
@@ -68,6 +70,15 @@ public class CentralExecutorRegistry implements DisposableBean {
                                                 60, TimeUnit.SECONDS,
                                                 new ArrayBlockingQueue<>(props.llm().queue()),
                                                 namedFactory("llm-agent"),
+                                                new ThreadPoolExecutor.CallerRunsPolicy()));
+
+                executors.put(ExecutorType.DISPATCHER,
+                                new ThreadPoolExecutor(
+                                                props.dispatcher().core(),
+                                                props.dispatcher().max(),
+                                                60, TimeUnit.SECONDS,
+                                                new ArrayBlockingQueue<>(props.dispatcher().queue()),
+                                                namedFactory("dispatcher"),
                                                 new ThreadPoolExecutor.CallerRunsPolicy()));
 
                 executors.put(ExecutorType.SCHEDULER,

@@ -227,9 +227,9 @@ public class NotificationDispatcher {
                     .forJob(job);
 
             if (schedule.getCronExpression() != null && !schedule.getCronExpression().isEmpty()) {
-                if (schedule.getTriggerType().equals("CRON")) {
+                if ("CRON".equals(schedule.getTriggerType())) {
                     triggerBuilder.withSchedule(CronScheduleBuilder.cronSchedule(schedule.getCronExpression()));
-                } else if (schedule.getTriggerType().equals("SIMPLE")) {
+                } else if ("SIMPLE".equals(schedule.getTriggerType())) {
                     triggerBuilder.withSchedule(SimpleScheduleBuilder.simpleSchedule()
                             .withIntervalInMilliseconds(Long.parseLong(schedule.getCronExpression()))
                             .repeatForever());

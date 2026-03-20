@@ -56,6 +56,10 @@ public class AgentContext {
     public String getCorrelationId() { return correlationId; }
     public void setCorrelationId(String correlationId) { this.correlationId = correlationId; }
 
+    public static AgentContextBuilder builder() {
+        return new AgentContextBuilder();
+    }
+
     public static class AgentContextBuilder {
         private AgentContext ctx;
 

@@ -1,5 +1,7 @@
 package com.example.agent.models;
 
+import com.example.agent.AgentContextHolder;
+
 import com.google.adk.events.Event;
 import com.google.genai.types.Content;
 import io.reactivex.rxjava3.core.Flowable;
@@ -17,6 +19,7 @@ public class TaskQueueEntry {
     private final Content prompt;
     private final Consumer<Flowable<Event>> resultCallback;
     private final Instant enqueuedAt;
+    private final AgentContext context;
 
     public TaskQueueEntry(String agentType, String taskId, Content prompt,
             Consumer<Flowable<Event>> resultCallback) {
@@ -25,6 +28,7 @@ public class TaskQueueEntry {
         this.prompt = prompt;
         this.resultCallback = resultCallback;
         this.enqueuedAt = Instant.now();
+        this.context = AgentContextHolder.getContext();
     }
 
     public String getAgentType() {
@@ -45,5 +49,9 @@ public class TaskQueueEntry {
 
     public Instant getEnqueuedAt() {
         return enqueuedAt;
+    }
+
+    public AgentContext getContext() {
+        return context;
     }
 }

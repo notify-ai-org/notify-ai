@@ -231,6 +231,57 @@ public class AgentOrchestrator {
         }
     }
 
+    /**
+     * Directly execute a task on an available agent of the specified type, bypassing the task queue.
+     * Blocks until an agent is available. Uses the provided Session.
+     */
+    public void executeDirect(String agentType, String taskId, Content prompt, com.google.adk.sessions.Session session, Consumer<Flowable<Event>> resultCallback) {
+        AgentWrapper agent = waitForAvailableAgent(agentType);
+        if (agent == null) {
+            throw new IllegalStateException("No available agent of type " + agentType);
+        }
+
+        availableAgents.get(agentType).remove(agent);
+        busyAgents.computeIfAbsent(agentType,
+                k -> java.util.Collections.synchronizedList(new java.util.ArrayList<>()))
+                .add(agent);
+
+        logger.info(String.format("Direct dispatch of task %s to agent %s (type: %s).",
+                taskId != null ? taskId : "direct", agent.getAgentId(), agentType));
+
+        emitOrchestratorEvent(AgentOrchestratorEventType.TASK_STARTED,
+                Map.of("taskId", taskId != null ? taskId : "direct", "agentId", agent.getAgentId()));
+
+        AgentContext agentContext = AgentContext.builder().session(session).build();
+        AgentContextHolder.setContext(agentContext);
+
+        BaseArtifactService artifactService = new InMemoryArtifactService();
+        InvocationContext context = InvocationContext.create(
+                sessionService, artifactService, agent.getAgent(),
+                session, null, null);
+
+        Flowable<Event> resultFlowable = agent.execute(context, taskId, prompt)
+                .doFinally(() -> {
+                    busyAgents.get(agentType).remove(agent);
+                    availableAgents.get(agentType).add(agent);
+                    agent.transitionTo(AgentStage.READY, "Task finished",
+                            Map.of("taskId", taskId != null ? taskId : "direct"));
+                    emitOrchestratorEvent(AgentOrchestratorEventType.TASK_COMPLETED,
+                            Map.of("taskId", taskId != null ? taskId : "direct", "agentId", agent.getAgentId()));
+                });
+
+        try {
+            resultCallback.accept(resultFlowable);
+        } catch (Exception e) {
+            logger.warning(String.format("Task %s callback failed: %s",
+                    taskId != null ? taskId : "direct", e.getMessage()));
+            emitOrchestratorEvent(AgentOrchestratorEventType.TASK_FAILED,
+                    Map.of("taskId", taskId != null ? taskId : "direct", "error", e.getMessage()));
+        } finally {
+            AgentContextHolder.clear();
+        }
+    }
+
 
 
     // -----------------------------------------------------------------------
@@ -272,7 +323,8 @@ public class AgentOrchestrator {
                         Map.of("taskId", entry.getTaskId(), "agentId", agent.getAgentId()));
 
                 // Build InvocationContext
-                AgentContext agentContext = AgentContextHolder.getContext();
+                AgentContextHolder.setContext(entry.getContext());
+                AgentContext agentContext = entry.getContext();
                 BaseArtifactService artifactService = new InMemoryArtifactService();
                 InvocationContext context = InvocationContext.create(
                         sessionService, artifactService, agent.getAgent(),

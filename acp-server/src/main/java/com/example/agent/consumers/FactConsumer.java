@@ -33,17 +33,33 @@ public class FactConsumer {
     private final AgentRegistry agentRegistry;
     private final FactRepository factRepository;
     private final MemoryAssembler pageAssembler;
+    private final com.example.agent.service.SessionService sessionService;
+
+    private com.google.adk.sessions.Session logToFactsSession;
 
     @Value("${agent.buffer.timeout:15s}")
     @ManagedConfiguration(key = "agent.buffer.timeout", source = ConfigSource.CONFIG_MAP)
     private Duration bufferTimeout;
 
     public FactConsumer(AgentOrchestrator orchestrator, AgentRegistry agentRegistry,
-            FactRepository factRepository, MemoryAssembler pageAssembler) {
+            FactRepository factRepository, MemoryAssembler pageAssembler, com.example.agent.service.SessionService sessionService) {
         this.orchestrator = orchestrator;
         this.agentRegistry = agentRegistry;
         this.factRepository = factRepository;
         this.pageAssembler = pageAssembler;
+        this.sessionService = sessionService;
+    }
+
+    @javax.annotation.PostConstruct
+    public void init() {
+        try {
+            // Create or get the persistent session for Log-to-Facts agent extraction
+            this.logToFactsSession = sessionService.createSession(
+                "notify-system", "system-user", new java.util.concurrent.ConcurrentHashMap<>(), "log-to-facts-session"
+            ).blockingGet();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to initialize Log-to-Facts session", e);
+        }
     }
 
     /**
@@ -79,8 +95,8 @@ public class FactConsumer {
                     Part.fromText("Extract facts from the following raw logs."),
                     Part.fromText(mapper.writeValueAsString(payload)));
 
-            // Enqueue the task — results delivered asynchronously via callback
-            orchestrator.executeTaskWithAgent(agentId, null, prompt, flowable -> {
+            // Execute the task directly bypassing the TaskQueue
+            orchestrator.executeDirect(agentId, UUID.randomUUID().toString(), prompt, this.logToFactsSession, flowable -> {
                 flowable.buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
                         .subscribe(events -> {
                             for (com.google.adk.events.Event agentEvent : events) {

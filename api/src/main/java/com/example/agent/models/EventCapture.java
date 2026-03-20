@@ -26,7 +26,7 @@ public class EventCapture extends RawLog {
     private Map<String, Object> payload;
 
     @ManyToOne(cascade = CascadeType.PERSIST)
-    private Event event;
+    private Event event = new Event();
 
     // Execution data
     @Embedded

@@ -1,6 +1,5 @@
 package com.example.agent.models;
 
-
 import jakarta.persistence.*;
 import lombok.Builder;
 import lombok.Getter;
@@ -10,15 +9,13 @@ import lombok.Value;
 import java.time.Instant;
 
 @Entity
-@Table(
-    name = "dead_letter_record",
-    indexes = {
+@Table(name = "dead_letter_record", indexes = {
         @Index(name = "idx_dlq_notification_id", columnList = "notificationId"),
         @Index(name = "idx_dlq_status_created", columnList = "replayStatus, createdAt"),
         @Index(name = "idx_dlq_category_reason", columnList = "failureCategory, failureReasonCode")
-    }
-)
-@Getter @Setter
+})
+@Getter
+@Setter
 public class DeadLetterRecord {
 
     @Id
@@ -105,10 +102,10 @@ public class DeadLetterRecord {
     @Builder
     public static class FailureInfo {
         FailureCategory category;
-        String reasonCode;      // e.g. SMTP_TIMEOUT, TEMPLATE_PARSE_ERROR
-        String message;         // human readable
-        String exceptionClass;  // ex.getClass().getName()
-        String stackTrace;      // truncated stack trace
+        String reasonCode; // e.g. SMTP_TIMEOUT, TEMPLATE_PARSE_ERROR
+        String message; // human readable
+        String exceptionClass; // ex.getClass().getName()
+        String stackTrace; // truncated stack trace
     }
 
     public enum FailureCategory {

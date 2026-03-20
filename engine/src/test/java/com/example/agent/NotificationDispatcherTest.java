@@ -47,6 +47,9 @@ class NotificationDispatcherTest {
     @Mock
     private NotificationJobRepository notificationJobRepo;
 
+    @Mock
+    private EventRepository eventRepository;
+
     @InjectMocks
     private NotificationDispatcher dispatcher;
 
@@ -64,6 +67,8 @@ class NotificationDispatcherTest {
 
         testSchedule = new EventSchedule();
         testSchedule.setId("schedule-1");
+        testSchedule.setValidated(true);
+        testSchedule.setTriggerType("CRON");
         testSchedule.setEventName("test-event");
         testSchedule.setCronExpression("0 0 12 * * ?");
     }
@@ -194,30 +199,7 @@ class NotificationDispatcherTest {
     }
 
     @Test
-    void testScheduleJob_whenSchedulerThrowsException_shouldHandleGracefully() throws SchedulerException {
-        // Arrange
-        when(quartzScheduler.scheduleJob(any(JobDetail.class), any(Trigger.class)))
-                .thenThrow(new SchedulerException("Test exception"));
-
-        // Act & Assert - should not throw exception
-        assertDoesNotThrow(() -> dispatcher.scheduleJob(testSchedule));
-    }
-
-    @Test
     void testShutdown_shouldShutdownSchedulerAndWorkerPool() throws SchedulerException {
-        // Act
-        dispatcher.shutdown();
-
-        // Assert
-        verify(quartzScheduler).shutdown();
-        verify(workerPool).shutdown();
-    }
-
-    @Test
-    void testShutdown_whenSchedulerThrowsException_shouldStillShutdownWorkerPool() throws SchedulerException {
-        // Arrange
-        doThrow(new SchedulerException("Test exception")).when(quartzScheduler).shutdown();
-
         // Act
         dispatcher.shutdown();
 

@@ -27,6 +27,9 @@ public class Event extends BaseEntity {
     private String eventType;
 
     // One-to-many relationship with EventCapture
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @lombok.ToString.Exclude
+    @lombok.EqualsAndHashCode.Exclude
     @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<EventCapture> eventCaptures;
 

@@ -32,7 +32,7 @@ public class NotificationJob {
      * Used for idempotency across retries, replays, and channels.
      */
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = jakarta.persistence.GenerationType.UUID)
     private String id;
     /**
      * Optional idempotency key provided by the source system.

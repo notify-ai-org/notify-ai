@@ -72,7 +72,7 @@ public class DispatcherWorkerPool implements Runnable {
 
     private final WorkerSnapshotRepository workerSnapshotRepository;
 
-    private final ExecutorService executor = Executors.newCachedThreadPool();
+    private final ExecutorService executor;
 
     private final Set<NotificationWorker> workers = ConcurrentHashMap.newKeySet();
 
@@ -159,7 +159,7 @@ public class DispatcherWorkerPool implements Runnable {
         int targetSize = Math.max(properties.getMinWorkers(), workers.size() + incomingJobs);
         int required = Math.min(properties.getMaxWorkers(), targetSize);
 
-        while (workers.size() < required) {
+        for (int i = 0; i < required; i++) {
             NotificationWorker worker = context.getBean(NotificationWorker.class);
             worker.setLogBuffer(logBuffer);
             workers.add(worker);
@@ -201,7 +201,7 @@ public class DispatcherWorkerPool implements Runnable {
     public void run() {
         while (!Thread.currentThread().isInterrupted()) {
             try {
-                Thread.sleep(5000);
+                Thread.sleep(properties.getLogFlushIntervalMs());
                 removeIdleWorkers();
                 // Update metrics and persist WorkerSnapshot for each worker
                 for (NotificationWorker worker : workers) {
