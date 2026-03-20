@@ -1,8 +1,8 @@
 <div align="center">
   <a href="https://www.freepik.com/free-photos-vectors/notification-symbols">
-    <img src="https://cdn-icons-png.flaticon.com/512/3119/3119338.png" width="80" alt="Notification Symbol">
+    <img src="https://img.freepik.com/free-vector/blue-notification-bell-with-one-notification_78370-6899.jpg" width="100" alt="Notification Symbol">
   </a>
-  <h1>Notify</h1>
+  <h1>Notify.ai</h1>
   <p><b>Agentic Notification & Event Orchestration System</b></p>
 </div>
 
