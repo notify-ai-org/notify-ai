@@ -60,7 +60,7 @@ public class LogToMemoryAgentWorker {
      * Pulls unprocessed logs from all repositories, merges them into
      * a single batch (up to maxBatchSize), and feeds to the fact extractor.
      */
-    @Scheduled(fixedDelayString = "${agent.log-worker.interval-ms:100000}")
+    // @Scheduled(fixedDelayString = "${agent.log-worker.interval-ms:100000}")
     @Transactional
     public void run() {
         try {

@@ -159,8 +159,8 @@ public class VocabularyConsumer {
                     Part.fromText(prompt),
                     Part.fromText(mapper.writeValueAsString(ruleRequest)));
 
-            agentOrchestrator.executeTaskWithAgent("RuleProcessor", null, content, flowable -> {
-                flowable.subscribe(agentEvent -> {
+            agentOrchestrator.createTaskFlowable("RuleProcessor", null, content, null)
+                .subscribe(agentEvent -> {
                     if (agentEvent.content().isPresent()
                             && agentEvent.content().get().parts().isPresent()
                             && !agentEvent.content().get().parts().get().isEmpty()) {
@@ -198,7 +198,6 @@ public class VocabularyConsumer {
                 }, error -> {
                     System.err.println("Rule processor agent call failed: " + error.getMessage());
                 });
-            });
         } catch (Exception e) {
             System.err.println("Error invoking rule processor agent: " + e.getMessage());
             throw new AgentApplicationException("Error invoking rule processor agent", e);

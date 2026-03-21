@@ -225,12 +225,19 @@ public class MemoryPageRepository {
 
         RedisCommands<String, String> cmd = connection.sync();
 
-        StringBuilder filter = new StringBuilder("*");
+        StringBuilder filter = new StringBuilder();
 
-        namespace.ifPresent(ns -> filter.append(" @namespace:{").append(escape(ns)).append("}"));
-        correlationId.ifPresent(cid -> filter.append(" @correlationId:{").append(escape(cid)).append("}"));
+        namespace.ifPresent(ns -> filter.append("@namespace:{").append(escape(ns)).append("} "));
+        correlationId.ifPresent(cid -> filter.append("@correlationId:{").append(escape(cid)).append("} "));
 
-        String query = filter + "=>[KNN " + k + " @embedding $vec AS score]";
+        String filterStr = filter.toString().trim();
+        if (filterStr.isEmpty()) {
+            filterStr = "*";
+        } else {
+            filterStr = "(" + filterStr + ")";
+        }
+
+        String query = filterStr + "=>[KNN " + k + " @embedding $vec AS score]";
 
         List<Object> res = cmd.dispatch(
                 RediSearchCommand.FT_SEARCH,

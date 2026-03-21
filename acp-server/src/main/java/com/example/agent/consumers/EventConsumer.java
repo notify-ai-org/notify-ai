@@ -15,7 +15,6 @@ import com.example.agent.models.EventCapture;
 import com.example.agent.models.EventSchedule;
 import com.example.agent.models.MessageTemplate;
 import com.example.agent.models.NotificationJob;
-import com.example.agent.models.subject.Subject;
 import com.example.agent.util.ObjectMapperFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -24,7 +23,6 @@ import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 
 import com.example.agent.config.AgentRegistry;
-import com.example.agent.exceptions.ValidationRequiredException;
 import com.example.agent.exceptions.AgentApplicationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -113,8 +111,9 @@ public class EventConsumer {
 
     /**
      * Enqueue each event capture for processing by the event processor agent.
-     * Results are handled asynchronously via callbacks.
+     * Uses RxJava Flowables to construct a sequential execution pipeline.
      */
+    @SuppressWarnings("null")
     private void enqueueEventProcessing(List<EventCapture> captures) {
         for (EventCapture capture : captures) {
             if (capture == null || capture.getEvent() == null) {
@@ -151,11 +150,109 @@ public class EventConsumer {
                         Part.fromText("Process the following event capture and determine if it should be emitted:"),
                         Part.fromText(inputJson));
 
-                // Enqueue the event processor task with a callback to handle results
-                agentOrchestrator.executeTaskWithAgent(
-                        agentRegistry.get(AgentRegistry.EVENT_PROCESSOR_AGENT_ID),
-                        null, prompt,
-                        flowable -> handleEventProcessorResult(flowable, capture));
+                // 1. Process Event Task
+                io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> eventProcessFlowable = agentOrchestrator
+                        .createTaskFlowable(
+                                agentRegistry.get(AgentRegistry.EVENT_PROCESSOR_AGENT_ID),
+                                UUID.randomUUID().toString(), prompt, AgentContextHolder.getContext());
+
+                // 2. Chain downstream tasks based on processor result
+                eventProcessFlowable.flatMap(agentEvent -> {
+                    if (agentEvent.content().isEmpty() || agentEvent.content().get().parts().isEmpty()
+                            || agentEvent.content().get().parts().get().isEmpty()) {
+                        return io.reactivex.rxjava3.core.Flowable.empty();
+                    }
+
+                    Optional<List<Part>> parts = agentEvent.content().get().parts();
+                    if (!parts.isPresent())
+                        return io.reactivex.rxjava3.core.Flowable.empty();
+
+                    List<io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event>> downstreamTasks = new java.util.ArrayList<>();
+
+                    for (Part part : parts.get()) {
+                        if (!part.text().isPresent())
+                            continue;
+                        String json = part.text().get();
+                        logger.info("Agent Output JSON: " + json);
+
+                        List<Map<String, Object>> processedEvents;
+                        try {
+                            processedEvents = mapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {
+                            });
+                        } catch (JsonProcessingException e) {
+                            logger.warn("Skipping non-JSON part: " + json);
+                            continue;
+                        }
+
+                        for (Map<String, Object> processedEvent : processedEvents) {
+                            String resultStatus = (String) processedEvent.get("result");
+                            if ("suppressed".equalsIgnoreCase(resultStatus)) {
+                                logger.info("Event '{}' suppressed by agent.", capture.getEvent().getName());
+                                continue;
+                            }
+
+                            Object eventTypeObj = processedEvent.get("eventType");
+                            @SuppressWarnings("unchecked")
+                            List<Map<String, String>> channels = (List<Map<String, String>>) processedEvent
+                                    .get("channels");
+
+                            if (channels != null) {
+                                for (Map<String, String> channelInfo : channels) {
+                                    String channel = channelInfo.get("channel");
+                                    AgentContext agentContext = AgentContextHolder.getContext();
+                                    Map<String, String> attributes = new java.util.HashMap<>();
+                                    if (capture.getPayload() != null) {
+                                        capture.getPayload().forEach((k, v) -> attributes.put(k, String.valueOf(v)));
+                                    }
+
+                                    NotificationJob job = NotificationJob.builder()
+                                            .id(UUID.randomUUID().toString())
+                                            .channel(channel)
+                                            .idempotencyKey(
+                                                    agentContext != null ? agentContext.getIdempotencyKey() : null)
+                                            .schemaVersion(
+                                                    agentContext != null ? agentContext.getSchemaVersion() : null)
+                                            .source(agentContext != null ? agentContext.getSource() : null)
+                                            .correlationId(
+                                                    agentContext != null ? agentContext.getCorrelationId() : null)
+                                            .eventType(capture.getEvent().getEventType())
+                                            .eventName(capture.getEvent().getName())
+                                            .priority(NotificationJob.NotificationPriority.NORMAL)
+                                            .dispatchMode(NotificationJob.DispatchMode.EVENT)
+                                            .subjects(capture.getSubjectResult() != null
+                                                    ? capture.getSubjectResult().getSubjects()
+                                                    : null)
+                                            .attributes(attributes)
+                                            .build();
+
+                                    try {
+                                        if (job.getAttributes() != null) {
+                                            job.setAttributesJson(mapper.writeValueAsString(job.getAttributes()));
+                                        }
+                                        if (job.getSubjects() != null) {
+                                            job.setSubjectsJson(mapper.writeValueAsString(job.getSubjects()));
+                                        }
+                                    } catch (JsonProcessingException e) {
+                                        logger.warn("Failed to stringify job attributes/subjects", e);
+                                    }
+
+                                    downstreamTasks.add(
+                                            buildScheduleAndTemplateFlowable(capture, job, eventTypeObj));
+                                }
+                            }
+                        }
+                    }
+
+                    if (downstreamTasks.isEmpty()) {
+                        return io.reactivex.rxjava3.core.Flowable.empty();
+                    }
+                    // Process channels in parallel via orchestrator API
+                    return agentOrchestrator.createParallelFlowable(downstreamTasks);
+
+                }).subscribe(
+                        result -> {
+                            /* Terminal elements dropped or logged */ },
+                        error -> logger.error("Event processing pipeline failed: " + error.getMessage(), error));
 
             } catch (Exception e) {
                 logger.error("Error enqueuing event processing: " + e.getMessage(), e);
@@ -163,296 +260,175 @@ public class EventConsumer {
         }
     }
 
-    /**
-     * Callback that handles the event processor agent's result.
-     * Parses the agent output and enqueues schedule/template generation tasks.
-     */
-    private void handleEventProcessorResult(io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> flowable,
-            EventCapture capture) {
-        flowable.subscribe(agentEvent -> {
-            if (agentEvent.content().isEmpty()
-                    || agentEvent.content().get().parts().isEmpty()
-                    || agentEvent.content().get().parts().get().isEmpty()) {
-                return;
-            }
+    private io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> buildScheduleAndTemplateFlowable(
+            EventCapture capture, NotificationJob job, Object eventTypeObj) {
+        io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> templateFlowable = buildTemplateGenerationFlowable(
+                capture, job, eventTypeObj);
 
-            Optional<List<Part>> parts = agentEvent.content().get().parts();
-            if (!parts.isPresent()) {
-                return;
-            }
-
-            for (Part part : parts.get()) {
-                if (!part.text().isPresent()) {
-                    continue;
-                }
-                String json = part.text().get();
-                logger.info("Agent Output JSON: " + json);
-
-                List<Map<String, Object>> processedEvents;
-                try {
-                    processedEvents = mapper.readValue(json,
-                            new TypeReference<List<Map<String, Object>>>() {
-                            });
-                } catch (JsonProcessingException e) {
-                    logger.warn("Skipping non-JSON part: " + json);
-                    continue;
-                }
-
-                for (Map<String, Object> processedEvent : processedEvents) {
-                    String resultStatus = (String) processedEvent.get("result");
-                    if ("suppressed".equalsIgnoreCase(resultStatus)) {
-                        logger.info("Event '{}' suppressed by agent.", capture.getEvent().getName());
-                        continue;
-                    }
-
-                    Object eventTypeObj = processedEvent.get("eventType");
-                    @SuppressWarnings("unchecked")
-                    List<Map<String, String>> channels = (List<Map<String, String>>) processedEvent
-                            .get("channels");
-                    if (channels != null) {
-                        for (Map<String, String> channelInfo : channels) {
-                            String channel = channelInfo.get("channel");
-
-                            List<MessageTemplate> templates = messageTemplateRepository
-                                    .findByEventType(capture.getEvent().getName());
-                            MessageTemplate template = templates.stream()
-                                    .filter(t -> t.getChannel().equalsIgnoreCase(channel))
-                                    .findFirst()
-                                    .orElse(null);
-
-                            AgentContext agentContext = AgentContextHolder.getContext();
-                            List<Subject> subjects = capture.getSubjectResult() != null
-                                    ? capture.getSubjectResult().getSubjects()
-                                    : null;
-
-                            Map<String, String> attributes = new java.util.HashMap<>();
-                            if (capture.getPayload() != null) {
-                                capture.getPayload().forEach(
-                                        (k, v) -> attributes.put(k, String.valueOf(v)));
-                            }
-
-                            NotificationJob job = NotificationJob.builder()
-                                    .id(UUID.randomUUID().toString())
-                                    .channel(channel)
-                                    .idempotencyKey(agentContext.getIdempotencyKey())
-                                    .schemaVersion(agentContext.getSchemaVersion())
-                                    .source(agentContext.getSource())
-                                    .correlationId(agentContext.getCorrelationId())
-                                    .eventType(capture.getEvent().getEventType())
-                                    .eventName(capture.getEvent().getName())
-                                    .priority(NotificationJob.NotificationPriority.NORMAL)
-                                    .dispatchMode(NotificationJob.DispatchMode.EVENT)
-                                    .subjects(subjects)
-                                    .attributes(attributes)
-                                    .template(template != null ? template.getTemplate() : null)
-                                    .build();
-
-                            // Enqueue schedule and template generation tasks
-                            enqueueScheduleAndTemplateGeneration(capture, job, eventTypeObj, template);
-                        }
-                    }
-                }
-            }
-        }, error -> {
-            logger.error("Event processor agent call failed: " + error.getMessage(), error);
-        });
+        List<MessageTemplate> newTemplates = messageTemplateRepository
+                .findByEventType(capture.getEvent().getName());
+        MessageTemplate newTemplate = newTemplates.stream()
+                .filter(t -> t.getChannel().equalsIgnoreCase(job.getChannel()))
+                .findFirst()
+                .orElse(null);
+        io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> scheduleFlowable = buildScheduleGenerationFlowable(
+                capture, job, eventTypeObj, newTemplate);
+        if (newTemplate != null) {
+            job.setTemplate(newTemplate.getTemplate());
+            return scheduleFlowable;
+        }
+        return agentOrchestrator.createSequentialFlowable(
+                java.util.List.of(templateFlowable, scheduleFlowable));
     }
 
-    /**
-     * Enqueue schedule generation and template generation as separate tasks.
-     */
-    private void enqueueScheduleAndTemplateGeneration(EventCapture capture, NotificationJob job,
-            Object eventTypeObj, MessageTemplate template) {
+    private io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> buildTemplateGenerationFlowable(
+            EventCapture capture, NotificationJob job, Object eventTypeObj) {
         try {
-            if (template == null && !"deferred".equals(capture.getEvent().getEventType())) {
-                // Generate templates, then enqueue schedule generation
-                enqueueTemplateGeneration(capture, job, eventTypeObj, () -> {
-                    try {
-                        List<MessageTemplate> newTemplates = messageTemplateRepository
-                                .findByEventType(capture.getEvent().getName());
-                        MessageTemplate newTemplate = newTemplates.stream()
-                                .filter(t -> t.getChannel().equalsIgnoreCase(job.getChannel()))
-                                .findFirst()
-                                .orElse(null);
-                        
-                        if (newTemplate != null) {
-                            job.setTemplate(newTemplate.getTemplate());
-                        }
+            StringBuilder sb = new StringBuilder();
+            sb.append("Generate message templates for the following event:\n\n");
+            Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("eventName", capture.getEvent().getName());
+            payload.put("description", capture.getEvent().getDescription());
+            payload.put("payload", capture.getPayload());
+            payload.put("occuredAt", capture.getOccuredAt() != null ? capture.getOccuredAt().toString() : null);
+            String jsonPayload = mapper.writeValueAsString(payload);
+            Content prompt = Content.fromParts(Part.fromText(sb.toString()), Part.fromText(jsonPayload));
 
-                        enqueueScheduleGeneration(capture, job, eventTypeObj, newTemplate);
-                    } catch (Exception e) {
-                        logger.error("Error enqueuing schedule generation after template generation: " + e.getMessage(), e);
-                    }
-                });
-            } else {
-                if (template != null) {
-                    logger.info("Templates already exist for event: {}", capture.getEvent().getName());
-                }
-                enqueueScheduleGeneration(capture, job, eventTypeObj, template);
-            }
+            return agentOrchestrator.createTaskFlowable(
+                    agentRegistry.get(AgentRegistry.MESSAGE_TEMPLATE_AGENT_ID),
+                    UUID.randomUUID().toString(), prompt, AgentContextHolder.getContext())
+                    .doOnNext(agentEvent -> {
+                        if (agentEvent.content().isEmpty() || agentEvent.content().get().parts().isEmpty()
+                                || agentEvent.content().get().parts().get().isEmpty()) {
+                            return;
+                        }
+                        for (Part part : agentEvent.content().get().parts().get()) {
+                            if (!part.text().isPresent())
+                                continue;
+                            String json = part.text().get();
+                            List<Map<String, String>> templateList;
+                            try {
+                                templateList = mapper.readValue(json, new TypeReference<List<Map<String, String>>>() {
+                                });
+                            } catch (Exception e) {
+                                logger.warn("Failed to parse message templates from JSON");
+                                continue;
+                            }
+                            for (Map<String, String> templateMap : templateList) {
+                                MessageTemplate messageTemplate = new MessageTemplate();
+                                messageTemplate.setChannel(templateMap.get("channel"));
+                                messageTemplate.setSubject(templateMap.get("subject"));
+                                messageTemplate.setTemplate(templateMap.get("template"));
+                                messageTemplate.setEventName(capture.getEvent().getName());
+                                messageTemplate.setEventType(capture.getEvent().getEventType());
+                                messageTemplateRepository.save(messageTemplate);
+                            }
+                        }
+                    });
         } catch (Exception e) {
-            logger.error("Error enqueuing schedule/template generation: " + e.getMessage(), e);
+            return io.reactivex.rxjava3.core.Flowable
+                    .error(new AgentApplicationException("Failed to enqueue template generation", e));
         }
     }
 
-    private void enqueueScheduleGeneration(EventCapture capture, NotificationJob job,
-            Object eventTypeObj, MessageTemplate template) throws JsonProcessingException {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Generate notification schedules for the following events:\n\n");
-        Map<String, Object> payload = new java.util.HashMap<>();
-        payload.put("eventName", capture.getEvent().getName());
-        payload.put("eventDescription", capture.getEvent().getDescription());
-        payload.put("occuredAt", capture.getOccuredAt().toString());
-        payload.put("scheduleIntent", capture.getEvent().getScheduleIntent());
-        payload.put("preferredTimeWindow", capture.getEvent().getPreferredTimeWindow());
-        String jsonPayload = mapper.writeValueAsString(payload);
-        Content prompt = Content.fromParts(Part.fromText(sb.toString()), Part.fromText(jsonPayload));
-
-        agentOrchestrator.executeTaskWithAgent(
-                agentRegistry.get(AgentRegistry.EVENT_SCHEDULER_AGENT_ID),
-                null, prompt,
-                flowable -> handleScheduleResult(flowable, capture, job, eventTypeObj, template));
-    }
-
-    private void enqueueTemplateGeneration(EventCapture capture, NotificationJob job,
-            Object eventTypeObj, Runnable onComplete) throws JsonProcessingException {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Generate message templates for the following event:\n\n");
-        Map<String, Object> payload = new java.util.HashMap<>();
-        payload.put("eventName", capture.getEvent().getName());
-        payload.put("description", capture.getEvent().getDescription());
-        payload.put("payload", capture.getPayload());
-        payload.put("occuredAt", capture.getOccuredAt() != null ? capture.getOccuredAt().toString() : null);
-        String jsonPayload = mapper.writeValueAsString(payload);
-        Content prompt = Content.fromParts(Part.fromText(sb.toString()), Part.fromText(jsonPayload));
-
-        agentOrchestrator.executeTaskWithAgent(
-                agentRegistry.get(AgentRegistry.MESSAGE_TEMPLATE_AGENT_ID),
-                null, prompt,
-                flowable -> handleTemplateResult(flowable, capture, onComplete));
-    }
-
-    /**
-     * Handle schedule generation agent result.
-     */
-    private void handleScheduleResult(io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> flowable,
+    private io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> buildScheduleGenerationFlowable(
             EventCapture capture, NotificationJob job, Object eventTypeObj, MessageTemplate template) {
-        flowable.subscribe(agentEvent -> {
-            if (agentEvent.content().isEmpty()
-                    || agentEvent.content().get().parts().isEmpty()
-                    || agentEvent.content().get().parts().get().isEmpty()) {
-                return;
-            }
-            for (Part part : agentEvent.content().get().parts().get()) {
-                if (!part.text().isPresent()) {
-                    continue;
-                }
-                String json = part.text().get();
-                List<Map<String, String>> schedules;
-                try {
-                    schedules = mapper.readValue(json,
-                            new TypeReference<List<Map<String, String>>>() {
-                            });
-                } catch (Exception e) {
-                    logger.error("Error parsing schedule JSON: {}", json, e);
-                    continue;
-                }
 
-                for (Map<String, String> scheduleMap : schedules) {
-                    EventSchedule eventSchedule = new EventSchedule();
-                    eventSchedule.setId(UUID.randomUUID().toString());
-                    eventSchedule.setDescription(scheduleMap.get("scheduleDescription"));
-                    eventSchedule.setEventName(capture.getEvent().getName());
-                    if (scheduleMap.containsKey("triggerValue")
-                            && "cron".equals(scheduleMap.get("triggerType"))) {
-                        eventSchedule.setCronExpression(scheduleMap.get("triggerValue"));
-                    }
-                    eventSchedule.setScheduledAt(Instant.now());
-                    eventScheduleRepository.save(eventSchedule);
-
-                    if (!eventSchedule.isValidated()) {
-                        logger.warn(
-                                "EventSchedule for '{}' (ID: {}) saved but not scheduled - requires validation",
-                                capture.getEvent().getName(), eventSchedule.getId());
-                    } else {
-                        notificationDispatcher.scheduleJob(eventSchedule);
-                        logger.info("Scheduled validated EventSchedule for '{}' (ID: {})",
-                                capture.getEvent().getName(), eventSchedule.getId());
-                    }
+        List<EventSchedule> existingSchedules = eventScheduleRepository.findByEventName(capture.getEvent().getName());
+        if (!existingSchedules.isEmpty()) {
+            logger.info("Schedules already exist for event: {}. Bypassing agent generation.",
+                    capture.getEvent().getName());
+            for (EventSchedule existingSchedule : existingSchedules) {
+                if (!existingSchedule.isValidated()) {
+                    logger.warn("Reused EventSchedule for '{}' (ID: {}) requires validation",
+                            capture.getEvent().getName(), existingSchedule.getId());
+                } else {
+                    job.setScheduleId(existingSchedule.getId());
                     notificationJobRepository.save(job);
-                }
-
-                // Handle static event dispatch
-                if (eventTypeObj != null && eventTypeObj.equals("static")) {
-                    if (!capture.getEvent().isValidated()) {
-                        logger.warn("Skipping dispatch for event '{}' (ID: {}) - not validated",
-                                capture.getEvent().getName(), capture.getEvent().getId());
-                        return;
-                    }
-                    if (template != null && !template.isValidated()) {
-                        logger.warn("Skipping dispatch for event '{}' - template (ID: {}) not validated",
-                                capture.getEvent().getName(), template.getId());
-                        return;
-                    }
+                    capture.setStatus(CaptureStatus.DISPATCHED);
+                    eventCaptureRepository.save(capture);
                     try {
-                        notificationDispatcher.pushJob(job);
-                        notificationJobRepository.save(job);
-                        capture.setStatus(CaptureStatus.DISPATCHED);
-                        logger.info("Dispatched job for validated event '{}'", capture.getEvent().getName());
-                    } catch (ValidationRequiredException e) {
-                        logger.error("Dispatch blocked: {}", e.getMessage());
+                        notificationDispatcher.scheduleJob(existingSchedule);
+                        logger.info("Scheduled reused EventSchedule for '{}' (ID: {})", capture.getEvent().getName(),
+                                existingSchedule.getId());
+                    } catch (Exception e) {
+                        logger.error("Failed to schedule reused EventSchedule: {}", e.getMessage(), e);
                     }
                 }
-            }
-        }, error -> {
-            logger.error("Schedule generation agent failed: " + error.getMessage(), error);
-        });
-    }
 
-    /**
-     * Handle template generation agent result.
-     */
-    private void handleTemplateResult(io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> flowable,
-            EventCapture capture, Runnable onComplete) {
-        flowable.subscribe(agentEvent -> {
-            if (agentEvent.content().isEmpty()
-                    || agentEvent.content().get().parts().isEmpty()
-                    || agentEvent.content().get().parts().get().isEmpty()) {
-                return;
             }
-            for (Part part : agentEvent.content().get().parts().get()) {
-                if (!part.text().isPresent()) {
-                    continue;
-                }
-                String json = part.text().get();
-                List<Map<String, String>> templateList;
-                try {
-                    templateList = mapper.readValue(json,
-                            new TypeReference<List<Map<String, String>>>() {
-                            });
-                } catch (Exception e) {
-                    logger.error("Failed to parse message templates from JSON: {}", json, e);
-                    continue;
-                }
-                for (Map<String, String> templateMap : templateList) {
-                    MessageTemplate messageTemplate = new MessageTemplate();
-                    messageTemplate.setChannel(templateMap.get("channel"));
-                    messageTemplate.setSubject(templateMap.get("subject"));
-                    messageTemplate.setTemplate(templateMap.get("template"));
-                    messageTemplate.setEventName(capture.getEvent().getName());
-                    messageTemplateRepository.save(messageTemplate);
-                }
-            }
-        }, error -> {
-            logger.error("Template generation agent failed: " + error.getMessage(), error);
-            if (onComplete != null) {
-                onComplete.run();
-            }
-        }, () -> {
-            if (onComplete != null) {
-                onComplete.run();
-            }
-        });
+            return io.reactivex.rxjava3.core.Flowable.empty();
+        }
+
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Generate notification schedules for the following events:\n\n");
+            Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("eventName", capture.getEvent().getName());
+            payload.put("eventType", eventTypeObj);
+            payload.put("eventDescription", capture.getEvent().getDescription());
+            payload.put("occuredAt", capture.getOccuredAt().toString());
+            payload.put("scheduleIntent", capture.getEvent().getScheduleIntent());
+            payload.put("preferredTimeWindow", capture.getEvent().getPreferredTimeWindow());
+            String jsonPayload = mapper.writeValueAsString(payload);
+            Content prompt = Content.fromParts(Part.fromText(sb.toString()), Part.fromText(jsonPayload));
+
+            return agentOrchestrator.createTaskFlowable(
+                    agentRegistry.get(AgentRegistry.EVENT_SCHEDULER_AGENT_ID),
+                    UUID.randomUUID().toString(), prompt, AgentContextHolder.getContext())
+                    .doOnNext(agentEvent -> {
+                        if (agentEvent.content().isEmpty() || agentEvent.content().get().parts().isEmpty()
+                                || agentEvent.content().get().parts().get().isEmpty()) {
+                            return;
+                        }
+                        for (Part part : agentEvent.content().get().parts().get()) {
+                            if (!part.text().isPresent())
+                                continue;
+                            String json = part.text().get();
+                            List<Map<String, String>> schedules;
+                            try {
+                                schedules = mapper.readValue(json, new TypeReference<List<Map<String, String>>>() {
+                                });
+                            } catch (Exception e) {
+                                logger.warn("Error parsing schedule JSON");
+                                continue;
+                            }
+
+                            for (Map<String, String> scheduleMap : schedules) {
+                                EventSchedule eventSchedule = new EventSchedule();
+                                eventSchedule.setId(UUID.randomUUID().toString());
+                                eventSchedule.setDescription(scheduleMap.get("scheduleDescription"));
+                                eventSchedule.setEventName(capture.getEvent().getName());
+                                eventSchedule.setTriggerType(scheduleMap.get("triggerType"));
+                                if (scheduleMap.containsKey("triggerValue")
+                                        && "cron".equals(scheduleMap.get("triggerType"))) {
+                                    eventSchedule.setCronExpression(scheduleMap.get("triggerValue"));
+                                }
+                                eventSchedule.setScheduledAt(Instant.now());
+                                eventScheduleRepository.save(eventSchedule);
+
+                                job.setScheduleId(eventSchedule.getId());
+                                notificationJobRepository.save(job);
+
+                                capture.setStatus(CaptureStatus.DISPATCHED);
+                                eventCaptureRepository.save(capture);
+
+                                if (!eventSchedule.isValidated()) {
+                                    logger.warn(
+                                            "EventSchedule for '{}' (ID: {}) saved but not scheduled - requires validation",
+                                            capture.getEvent().getName(), eventSchedule.getId());
+                                } else {
+                                    notificationDispatcher.scheduleJob(eventSchedule);
+                                    logger.info("Scheduled validated EventSchedule for '{}' (ID: {})",
+                                            capture.getEvent().getName(), eventSchedule.getId());
+                                }
+                            }
+                        }
+                    });
+        } catch (Exception e) {
+            return io.reactivex.rxjava3.core.Flowable
+                    .error(new AgentApplicationException("Failed to enqueue schedule generation", e));
+        }
     }
 
     /**

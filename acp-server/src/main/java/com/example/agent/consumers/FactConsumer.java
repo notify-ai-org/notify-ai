@@ -14,6 +14,8 @@ import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import com.example.agent.exceptions.AgentApplicationException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -37,12 +39,15 @@ public class FactConsumer {
 
     private com.google.adk.sessions.Session logToFactsSession;
 
+    private static final Logger logger = LoggerFactory.getLogger(EventConsumer.class);
+
     @Value("${agent.buffer.timeout:15s}")
     @ManagedConfiguration(key = "agent.buffer.timeout", source = ConfigSource.CONFIG_MAP)
     private Duration bufferTimeout;
 
     public FactConsumer(AgentOrchestrator orchestrator, AgentRegistry agentRegistry,
-            FactRepository factRepository, MemoryAssembler pageAssembler, com.example.agent.service.SessionService sessionService) {
+            FactRepository factRepository, MemoryAssembler pageAssembler,
+            com.example.agent.service.SessionService sessionService) {
         this.orchestrator = orchestrator;
         this.agentRegistry = agentRegistry;
         this.factRepository = factRepository;
@@ -55,8 +60,8 @@ public class FactConsumer {
         try {
             // Create or get the persistent session for Log-to-Facts agent extraction
             this.logToFactsSession = sessionService.createSession(
-                "notify-system", "system-user", new java.util.concurrent.ConcurrentHashMap<>(), "log-to-facts-session"
-            ).blockingGet();
+                    "notify-system", "system-user", new java.util.concurrent.ConcurrentHashMap<>(),
+                    "log-to-facts-session").blockingGet();
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize Log-to-Facts session", e);
         }
@@ -95,25 +100,23 @@ public class FactConsumer {
                     Part.fromText("Extract facts from the following raw logs."),
                     Part.fromText(mapper.writeValueAsString(payload)));
 
-            // Execute the task directly bypassing the TaskQueue
-            orchestrator.executeDirect(agentId, UUID.randomUUID().toString(), prompt, this.logToFactsSession, flowable -> {
-                flowable.buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
-                        .subscribe(events -> {
-                            for (com.google.adk.events.Event agentEvent : events) {
-                                agentEvent.content().flatMap(Content::parts).ifPresent(parts -> {
-                                    for (Part part : parts) {
-                                        part.text().ifPresent(json -> {
-                                            List<Fact> facts = persistFactsFromJson(json, tenantId, sourceType,
-                                                    correlationId);
-                                            if (!facts.isEmpty()) {
-                                                pageAssembler.buildPages(facts);
-                                            }
-                                        });
+            com.example.agent.models.AgentContext context = com.example.agent.models.AgentContext.builder().session(this.logToFactsSession).build();
+            orchestrator.createTaskFlowable(agentId, UUID.randomUUID().toString(), prompt, context)
+                .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
+                .subscribe(events -> {
+                    for (com.google.adk.events.Event agentEvent : events) {
+                        agentEvent.content().flatMap(Content::parts).ifPresent(parts -> {
+                            for (Part part : parts) {
+                                part.text().ifPresent(json -> {
+                                    List<Fact> facts = persistFactsFromJson(json, tenantId, sourceType, correlationId);
+                                    if (!facts.isEmpty()) {
+                                        pageAssembler.buildPages(facts);
                                     }
                                 });
                             }
-                        }, Throwable::printStackTrace);
-            });
+                        });
+                    }
+                }, Throwable::printStackTrace);
 
         } catch (Exception e) {
             throw new AgentApplicationException("Fact extraction initiation failed", e);
@@ -135,8 +138,15 @@ public class FactConsumer {
     private List<Fact> persistFactsFromJson(String json, String tenantId, String sourceType, String correlationId) {
         List<Fact> result = new ArrayList<>();
         try {
-            List<Map<String, Object>> facts = mapper.readValue(json, new TypeReference<List<Map<String, Object>>>() {
-            });
+            List<Map<String, Object>> facts;
+            try {
+                facts = mapper.readValue(json,
+                        new TypeReference<List<Map<String, Object>>>() {
+                        });
+            } catch (Exception e) {
+                logger.error("Error parsing schedule JSON: {}", json, e);
+                return result;
+            }
             for (Map<String, Object> f : facts) {
                 String factType = asString(f.get("factType"));
                 String sentence = asString(f.get("sentence"));

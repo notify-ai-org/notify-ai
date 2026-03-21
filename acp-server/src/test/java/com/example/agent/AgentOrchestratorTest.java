@@ -178,65 +178,6 @@ class AgentOrchestratorTest {
     }
 
     // -----------------------------------------------------------------------
-    // Task queue tests
+    // Reactive flowability tests are handled in consumer testing
     // -----------------------------------------------------------------------
-
-    @Test
-    void testEnqueueTask_shouldNotThrowWhenNoAgentAvailable() {
-        // Act — enqueue a task when no agents are registered; should not throw
-        String taskId = orchestrator.executeTaskWithAgent("NonExistentType", null,
-                com.google.genai.types.Content.fromParts(
-                        com.google.genai.types.Part.fromText("test")),
-                flowable -> {
-                });
-
-        // Assert
-        assertNotNull(taskId);
-        assertEquals(1, orchestrator.getQueueDepth());
-    }
-
-    @Test
-    void testEnqueueTask_shouldIncrementQueueDepth() {
-        // Act
-        orchestrator.executeTaskWithAgent("TypeA", null,
-                com.google.genai.types.Content.fromParts(
-                        com.google.genai.types.Part.fromText("task1")),
-                flowable -> {
-                });
-        orchestrator.executeTaskWithAgent("TypeA", null,
-                com.google.genai.types.Content.fromParts(
-                        com.google.genai.types.Part.fromText("task2")),
-                flowable -> {
-                });
-
-        // Assert
-        assertEquals(2, orchestrator.getQueueDepth());
-    }
-
-    @Test
-    void testEnqueueTask_shouldGenerateTaskIdWhenNull() {
-        // Act
-        String taskId = orchestrator.executeTask(null,
-                com.google.genai.types.Content.fromParts(
-                        com.google.genai.types.Part.fromText("test")),
-                flowable -> {
-                });
-
-        // Assert
-        assertNotNull(taskId);
-        assertFalse(taskId.isBlank());
-    }
-
-    @Test
-    void testEnqueueTask_shouldPreserveExplicitTaskId() {
-        // Act
-        String taskId = orchestrator.executeTask("my-explicit-task-id",
-                com.google.genai.types.Content.fromParts(
-                        com.google.genai.types.Part.fromText("test")),
-                flowable -> {
-                });
-
-        // Assert
-        assertEquals("my-explicit-task-id", taskId);
-    }
 }

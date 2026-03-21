@@ -26,6 +26,7 @@ import com.example.agent.models.NotificationJob;
 import com.example.agent.models.Event;
 import com.example.agent.interfaces.DeadLetterManager;
 import com.example.agent.models.EventSchedule;
+import com.example.agent.models.MessageTemplate;
 import com.example.agent.exceptions.ValidationRequiredException;
 
 @Service
@@ -38,6 +39,7 @@ public class NotificationDispatcher {
     private final Scheduler quartzScheduler;
     private final EventScheduleRepository eventScheduleRepository;
     private final EventRepository eventRepository;
+    private final MessageTemplateRepository messageTemplateRepository;
     private final DeadLetterManager deadLetterManager;
     private final NotificationJobRepository notificationJobRepo;
     // --- Cleaner thread for purging expired notification jobs ---
@@ -127,6 +129,7 @@ public class NotificationDispatcher {
                     new QueueingTriggerListener(eventScheduleRepository,
                             this,
                             notificationJobRepo,
+                            messageTemplateRepository,
                             deadLetterManager));
 
             // Load and schedule all persisted EventSchedules
@@ -275,6 +278,7 @@ public class NotificationDispatcher {
         private final EventScheduleRepository eventScheduleRepository;
         private final NotificationDispatcher notificationDispatcher;
         private final NotificationJobRepository notificationJobRepo;
+        private final MessageTemplateRepository messageTemplateRepository;
         private final DeadLetterManager deadLetterManager;
 
         @Override
@@ -299,17 +303,25 @@ public class NotificationDispatcher {
             String eventName = schedule.getEventName();
             NotificationJob job = notificationJobRepo.findByEventName(eventName).orElseThrow();
 
-            String eventTypeObj = job.getEventType();
-            if (eventTypeObj != null && eventTypeObj.equals("deffered")) {
-                try {
-                    notificationDispatcher.pushJob(job);
-                } catch (ValidationRequiredException e) {
-                    logger.error("Cannot dispatch job for schedule '{}': {}",
-                            schedule.getId(), e.getMessage());
-                    throw e;
+            if (job.getTemplate() == null) {
+                List<MessageTemplate> newTemplates = messageTemplateRepository
+                        .findByEventTypeAndChannel(eventName, job.getChannel());
+                if (newTemplates.isEmpty()) {
+                    logger.error("No Template found for job id : ", job.getId());
+                    throw new RuntimeException("No Template found for job id : " + job.getId());
                 }
+                MessageTemplate newTemplate = newTemplates.get(0);
+                if (newTemplate != null)
+                    job.setTemplate(newTemplate.getTemplate());
             }
 
+            try {
+                notificationDispatcher.pushJob(job);
+            } catch (ValidationRequiredException e) {
+                logger.error("Cannot dispatch job for schedule '{}': {}",
+                        schedule.getId(), e.getMessage());
+                throw e;
+            }
         }
 
         @Override

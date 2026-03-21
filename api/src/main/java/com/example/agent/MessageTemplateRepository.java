@@ -12,5 +12,7 @@ public interface MessageTemplateRepository extends JpaRepository<MessageTemplate
 
     List<MessageTemplate> findByEventType(String eventType);
 
+    List<MessageTemplate> findByEventTypeAndChannel(String eventType, String channel);
+
     List<MessageTemplate> findByValidated(boolean validated);
 }

@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface EventScheduleRepository extends JpaRepository<EventSchedule, String> {
     List<EventSchedule> findByValidated(boolean validated);
+    List<EventSchedule> findByEventName(String eventName);
 }

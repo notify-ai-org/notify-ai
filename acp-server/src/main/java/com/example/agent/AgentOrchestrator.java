@@ -6,9 +6,6 @@ import com.example.agent.models.AgentContext;
 import com.example.agent.models.AgentOrchestratorEvent;
 import com.example.agent.models.AgentSnapshot;
 import com.example.agent.models.AgentStageChangeEvent;
-import com.example.agent.models.AgentTaskContext;
-import com.example.agent.models.TaskQueueEntry;
-
 import com.example.agent.service.SessionService;
 import com.example.agent.util.AgentWrapper;
 import com.example.agent.util.CentralExecutorRegistry;
@@ -27,12 +24,10 @@ import io.reactivex.rxjava3.subjects.Subject;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import io.lettuce.core.api.StatefulRedisConnection;
@@ -59,10 +54,6 @@ public class AgentOrchestrator {
     private final Map<String, List<AgentWrapper>> availableAgents;
     private final Map<String, List<AgentWrapper>> busyAgents;
     private final AtomicInteger nextAgentId;
-
-    // Task queue
-    private final LinkedBlockingQueue<TaskQueueEntry> taskQueue;
-    private volatile Thread dispatcherThread;
 
     // Configuration — corePoolSize is the protected floor (never evicted);
     // maxPoolSize is the burst ceiling. Both are configurable via application
@@ -114,7 +105,6 @@ public class AgentOrchestrator {
         this.nextAgentId = new AtomicInteger(1);
         this.redisConnection = redisConnection;
         this.overflowAgentIds = ConcurrentHashMap.newKeySet();
-        this.taskQueue = new LinkedBlockingQueue<>();
 
         this.globalStageChangeSubject = PublishSubject.create();
         this.orchestratorEventSubject = PublishSubject.create();
@@ -165,208 +155,88 @@ public class AgentOrchestrator {
 
         return agentId;
     }
-
     // -----------------------------------------------------------------------
-    // Task Enqueue API
-    // -----------------------------------------------------------------------
-
-    /**
-     * Enqueue a task for any available agent.
-     * The task is placed in the queue and dispatched when an agent becomes
-     * available.
-     *
-     * @return the taskId assigned to this task
-     */
-    public String executeTask(String taskId, Content prompt, Consumer<Flowable<Event>> resultCallback) {
-        TaskQueueEntry entry = new TaskQueueEntry(null, taskId, prompt, resultCallback);
-        taskQueue.add(entry);
-        logger.info(String.format("Task %s enqueued (any agent type). Queue depth: %d",
-                entry.getTaskId(), taskQueue.size()));
-        emitOrchestratorEvent(AgentOrchestratorEventType.TASK_ENQUEUED,
-                Map.of("taskId", entry.getTaskId(), "queueDepth", taskQueue.size()));
-        return entry.getTaskId();
-    }
-
-    /**
-     * Enqueue a task for a specific agent type.
-     * The task is placed in the queue and dispatched when an agent of the
-     * requested type becomes available.
-     *
-     * @return the taskId assigned to this task
-     */
-    public String executeTaskWithAgent(String agentType, String taskId, Content prompt,
-            Consumer<Flowable<Event>> resultCallback) {
-        TaskQueueEntry entry = new TaskQueueEntry(agentType, taskId, prompt, resultCallback);
-        taskQueue.add(entry);
-        logger.info(String.format("Task %s enqueued for agent type '%s'. Queue depth: %d",
-                entry.getTaskId(), agentType, taskQueue.size()));
-        emitOrchestratorEvent(AgentOrchestratorEventType.TASK_ENQUEUED,
-                Map.of("taskId", entry.getTaskId(), "agentType", agentType,
-                        "queueDepth", taskQueue.size()));
-        return entry.getTaskId();
-    }
-
-    /**
-     * Enqueue multiple tasks to be executed sequentially by their respective agent
-     * types.
-     * Each task is enqueued independently; ordering is determined by queue FIFO.
-     *
-     * @param agentContexts list of task contexts to enqueue
-     */
-    public void executeTasksSequentially(List<AgentTaskContext> agentContexts) {
-        for (AgentTaskContext atc : agentContexts) {
-            executeTaskWithAgent(atc.agentType, atc.taskId, atc.prompt, atc.resultCallback);
-        }
-    }
-
-    /**
-     * Enqueue multiple tasks; all are placed in the queue and dispatched as agents
-     * become available (effectively parallel when agents are available).
-     *
-     * @param agentContexts list of task contexts to enqueue
-     */
-    public void executeTasksInParallel(List<AgentTaskContext> agentContexts) {
-        for (AgentTaskContext atc : agentContexts) {
-            executeTaskWithAgent(atc.agentType, atc.taskId, atc.prompt, atc.resultCallback);
-        }
-    }
-
-    /**
-     * Directly execute a task on an available agent of the specified type, bypassing the task queue.
-     * Blocks until an agent is available. Uses the provided Session.
-     */
-    public void executeDirect(String agentType, String taskId, Content prompt, com.google.adk.sessions.Session session, Consumer<Flowable<Event>> resultCallback) {
-        AgentWrapper agent = waitForAvailableAgent(agentType);
-        if (agent == null) {
-            throw new IllegalStateException("No available agent of type " + agentType);
-        }
-
-        availableAgents.get(agentType).remove(agent);
-        busyAgents.computeIfAbsent(agentType,
-                k -> java.util.Collections.synchronizedList(new java.util.ArrayList<>()))
-                .add(agent);
-
-        logger.info(String.format("Direct dispatch of task %s to agent %s (type: %s).",
-                taskId != null ? taskId : "direct", agent.getAgentId(), agentType));
-
-        emitOrchestratorEvent(AgentOrchestratorEventType.TASK_STARTED,
-                Map.of("taskId", taskId != null ? taskId : "direct", "agentId", agent.getAgentId()));
-
-        AgentContext agentContext = AgentContext.builder().session(session).build();
-        AgentContextHolder.setContext(agentContext);
-
-        BaseArtifactService artifactService = new InMemoryArtifactService();
-        InvocationContext context = InvocationContext.create(
-                sessionService, artifactService, agent.getAgent(),
-                session, null, null);
-
-        Flowable<Event> resultFlowable = agent.execute(context, taskId, prompt)
-                .doFinally(() -> {
-                    busyAgents.get(agentType).remove(agent);
-                    availableAgents.get(agentType).add(agent);
-                    agent.transitionTo(AgentStage.READY, "Task finished",
-                            Map.of("taskId", taskId != null ? taskId : "direct"));
-                    emitOrchestratorEvent(AgentOrchestratorEventType.TASK_COMPLETED,
-                            Map.of("taskId", taskId != null ? taskId : "direct", "agentId", agent.getAgentId()));
-                });
-
-        try {
-            resultCallback.accept(resultFlowable);
-        } catch (Exception e) {
-            logger.warning(String.format("Task %s callback failed: %s",
-                    taskId != null ? taskId : "direct", e.getMessage()));
-            emitOrchestratorEvent(AgentOrchestratorEventType.TASK_FAILED,
-                    Map.of("taskId", taskId != null ? taskId : "direct", "error", e.getMessage()));
-        } finally {
-            AgentContextHolder.clear();
-        }
-    }
-
-
-
-    // -----------------------------------------------------------------------
-    // Dispatcher Thread
+    // Task Enqueue API (Reactive)
     // -----------------------------------------------------------------------
 
     /**
-     * Continuously running dispatcher that takes tasks from the queue and
-     * executes them when a matching agent is available.
+     * Build an execution Flowable for a given task and agent type.
+     * The task is deferred until subscription occurs.
      */
-    private void dispatchLoop() {
-        logger.info("Dispatcher thread started.");
-        while (!Thread.currentThread().isInterrupted()) {
-            try {
-                // Block until a task is available
-                TaskQueueEntry entry = taskQueue.take();
-
-                // Wait for an available agent of the requested type
-                AgentWrapper agent = waitForAvailableAgent(entry.getAgentType());
-                if (agent == null) {
-                    // Thread was interrupted while waiting
-                    // Re-enqueue the entry so it's not lost
-                    taskQueue.add(entry);
-                    break;
-                }
-
-                String agentType = agent.getAgentType();
-
-                // Move agent from available to busy
-                availableAgents.get(agentType).remove(agent);
-                busyAgents.computeIfAbsent(agentType,
-                        k -> java.util.Collections.synchronizedList(new java.util.ArrayList<>()))
-                        .add(agent);
-
-                logger.info(String.format("Dispatching task %s to agent %s (type: %s). Queue depth: %d",
-                        entry.getTaskId(), agent.getAgentId(), agentType, taskQueue.size()));
-
-                emitOrchestratorEvent(AgentOrchestratorEventType.TASK_STARTED,
-                        Map.of("taskId", entry.getTaskId(), "agentId", agent.getAgentId()));
-
-                // Build InvocationContext
-                AgentContextHolder.setContext(entry.getContext());
-                AgentContext agentContext = entry.getContext();
-                BaseArtifactService artifactService = new InMemoryArtifactService();
-                InvocationContext context = InvocationContext.create(
-                        sessionService, artifactService, agent.getAgent(),
-                        agentContext.getSession(), null, null);
-
-                // Execute and wire up lifecycle
-                Flowable<Event> resultFlowable = agent.execute(context, entry.getTaskId(), entry.getPrompt())
-                        .doFinally(() -> {
-                            busyAgents.get(agentType).remove(agent);
-                            availableAgents.get(agentType).add(agent);
-                            agent.transitionTo(AgentStage.READY, "Task finished",
-                                    Map.of("taskId", entry.getTaskId()));
-                            emitOrchestratorEvent(AgentOrchestratorEventType.TASK_COMPLETED,
-                                    Map.of("taskId", entry.getTaskId(), "agentId", agent.getAgentId()));
-                        });
-
-                // Deliver the Flowable to the caller's callback
-                try {
-                    entry.getResultCallback().accept(resultFlowable);
-                } catch (Exception e) {
-                    logger.warning(String.format("Task %s callback failed: %s",
-                            entry.getTaskId(), e.getMessage()));
-                    emitOrchestratorEvent(AgentOrchestratorEventType.TASK_FAILED,
-                            Map.of("taskId", entry.getTaskId(), "error", e.getMessage()));
-                }
-
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                logger.info("Dispatcher thread interrupted, shutting down.");
-                break;
-            } catch (Exception e) {
-                logger.warning("Dispatcher loop error: " + e.getMessage());
+    public Flowable<Event> createTaskFlowable(String agentType, String taskId, Content prompt, AgentContext context) {
+        return Flowable.defer(() -> {
+            AgentWrapper agent = waitForAvailableAgent(agentType);
+            if (agent == null) {
+                return Flowable.error(new IllegalStateException("No available agent of type " + agentType));
             }
-        }
-        logger.info("Dispatcher thread stopped.");
+
+            String activeAgentType = agent.getAgentType();
+            availableAgents.get(activeAgentType).remove(agent);
+            busyAgents.computeIfAbsent(activeAgentType,
+                    k -> java.util.Collections.synchronizedList(new java.util.ArrayList<>()))
+                    .add(agent);
+
+            logger.info(String.format("Dispatching task %s to agent %s (type: %s).",
+                    taskId != null ? taskId : "direct", agent.getAgentId(), activeAgentType));
+
+            emitOrchestratorEvent(AgentOrchestratorEventType.TASK_STARTED,
+                    Map.of("taskId", taskId != null ? taskId : "direct", "agentId", agent.getAgentId()));
+
+            BaseArtifactService artifactService = new InMemoryArtifactService();
+            InvocationContext invocationContext = InvocationContext.create(
+                    sessionService, artifactService, agent.getAgent(),
+                    context != null ? context.getSession() : null, null, null);
+
+            return agent.execute(invocationContext, taskId, prompt)
+                    .doOnSubscribe(s -> {
+                        if (context != null) {
+                            AgentContextHolder.setContext(context);
+                        }
+                    })
+                    .doFinally(() -> {
+                        busyAgents.get(activeAgentType).remove(agent);
+                        availableAgents.get(activeAgentType).add(agent);
+                        agent.transitionTo(AgentStage.READY, "Task finished",
+                                Map.of("taskId", taskId != null ? taskId : "direct"));
+                        emitOrchestratorEvent(AgentOrchestratorEventType.TASK_COMPLETED,
+                                Map.of("taskId", taskId != null ? taskId : "direct", "agentId", agent.getAgentId()));
+                        AgentContextHolder.clear();
+                    });
+        }).subscribeOn(io.reactivex.rxjava3.schedulers.Schedulers.io()); // Ensure acquiring blocks don't hold up caller
+                                                                         // threads
     }
+
+    /**
+     * Composes a list of Flowables into a sequential execution stream.
+     * Each task will only start after the previous one completes.
+     */
+    public Flowable<Event> createSequentialFlowable(List<Flowable<Event>> flowables) {
+        if (flowables == null || flowables.isEmpty()) {
+            return Flowable.empty();
+        }
+        return Flowable.concat(flowables);
+    }
+
+    /**
+     * Composes a list of Flowables into a parallel execution stream.
+     * All tasks run concurrently.
+     */
+    public Flowable<Event> createParallelFlowable(List<Flowable<Event>> flowables) {
+        if (flowables == null || flowables.isEmpty()) {
+            return Flowable.empty();
+        }
+        return Flowable.merge(flowables);
+    }
+
+    // -----------------------------------------------------------------------
+    // Internal Agent Synchronization
+    // -----------------------------------------------------------------------
 
     /**
      * Spin-wait for an available agent matching the requested type.
      * Returns null if the thread is interrupted while waiting.
      */
-    private AgentWrapper waitForAvailableAgent(String agentType) {
+    public AgentWrapper waitForAvailableAgent(String agentType) {
         while (!Thread.currentThread().isInterrupted()) {
             AgentWrapper agent = (agentType == null) ? getAvailableAgent() : getAvailableAgent(agentType);
             if (agent != null) {
@@ -438,13 +308,6 @@ public class AgentOrchestrator {
                             state.put("currentTaskId", wrapper.getCurrentTaskId());
                             return state;
                         }));
-    }
-
-    /**
-     * Get the current task queue depth.
-     */
-    public int getQueueDepth() {
-        return taskQueue.size();
     }
 
     /**
@@ -531,10 +394,6 @@ public class AgentOrchestrator {
         return restoredCount;
     }
 
-    // -----------------------------------------------------------------------
-    // Event Observables
-    // -----------------------------------------------------------------------
-
     /**
      * Get observable for all stage change events
      */
@@ -549,27 +408,18 @@ public class AgentOrchestrator {
         return orchestratorEventSubject;
     }
 
-    // -----------------------------------------------------------------------
-    // Lifecycle
-    // -----------------------------------------------------------------------
-
     /**
      * Start the dispatcher thread and idle-agent cleanup scheduler.
      */
     @PostConstruct
     public void init() {
-        // Start the continuously running dispatcher thread
-        dispatcherThread = new Thread(this::dispatchLoop, "agent-dispatcher");
-        dispatcherThread.setDaemon(true);
-        dispatcherThread.start();
-
         // Start the idle-agent cleanup scheduler
         ScheduledExecutorService scheduler = (ScheduledExecutorService) executorRegistry.get(ExecutorType.SCHEDULER);
         cleanupFuture = scheduler.scheduleAtFixedRate(
                 this::cleanupIdleOverflowAgents,
                 cleanupIntervalSeconds, cleanupIntervalSeconds, TimeUnit.SECONDS);
         logger.info(String.format(
-                "AgentOrchestrator initialized: dispatcher thread started, cleanup interval=%ds, idleTimeout=%ds, corePool=%d, maxPool=%d",
+                "AgentOrchestrator initialized: reactive streaming enabled, cleanup interval=%ds, idleTimeout=%ds, corePool=%d, maxPool=%d",
                 cleanupIntervalSeconds, idleTimeoutSeconds, corePoolSize, maxPoolSize));
     }
 
@@ -615,18 +465,6 @@ public class AgentOrchestrator {
     public void shutdown() {
         logger.info("Shutting down agent orchestrator...");
 
-        // Stop the dispatcher thread
-        if (dispatcherThread != null) {
-            dispatcherThread.interrupt();
-        }
-
-        // Drain remaining tasks from the queue
-        List<TaskQueueEntry> remaining = new ArrayList<>();
-        taskQueue.drainTo(remaining);
-        if (!remaining.isEmpty()) {
-            logger.warning(String.format("Drained %d tasks from queue during shutdown", remaining.size()));
-        }
-
         // Cancel the cleanup scheduler
         if (cleanupFuture != null) {
             cleanupFuture.cancel(false);
@@ -639,11 +477,7 @@ public class AgentOrchestrator {
         logger.info("Agent orchestrator shutdown complete");
     }
 
-    // -----------------------------------------------------------------------
-    // Private helpers
-    // -----------------------------------------------------------------------
-
-    private AgentWrapper getAvailableAgent() {
+    public AgentWrapper getAvailableAgent() {
         return availableAgents.values().stream()
                 .flatMap(List::stream)
                 .filter(AgentWrapper::isAvailable)

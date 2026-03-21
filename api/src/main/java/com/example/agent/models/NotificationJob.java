@@ -128,6 +128,8 @@ public class NotificationJob {
      */
     private String template;
 
+    private String scheduleId;
+
     /**
      * Channel-specific attributes.
      * Example:
@@ -138,6 +140,12 @@ public class NotificationJob {
     @Transient
     @Builder.Default
     private Map<String, String> attributes = new HashMap<>();
+
+    @jakarta.persistence.Column(columnDefinition = "TEXT")
+    private String attributesJson;
+
+    @jakarta.persistence.Column(columnDefinition = "TEXT")
+    private String subjectsJson;
 
     /*
      * ================================

@@ -159,11 +159,10 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
             java.util.concurrent.CompletableFuture<com.google.adk.events.Event> future =
                     new java.util.concurrent.CompletableFuture<>();
 
-            orchestrator.executeTaskWithAgent(agentId, null, prompt, flowable -> {
-                flowable.firstElement().subscribe(
-                        future::complete,
-                        future::completeExceptionally);
-            });
+            orchestrator.createTaskFlowable(agentId, null, prompt, null)
+                .firstElement().subscribe(
+                    future::complete,
+                    future::completeExceptionally);
 
             com.google.adk.events.Event event = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
 
