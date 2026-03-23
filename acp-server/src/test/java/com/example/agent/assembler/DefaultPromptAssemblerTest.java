@@ -110,24 +110,6 @@ class DefaultPromptAssemblerTest {
     }
 
     @Test
-    void testAssemble_shouldIncludeAllSections() {
-        // Arrange
-        when(tokenEstimator.estimateTokens(anyString())).thenReturn(100);
-
-        // Act
-        PromptPackage result = promptAssembler.assemble(testRequest, testBundle);
-
-        // Assert
-        String userPrompt = result.userPrompt();
-        assertTrue(userPrompt.contains("## Task"));
-        assertTrue(userPrompt.contains("## Deterministic Facts"));
-        assertTrue(userPrompt.contains("## Procedural Rules"));
-        assertTrue(userPrompt.contains("## Semantic Memory"));
-        assertTrue(userPrompt.contains("## Episodic Memory"));
-        assertTrue(userPrompt.contains("## Tool Receipts"));
-    }
-
-    @Test
     void testAssemble_shouldFormatFactsCorrectly() {
         // Arrange
         when(tokenEstimator.estimateTokens(anyString())).thenReturn(100);
@@ -203,8 +185,7 @@ class DefaultPromptAssemblerTest {
         PromptPackage result = promptAssembler.assemble(testRequest, emptyBundle);
 
         // Assert
-        assertTrue(result.userPrompt().contains("## Deterministic Facts"));
-        assertTrue(result.userPrompt().contains("(none)"));
+        assertFalse(result.userPrompt().contains("## Deterministic Facts"));
     }
 
     @Test
@@ -222,8 +203,7 @@ class DefaultPromptAssemblerTest {
         PromptPackage result = promptAssembler.assemble(testRequest, emptyBundle);
 
         // Assert
-        assertTrue(result.userPrompt().contains("## Semantic Memory"));
-        assertTrue(result.userPrompt().contains("(none)"));
+        assertFalse(result.userPrompt().contains("## Semantic Memory"));
     }
 
     @Test

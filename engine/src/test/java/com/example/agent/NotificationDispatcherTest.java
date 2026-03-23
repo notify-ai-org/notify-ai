@@ -48,7 +48,7 @@ class NotificationDispatcherTest {
     private NotificationJobRepository notificationJobRepo;
 
     @Mock
-    private EventRepository eventRepository;
+    private MessageTemplateRepository messageTemplateRepository;
 
     @InjectMocks
     private NotificationDispatcher dispatcher;
@@ -266,7 +266,7 @@ class NotificationDispatcherTest {
     void testQueueingTriggerListener_getName_shouldReturnCorrectName() {
         // Arrange
         NotificationDispatcher.QueueingTriggerListener listener = new NotificationDispatcher.QueueingTriggerListener(
-                eventScheduleRepository, dispatcher, notificationJobRepo, deadLetterManager);
+                eventScheduleRepository, dispatcher, notificationJobRepo, messageTemplateRepository, deadLetterManager);
 
         // Act
         String name = listener.getName();
@@ -279,7 +279,7 @@ class NotificationDispatcherTest {
     void testQueueingTriggerListener_triggerFired_withDeferredEvent_shouldPushJob() {
         // Arrange
         NotificationDispatcher.QueueingTriggerListener listener = new NotificationDispatcher.QueueingTriggerListener(
-                eventScheduleRepository, dispatcher, notificationJobRepo, deadLetterManager);
+                eventScheduleRepository, dispatcher, notificationJobRepo, messageTemplateRepository, deadLetterManager);
 
         Trigger trigger = mock(Trigger.class);
         org.quartz.JobExecutionContext context = mock(org.quartz.JobExecutionContext.class);
@@ -309,7 +309,7 @@ class NotificationDispatcherTest {
     void testQueueingTriggerListener_vetoJobExecution_shouldReturnFalse() {
         // Arrange
         NotificationDispatcher.QueueingTriggerListener listener = new NotificationDispatcher.QueueingTriggerListener(
-                eventScheduleRepository, dispatcher, notificationJobRepo, deadLetterManager);
+                eventScheduleRepository, dispatcher, notificationJobRepo, messageTemplateRepository, deadLetterManager);
 
         Trigger trigger = mock(Trigger.class);
         org.quartz.JobExecutionContext context = mock(org.quartz.JobExecutionContext.class);
@@ -325,7 +325,7 @@ class NotificationDispatcherTest {
     void testQueueingTriggerListener_triggerComplete_shouldNotThrowException() {
         // Arrange
         NotificationDispatcher.QueueingTriggerListener listener = new NotificationDispatcher.QueueingTriggerListener(
-                eventScheduleRepository, dispatcher, notificationJobRepo, deadLetterManager);
+                eventScheduleRepository, dispatcher, notificationJobRepo, messageTemplateRepository, deadLetterManager);
 
         Trigger trigger = mock(Trigger.class);
         org.quartz.JobExecutionContext context = mock(org.quartz.JobExecutionContext.class);

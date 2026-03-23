@@ -101,6 +101,7 @@ public class EmbeddingService {
                     }
                 })
                 .doOnError(ex -> pendings.forEach(p -> p.sink.error(ex)))
+                .onErrorResume(ex -> Mono.empty())
                 .then();
     }
 

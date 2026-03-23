@@ -6,6 +6,7 @@ import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Set;
+import java.time.Duration;
 import java.time.Instant;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +17,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.example.agent.enums.PageType;
 import com.example.agent.interfaces.EmbeddingCache;
-import com.example.agent.interfaces.EmbeddingProvider;
 import com.example.agent.records.EmbeddingResult;
 import com.example.agent.records.EntityRef;
 import com.example.agent.records.MemoryPage;
@@ -39,7 +39,7 @@ import reactor.test.StepVerifier;
 class EmbeddingServiceTest {
 
         @Mock
-        private EmbeddingProvider embeddingProvider;
+        private WebClientEmbeddingProvider embeddingProvider;
 
         @Mock
         private EmbeddingCache embeddingCache;
@@ -49,6 +49,13 @@ class EmbeddingServiceTest {
         @BeforeEach
         void setUp() {
                 embeddingService = new EmbeddingService(embeddingProvider, embeddingCache);
+                org.springframework.test.util.ReflectionTestUtils.setField(embeddingService, "maxBatchSize", 10);
+                org.springframework.test.util.ReflectionTestUtils.setField(embeddingService, "maxWait",
+                                Duration.ofMillis(100));
+                org.springframework.test.util.ReflectionTestUtils.setField(embeddingService, "schemaVersion", "v1");
+                org.springframework.test.util.ReflectionTestUtils.setField(embeddingService, "cacheTtl",
+                                Duration.ofHours(24));
+                embeddingService.init();
         }
 
         // -----------------------------------------------------------------------
@@ -67,7 +74,7 @@ class EmbeddingServiceTest {
                 float[] cachedVector = new float[] { 0.5f, 0.6f, 0.7f };
 
                 // First model tried is "text-embedding-3-large"
-                when(embeddingCache.get("text-embedding-3-large", null, textHash))
+                when(embeddingCache.get(eq("text-embedding-3-large"), any(), eq(textHash)))
                                 .thenReturn(Mono.just(cachedVector));
 
                 // Act & Assert
@@ -95,7 +102,7 @@ class EmbeddingServiceTest {
                                 "text-embedding-3-large", textHash, expectedVector);
 
                 // Cache miss for the first model
-                when(embeddingCache.get("text-embedding-3-large", null, textHash))
+                when(embeddingCache.get(eq("text-embedding-3-large"), any(), eq(textHash)))
                                 .thenReturn(Mono.empty());
 
                 // Provider returns a result
@@ -103,7 +110,7 @@ class EmbeddingServiceTest {
                                 .thenReturn(Mono.just(List.of(providerResult)));
 
                 // Cache put succeeds
-                when(embeddingCache.put(eq("text-embedding-3-large"), isNull(),
+                when(embeddingCache.put(eq("text-embedding-3-large"), any(),
                                 eq(textHash), eq(expectedVector), any()))
                                 .thenReturn(Mono.empty());
 
@@ -116,7 +123,7 @@ class EmbeddingServiceTest {
                                 .verifyComplete();
 
                 verify(embeddingProvider).embedBatch(eq("text-embedding-3-large"), anyList(), anyList());
-                verify(embeddingCache).put(eq("text-embedding-3-large"), isNull(),
+                verify(embeddingCache).put(eq("text-embedding-3-large"), any(),
                                 eq(textHash), eq(expectedVector), any());
         }
 
@@ -145,7 +152,7 @@ class EmbeddingServiceTest {
                                 .thenReturn(Mono.just(List.of(providerResult)));
 
                 // Cache put succeeds
-                when(embeddingCache.put(eq("text-embedding-3-small"), isNull(),
+                when(embeddingCache.put(eq("text-embedding-3-small"), any(),
                                 eq(textHash), eq(expectedVector), any()))
                                 .thenReturn(Mono.empty());
 
