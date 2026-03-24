@@ -29,18 +29,7 @@ spec:
               memory: "1Gi"
               cpu: "1000m"
           # Optional: Add Liveness and Readiness probes to ensure the app is healthy
-          readinessProbe:
-            httpGet:
-              path: /actuator/health/readiness # Assuming Spring Boot Actuator is enabled
-              port: 8080
-            initialDelaySeconds: 15
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /actuator/health/liveness # Assuming Spring Boot Actuator is enabled
-              port: 8080
-            initialDelaySeconds: 20
-            periodSeconds: 10
+          # (Disabled because spring-boot-starter-actuator is missing from pom.xml)
           # Load all non-sensitive config from ConfigMap
           envFrom:
             - configMapRef:

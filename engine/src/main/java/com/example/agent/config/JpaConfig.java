@@ -14,7 +14,6 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 
-import javax.sql.DataSource;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,13 +32,13 @@ public class JpaConfig {
     // --------------------
     // DataSource: HikariCP
     // --------------------
-    @Value("${spring.datasource.url:jdbc:mysql://localhost:3306/vocabdb?useSSL=false&allowPublicKeyRetrieval=true}")
+    @Value("${spring.datasource.url}")
     private String dbUrl;
 
-    @Value("${spring.datasource.username:root}")
+    @Value("${spring.datasource.username}")
     private String dbUser;
 
-    @Value("${spring.datasource.password:root}")
+    @Value("${spring.datasource.password}")
     private String dbPassword;
 
     @Bean

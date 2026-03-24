@@ -29,8 +29,8 @@ spring:
       org.quartz.threadPool.threadCount: 2
 
 vocab:
-  kafka-topic: ${VOCAB_TOPIC:vocabulary-raw}
-  openai-model: ${OPENAI_MODEL:gpt-4o-mini}
+  kafka-topic: ${VOCAB_TOPIC}
+  openai-model: ${OPENAI_MODEL}
   openai-max-tokens: 160
   description-max-length: 512
 

@@ -140,15 +140,15 @@ public class Config {
     // --------------------
     // DataSource: HikariCP
     // --------------------
-    @Value("${spring.datasource.url:jdbc:mysql://localhost:3306/vocabdb?useSSL=false&allowPublicKeyRetrieval=true}")
+    @Value("${spring.datasource.url}")
     @ManagedConfiguration(key = "spring.datasource.url", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
     private String dbUrl;
 
-    @Value("${spring.datasource.username:root}")
+    @Value("${spring.datasource.username}")
     @ManagedConfiguration(key = "spring.datasource.username", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
     private String dbUser;
 
-    @Value("${spring.datasource.password:root}")
+    @Value("${spring.datasource.password}")
     @ManagedConfiguration(key = "spring.datasource.password", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
     private String dbPassword;
 

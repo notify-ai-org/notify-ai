@@ -49,7 +49,7 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
 
     @Value("${acp.auth.jwt.secret:wsws}")
     @ManagedConfiguration(key = "acp.auth.jwt.secret", source = ConfigSource.CONFIG_MAP)
-    String secret = "secretmdkemdokp4i98985908606805609706ktk0509i05968905087096870698";
+    String secret;
     @Value("${acp.auth.jwt.required-scope:agent:invoke}")
     @ManagedConfiguration(key = "acp.auth.jwt.required-scope", source = ConfigSource.CONFIG_MAP)
     String requiredScope = "invoke";
