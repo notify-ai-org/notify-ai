@@ -140,15 +140,15 @@ public class Config {
     // --------------------
     // DataSource: HikariCP
     // --------------------
-    @Value("${spring.datasource.url:jdbc:postgresql://localhost:5432/vocabdb}")
+    @Value("${spring.datasource.url:jdbc:mysql://localhost:3306/vocabdb?useSSL=false&allowPublicKeyRetrieval=true}")
     @ManagedConfiguration(key = "spring.datasource.url", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
     private String dbUrl;
 
-    @Value("${spring.datasource.username:postgres}")
+    @Value("${spring.datasource.username:root}")
     @ManagedConfiguration(key = "spring.datasource.username", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
     private String dbUser;
 
-    @Value("${spring.datasource.password:postgres}")
+    @Value("${spring.datasource.password:root}")
     @ManagedConfiguration(key = "spring.datasource.password", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
     private String dbPassword;
 
@@ -160,7 +160,7 @@ public class Config {
         hikariConfig.setPassword(dbPassword);
 
         // Optional Hikari settings
-        hikariConfig.setDriverClassName("org.postgresql.Driver");
+        hikariConfig.setDriverClassName("com.mysql.cj.jdbc.Driver");
         hikariConfig.setMaximumPoolSize(10);
         hikariConfig.setMinimumIdle(5);
         hikariConfig.setIdleTimeout(30000);
@@ -206,7 +206,7 @@ public class Config {
     private Map<String, Object> hibernateProperties() {
         Map<String, Object> props = new HashMap<>();
         props.put("hibernate.hbm2ddl.auto", "create"); // or validate, create, none
-        props.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect"); // change if using another DB
+        props.put("hibernate.dialect", "org.hibernate.dialect.MySQLDialect"); // change if using another DB
         props.put("hibernate.show_sql", false);
         props.put("hibernate.format_sql", false);
         props.put("hibernate.use_sql_comments", false);

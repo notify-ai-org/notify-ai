@@ -16,10 +16,10 @@ spring:
 #        max.poll.records: 50
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:vocabdb}
-    username: ${DB_USER:postgres}
-    password: ${DB_PASSWORD:postgres}
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
@@ -39,10 +39,10 @@ spring:
       api-key: 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
 
 redis:
-  host: ${REDIS_HOST:redis-19139.crce263.ap-south-1-1.ec2.cloud.redislabs.com}
-  port: ${REDIS_PORT:19139}
-  username: ${REDIS_USERNAME:test}
-  password: ${REDIS_PASSWORD:Msdian-77}
+  host: ${REDIS_HOST}
+  port: ${REDIS_PORT}
+  username: ${REDIS_USERNAME}
+  password: ${REDIS_PASSWORD}
 
 vocab:
   kafka-topic: ${VOCAB_TOPIC:vocabulary-raw}

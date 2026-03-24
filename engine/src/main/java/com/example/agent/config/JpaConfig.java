@@ -3,8 +3,7 @@ package com.example.agent.config;
 import jakarta.persistence.EntityManagerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
-import com.example.agent.annotations.ManagedConfiguration;
+import javax.sql.DataSource;
 import org.springframework.boot.orm.jpa.EntityManagerFactoryBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -31,68 +30,76 @@ import java.util.Map;
 @Configuration
 public class JpaConfig {
 
-    @Value("${spring.datasource.url:jdbc:postgresql://localhost:5432/vocabdb}")
-    @ManagedConfiguration(key = "spring.datasource.url", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
+    // --------------------
+    // DataSource: HikariCP
+    // --------------------
+    @Value("${spring.datasource.url:jdbc:mysql://localhost:3306/vocabdb?useSSL=false&allowPublicKeyRetrieval=true}")
     private String dbUrl;
 
-    @Value("${spring.datasource.username:postgres}")
-    @ManagedConfiguration(key = "spring.datasource.username", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
+    @Value("${spring.datasource.username:root}")
     private String dbUser;
 
-    @Value("${spring.datasource.password:postgres}")
-    @ManagedConfiguration(key = "spring.datasource.password", source = ManagedConfiguration.ConfigSource.CONFIG_MAP)
+    @Value("${spring.datasource.password:root}")
     private String dbPassword;
 
     @Bean
-    @ConditionalOnMissingBean(DataSource.class)
     public DataSource dataSource() {
         HikariConfig hikariConfig = new HikariConfig();
         hikariConfig.setJdbcUrl(dbUrl);
         hikariConfig.setUsername(dbUser);
         hikariConfig.setPassword(dbPassword);
 
-        hikariConfig.setDriverClassName("org.postgresql.Driver");
+        // Optional Hikari settings
+        hikariConfig.setDriverClassName("com.mysql.cj.jdbc.Driver");
         hikariConfig.setMaximumPoolSize(10);
         hikariConfig.setMinimumIdle(5);
         hikariConfig.setIdleTimeout(30000);
         hikariConfig.setConnectionTimeout(20000);
-        hikariConfig.setPoolName("HikariCP");
+        hikariConfig.setPoolName("HikariCP-Engine");
 
         return new HikariDataSource(hikariConfig);
     }
 
+    // -------------------------
+    // EntityManagerFactory Bean
+    // -------------------------
     @Bean(name = "entityManagerFactory")
-    @ConditionalOnMissingBean(name = "entityManagerFactory")
-    public LocalContainerEntityManagerFactoryBean entityManagerFactory(
-            EntityManagerFactoryBuilder builder, DataSource dataSource) {
+    public LocalContainerEntityManagerFactoryBean entityManagerFactory(EntityManagerFactoryBuilder builder) {
         return builder
-                .dataSource(dataSource)
-                .packages("com.example.agent.models")
-                .persistenceUnit("defaultPU")
+                .dataSource(dataSource())
+                .packages("com.example.agent.models") // adjust to your entities package
+                .persistenceUnit("enginePU")
                 .properties(hibernateProperties())
                 .build();
     }
 
+    // ------------------------
+    // Transaction Manager Bean
+    // ------------------------
     @Bean(name = "transactionManager")
-    @ConditionalOnMissingBean(name = "transactionManager")
     public JpaTransactionManager transactionManager(
             @Qualifier("entityManagerFactory") EntityManagerFactory entityManagerFactory) {
         return new JpaTransactionManager(entityManagerFactory);
     }
 
+    // --------------------
+    // Exception Translation
+    // --------------------
     @Bean
-    @ConditionalOnMissingBean(PersistenceExceptionTranslationPostProcessor.class)
     public PersistenceExceptionTranslationPostProcessor exceptionTranslation() {
         return new PersistenceExceptionTranslationPostProcessor();
     }
 
+    // --------------------
+    // Hibernate Properties
+    // --------------------
     private Map<String, Object> hibernateProperties() {
         Map<String, Object> props = new HashMap<>();
-        props.put("hibernate.hbm2ddl.auto", "update");
-        props.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
-        props.put("hibernate.show_sql", true);
-        props.put("hibernate.format_sql", true);
-        props.put("hibernate.use_sql_comments", true);
+        props.put("hibernate.hbm2ddl.auto", "update"); // Use 'update' or 'none' in production
+        props.put("hibernate.dialect", "org.hibernate.dialect.MySQLDialect"); // change to desired dialect
+        props.put("hibernate.show_sql", false);
+        props.put("hibernate.format_sql", false);
+        props.put("hibernate.use_sql_comments", false);
         props.put("hibernate.jdbc.batch_size", 20);
         return props;
     }

@@ -6,19 +6,19 @@ metadata:
     app: vocab-agent
 data:
   # ─── Database ──────────────────────────────────────────────────────────────
-  DB_HOST: "localhost"           # Replace with your Cloud SQL or Postgres host
-  DB_PORT: "5432"
+  DB_HOST: "35.244.35.149"           # Replace with your Cloud SQL or Postgres host
+  DB_PORT: "3306"
   DB_NAME: "agent"
 
   # ─── Redis ─────────────────────────────────────────────────────────────────
   REDIS_HOST: "redis-19139.crce263.ap-south-1-1.ec2.cloud.redislabs.com"
   REDIS_PORT: "19139"
-  REDIS_USERNAME: "default"
+  REDIS_USERNAME: "test"
   REDIS_VECTOR_DIM: "3072"
 
   # ─── Kafka ─────────────────────────────────────────────────────────────────
-  KAFKA_BOOTSTRAP: "localhost:9092"  # Replace with your managed Kafka endpoint
-  KAFKA_GROUP_ID: "vocab-adk-group"
+#  KAFKA_BOOTSTRAP: "localhost:9092"  # Replace with your managed Kafka endpoint
+#  KAFKA_GROUP_ID: "vocab-adk-group"
 
   # ─── OpenAI ────────────────────────────────────────────────────────────────
   OPENAI_API_BASE_URL: "https://api.openai.com/v1"
