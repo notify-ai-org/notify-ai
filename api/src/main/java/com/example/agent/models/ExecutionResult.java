@@ -8,6 +8,6 @@ import lombok.Data;
 @Data
 public class ExecutionResult {
     private Boolean success;
-    @Column(length = 5000)
+    @Column(columnDefinition = "TEXT")
     private String returnValue; // serialized return value
 }

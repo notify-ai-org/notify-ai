@@ -77,6 +77,20 @@ public class DefaultPromptAssembler implements PromptAssembler {
             sb.append("## Tool Receipts (summaries only)\n").append(toolReceipts).append("\n\n");
         }
 
+        // 7) Session event history — verbatim lines (lowest priority; omit if empty)
+        List<String> eventSummaries = bundle.sessionEventSummaries();
+        if (eventSummaries != null && !eventSummaries.isEmpty()) {
+            sb.append("## Session Event History\n");
+            eventSummaries.forEach(line -> sb.append("- ").append(line).append("\n"));
+            sb.append("\n");
+        }
+
+        // 8) Session history summary — LLM-compressed fallback
+        String historySummary = bundle.sessionHistorySummary();
+        if (historySummary != null && !historySummary.isBlank()) {
+            sb.append("## Session History (Summary)\n").append(historySummary).append("\n\n");
+        }
+
         return sb.toString();
     }
 

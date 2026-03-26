@@ -24,6 +24,14 @@ import com.google.genai.types.Part;
 
 import com.example.agent.config.AgentRegistry;
 import com.example.agent.exceptions.AgentApplicationException;
+import com.example.agent.interfaces.PromptAssembler;
+import com.example.agent.interfaces.RetrievalPlanner;
+import com.example.agent.records.ContextBundle;
+import com.example.agent.records.DecisionRequest;
+
+import com.example.agent.records.EventRef;
+import com.example.agent.records.PromptPackage;
+import com.example.agent.enums.DecisionType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,6 +63,8 @@ public class EventConsumer {
     private final NotificationJobRepository notificationJobRepository;
     private final AgentRegistry agentRegistry;
     private final EventRepository eventRepository;
+    private final RetrievalPlanner retrievalPlanner;
+    private final PromptAssembler promptAssembler;
 
     private static final Logger logger = LoggerFactory.getLogger(EventConsumer.class);
 
@@ -68,7 +78,8 @@ public class EventConsumer {
             EventScheduleRepository eventScheduleRepository, MessageTemplateRepository messageTemplateRepository,
             AgentOrchestrator agentOrchestrator,
             NotificationDispatcher notificationDispatcher, NotificationJobRepository notificationJobRepository,
-            AgentRegistry agentRegistry, EventRepository eventRepository) {
+            AgentRegistry agentRegistry, EventRepository eventRepository,
+            RetrievalPlanner retrievalPlanner, PromptAssembler promptAssembler) {
         this.eventCaptureRepository = eventCaptureRepository;
         this.eventScheduleRepository = eventScheduleRepository;
         this.messageTemplateRepository = messageTemplateRepository;
@@ -77,6 +88,8 @@ public class EventConsumer {
         this.notificationJobRepository = notificationJobRepository;
         this.agentRegistry = agentRegistry;
         this.eventRepository = eventRepository;
+        this.retrievalPlanner = retrievalPlanner;
+        this.promptAssembler = promptAssembler;
     }
 
     @Transactional
@@ -146,9 +159,40 @@ public class EventConsumer {
                 String inputJson = mapper.writeValueAsString(agentInput);
                 logger.info("Agent Input JSON: " + inputJson);
 
+                // Derive token budget from the model assigned to the EventProcessor agent
+                int tokenBudget = agentRegistry.getTokenLimitForAgent(AgentRegistry.EVENT_PROCESSOR_AGENT_ID);
+
+                // Extract sessionId from agent context if present
+                AgentContext agentCtx = AgentContextHolder.getContext();
+                String sessionId = (agentCtx != null && agentCtx.getSession() != null)
+                        ? agentCtx.getSession().id() : null;
+
+                // Build a DecisionRequest to pass to the planner/assembler pipeline
+                DecisionRequest decisionReq = new DecisionRequest(
+                        DecisionType.EMIT,
+                        List.of(),               // entities not available on EventCapture
+                        new EventRef(
+                                capture.getCorrelationId(),
+                                capture.getEvent() != null ? capture.getEvent().getEventType() : null,
+                                "NORMAL",
+                                capture.getOccuredAt() != null ? capture.getOccuredAt() : Instant.now()),
+                        30,                      // timeWindowDays
+                        tokenBudget,
+                        (int) bufferTimeout.toMillis(),
+                        "en_US",
+                        "UTC",
+                        sessionId);
+
+                // Run retrieval + context assembly
+                ContextBundle bundle = retrievalPlanner.plan(decisionReq);
+                PromptPackage pkg = promptAssembler.assemble(decisionReq, bundle);
+
+                // Build the enriched prompt: system context first, then raw event JSON
                 Content prompt = Content.fromParts(
-                        Part.fromText("Process the following event capture and determine if it should be emitted:"),
-                        Part.fromText(inputJson));
+                        Part.fromText(pkg.userPrompt()),
+                        Part.fromText("\n\n## Event Capture\n" + inputJson));
+
+                logger.debug("Assembled context prompt with {} token estimate", bundle.tokenEstimate());
 
                 // 1. Process Event Task
                 io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> eventProcessFlowable = agentOrchestrator

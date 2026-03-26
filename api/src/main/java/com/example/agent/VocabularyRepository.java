@@ -8,4 +8,6 @@ public interface VocabularyRepository extends JpaRepository<Vocabulary, Long> {
     List<Vocabulary> findByTermIgnoreCaseIn(List<String> terms);
 
     java.util.Optional<Vocabulary> findByTermIgnoreCase(String term);
+
+    java.util.Optional<Vocabulary> findByTermIgnoreCaseAndParent(String term, Vocabulary parent);
 }

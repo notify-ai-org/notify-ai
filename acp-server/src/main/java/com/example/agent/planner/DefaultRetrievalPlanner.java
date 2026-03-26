@@ -16,12 +16,14 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
     private final FactStore factStore;
     private final MemoryAssembler memoryAssembler;
     private final TokenEstimator tokenEstimator;
+    private final EventHistoryPlanner eventHistoryPlanner;
 
     public DefaultRetrievalPlanner(FactStore factStore, MemoryAssembler memoryAssembler,
-            TokenEstimator tokenEstimator) {
+            TokenEstimator tokenEstimator, EventHistoryPlanner eventHistoryPlanner) {
         this.factStore = factStore;
         this.memoryAssembler = memoryAssembler;
         this.tokenEstimator = tokenEstimator;
+        this.eventHistoryPlanner = eventHistoryPlanner;
     }
 
     @Override
@@ -86,7 +88,11 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
 
         int totalTokens = req.tokenBudget() - Math.max(0, budget) - reservedForModelBuffer; // approximate
         Provenance provenance = new Provenance(queries, reasons, dropped);
-        return new ContextBundle(facts, pages, toolReceipts, provenance, Math.max(0, totalTokens));
+        ContextBundle contextBundle = new ContextBundle(facts, pages, toolReceipts, provenance,
+                Math.max(0, totalTokens));
+
+        // Enrich with ADK session event history using remaining token budget
+        return eventHistoryPlanner.enrich(contextBundle, req, Math.max(0, budget));
     }
 
     private int selectPagesWithinBudget(
@@ -167,21 +173,21 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
                             Set.of("schedule", "dnd", "window"), scope, PageType.SEMANTIC, 25),
                     new RetrievalQuery("recent suppressions and reschedules", Set.of("suppression", "reschedule"),
                             scope, PageType.EPISODIC, 25));
-            case SUPPRESS -> List.of(
-                    new RetrievalQuery("suppression reasons and complaints history",
-                            Set.of("complaint", "optout", "suppression"), scope, PageType.EPISODIC, 25),
-                    new RetrievalQuery("policy rules for suppression and compliance", Set.of("policy", "compliance"),
-                            scope, PageType.PROCEDURAL, 15));
             case TEMPLATE_PICK -> List.of(
                     new RetrievalQuery("template performance and engagement by channel",
                             Set.of("template", "engagement"), scope, PageType.SEMANTIC, 25),
                     new RetrievalQuery("recent template failures and rendering issues", Set.of("template", "failure"),
                             scope, PageType.EPISODIC, 25));
-            case ESCALATE -> List.of(
-                    new RetrievalQuery("escalation rules and severity thresholds", Set.of("escalation", "severity"),
-                            scope, PageType.PROCEDURAL, 15),
-                    new RetrievalQuery("similar escalations and outcomes", Set.of("escalation", "outcome"), scope,
-                            PageType.EPISODIC, 25));
+            case EMIT -> List.of(
+                    new RetrievalQuery("suppression and opt-out rules for this event type",
+                            Set.of("suppression", "optout", "policy", "compliance"), scope, PageType.PROCEDURAL, 20),
+                    new RetrievalQuery("previous outcomes for the same event type — sent, suppressed, or delayed",
+                            Set.of("outcome", "emit", "send", "suppress", "delay"), scope, PageType.EPISODIC, 30),
+                    new RetrievalQuery("channel preferences and reachability for this recipient",
+                            Set.of("channel", "preference", "reachability", "engagement"), scope, PageType.SEMANTIC,
+                            20),
+                    new RetrievalQuery("notification frequency caps and rate limits",
+                            Set.of("frequency", "rate", "cap", "limit"), scope, PageType.PROCEDURAL, 15));
         };
     }
 
@@ -243,9 +249,8 @@ public class DefaultRetrievalPlanner implements RetrievalPlanner {
             case CHANNEL_FALLBACK ->
                 Set.of("fallback", "failure", "provider", "channel", "retry", "engagement", "preference");
             case SCHEDULE -> Set.of("schedule", "dnd", "window", "digest", "timezone");
-            case SUPPRESS -> Set.of("optout", "suppression", "complaint", "compliance");
             case TEMPLATE_PICK -> Set.of("template", "render", "click", "engagement");
-            case ESCALATE -> Set.of("escalation", "severity", "pager", "oncall", "incident");
+            case EMIT -> Set.of("emit", "send", "outcome", "suppress", "optout", "channel", "frequency", "cap");
         };
         long hits = tags.stream().filter(wanted::contains).count();
         return clamp01(0.2 + (hits / (double) Math.max(1, wanted.size())) * 1.2);

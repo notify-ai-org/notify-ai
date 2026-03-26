@@ -71,12 +71,11 @@
         "inputSchemaTitle": "RuleDefinitionRequest",
         "inputSchemaDescription": "Request for converting a natural language rule definition to an executable expression.",
         "inputClass": "com.example.agent.models.dto.RuleDefinitionRequestDto",
-        "outputSchemaTitle": "RuleExpression",
-        "outputSchemaDescription": "Executable rule expression using vocabulary terms",
-        "outputClass": "com.example.agent.models.dto.RuleExpressionDto",
-        "outputType": "OBJECT",
-        "tools": [],
-        "outputKey": "ruleExpression"
+        "tools": [
+            "getExistingRules",
+            "listAllVocabulary",
+            "searchVocabulary"
+        ]
     },
     {
         "id": "MemorySummarizer",
@@ -89,6 +88,22 @@
         "inputClass": "com.example.agent.models.dto.MemorySummarizationRequestDto",
         "outputSchemaTitle": "MemorySummarizationResponse",
         "outputSchemaDescription": "The generated summary.",
+        "outputClass": "com.example.agent.models.dto.MemorySummarizationResponseDto",
+        "outputType": "OBJECT",
+        "tools": [],
+        "outputKey": "summary"
+    },
+    {
+        "id": "EventSummarizer",
+        "name": "Event History Summarizer Agent",
+        "description": "Compresses a list of recent ADK session event lines into a concise summary paragraph.",
+        "resourcePath": "agents/event-summarizer",
+        "model": "gemini-2.0-flash",
+        "inputSchemaTitle": "EventHistoryInput",
+        "inputSchemaDescription": "Raw session event lines to summarise.",
+        "inputClass": "com.example.agent.models.dto.MemorySummarizationRequestDto",
+        "outputSchemaTitle": "EventHistorySummary",
+        "outputSchemaDescription": "Compact summary of recent session events.",
         "outputClass": "com.example.agent.models.dto.MemorySummarizationResponseDto",
         "outputType": "OBJECT",
         "tools": [],

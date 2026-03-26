@@ -8,8 +8,8 @@ import lombok.Data;
 @Data
 public class ExceptionInfo {
     private String exceptionType; // java.lang.NullPointerException
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String message; // exception message
-    @Column(length = 10000)
+    @Column(columnDefinition = "TEXT")
     private String stackTrace; // full stack trace as string
 }

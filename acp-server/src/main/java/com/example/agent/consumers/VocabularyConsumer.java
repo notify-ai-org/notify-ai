@@ -3,6 +3,7 @@ package com.example.agent.consumers;
 import com.example.agent.RuleRepository;
 import com.example.agent.AgentOrchestrator;
 import com.example.agent.VocabularyRepository;
+import com.example.agent.models.AttributeModel;
 import com.example.agent.models.ClassModel;
 import com.example.agent.models.Rule;
 import com.example.agent.models.Vocabulary;
@@ -14,6 +15,9 @@ import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 import com.example.agent.exceptions.AgentApplicationException;
 import reactor.core.publisher.Mono;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 
@@ -27,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/vocabulary")
@@ -42,6 +45,8 @@ public class VocabularyConsumer {
     @ManagedConfiguration(key = "agent.buffer.timeout", source = ConfigSource.CONFIG_MAP)
     private Duration bufferTimeout;
 
+    private static final Logger logger = LoggerFactory.getLogger(VocabularyConsumer.class);
+
     public VocabularyConsumer(VocabularyRepository repo, AgentOrchestrator agentOrchestrator,
             RuleRepository ruleRepository) {
         this.repo = repo;
@@ -50,37 +55,60 @@ public class VocabularyConsumer {
     }
 
     private void processClasses(List<ClassModel> classes) throws JsonProcessingException {
-        // Check if vocabulary already exists
-        List<Vocabulary> existing = repo.findByTermIgnoreCaseIn(
-                classes.stream().map(ClassModel::getClassName)
-                        .collect(Collectors.toList()));
+        // Prefetch all existing vocabulary into memory to avoid multiple DB calls
+        List<Vocabulary> allVocabEntries = repo.findAll();
 
-        for (Vocabulary vocab : existing) {
-            ClassModel classModel = classes.stream().filter(c -> c.getClassName().equalsIgnoreCase(vocab.getTerm()))
-                    .findFirst().get();
-            vocab.setDescription(classModel.getClassDescription());
-            Vocabulary parent = repo.findByTermIgnoreCase(classModel.getSuperClass()).orElse(null);
-            vocab.setParent(parent);
-            repo.save(vocab);
+        // Separate into root (class) and child (attribute) caches
+        Map<String, Vocabulary> classCache = new HashMap<>();
+        Map<String, Vocabulary> attributeCacheByParent = new HashMap<>();
+
+        for (Vocabulary vocab : allVocabEntries) {
+            if (vocab.getParent() == null) {
+                classCache.put(vocab.getTerm().toLowerCase(), vocab);
+            } else {
+                String key = vocab.getParent().getId() + ":" + vocab.getTerm().toLowerCase();
+                attributeCacheByParent.put(key, vocab);
+            }
         }
 
-        classes = classes.stream()
-                .filter(c -> !existing.stream().anyMatch(e -> e.getTerm().equalsIgnoreCase(c.getClassName())))
-                .collect(Collectors.toList());
-
-        if (classes.size() == 0) {
-            System.out.println("No new classes found in message");
-            return;
-        }
-
-        // Process each class - save initial vocabulary terms
         for (ClassModel classModel : classes) {
-            Vocabulary vocab = new Vocabulary();
-            vocab.setTerm(classModel.getClassName());
-            vocab.setDescription(classModel.getClassDescription());
-            Vocabulary parent = repo.findByTermIgnoreCase(classModel.getSuperClass()).orElse(null);
-            vocab.setParent(parent);
-            repo.save(vocab);
+            // 1. Get or create the class vocabulary
+            String classNameLower = classModel.getClassName().toLowerCase();
+            Vocabulary classVocab = classCache.get(classNameLower);
+            if (classVocab == null) {
+                classVocab = new Vocabulary();
+                classVocab.setTerm(classModel.getClassName());
+                classCache.put(classNameLower, classVocab);
+            }
+
+            classVocab.setDescription(classModel.getClassDescription());
+
+            // Super class lookup from cache
+            if (classModel.getSuperClass() != null) {
+                Vocabulary parentClassVocab = classCache.get(classModel.getSuperClass().toLowerCase());
+                classVocab.setParent(parentClassVocab);
+            }
+
+            classVocab = repo.save(classVocab);
+
+            // 2. Process attributes with cache lookup
+            if (classModel.getAttributes() != null) {
+                for (AttributeModel attr : classModel.getAttributes()) {
+                    String attrKey = classVocab.getId() + ":" + attr.getName().toLowerCase();
+                    Vocabulary attrVocab = attributeCacheByParent.get(attrKey);
+
+                    if (attrVocab == null) {
+                        attrVocab = new Vocabulary();
+                        attrVocab.setTerm(attr.getName());
+                        attrVocab.setParent(classVocab);
+                        attributeCacheByParent.put(attrKey, attrVocab);
+                    }
+
+                    attrVocab.setDescription(attr.getDescription());
+                    attrVocab.setType(attr.getType());
+                    repo.save(attrVocab);
+                }
+            }
         }
     }
 
@@ -159,45 +187,52 @@ public class VocabularyConsumer {
                     Part.fromText(prompt),
                     Part.fromText(mapper.writeValueAsString(ruleRequest)));
 
-            agentOrchestrator.createTaskFlowable("RuleProcessor", null, content, null)
-                .subscribe(agentEvent -> {
-                    if (agentEvent.content().isPresent()
-                            && agentEvent.content().get().parts().isPresent()
-                            && !agentEvent.content().get().parts().get().isEmpty()) {
-                        try {
-                            Optional<List<Part>> parts = agentEvent.content().get().parts();
-                            if (!parts.isPresent()) {
-                                return;
-                            }
-                            for (Part part : parts.get()) {
-                                if (part.text().isPresent()) {
-                                    String json = part.text().get();
-                                    Map<String, Object> ruleExpression = mapper.readValue(json,
-                                            new TypeReference<Map<String, Object>>() {
-                                            });
+            String taskId = UUID.randomUUID().toString();
+            com.example.agent.models.AgentContext context = com.example.agent.AgentContextHolder.getContext();
 
-                                    Rule rule = new Rule();
-                                    rule.setId(UUID.randomUUID().toString());
-                                    rule.setName((String) ruleExpression.get("ruleName"));
-                                    rule.setEventName(eventName);
-                                    rule.setDescription(ruleDescription);
-                                    rule.setConditionExpr((String) ruleExpression.get("conditionExpr"));
-                                    rule.setEnabled(true);
-                                    rule.setPriority(0);
-
-                                    ruleRepository.save(rule);
-                                    System.out.println("Saved rule: " + rule.getName() + " with expression: "
-                                            + rule.getConditionExpr());
+            agentOrchestrator.createTaskFlowable("RuleProcessor", taskId, content, context)
+                    .subscribe(agentEvent -> {
+                        if (agentEvent.content().isPresent()
+                                && agentEvent.content().get().parts().isPresent()
+                                && !agentEvent.content().get().parts().get().isEmpty()) {
+                            try {
+                                Optional<List<Part>> parts = agentEvent.content().get().parts();
+                                if (!parts.isPresent()) {
+                                    return;
                                 }
+                                for (Part part : parts.get()) {
+                                    if (part.text().isPresent()) {
+                                        String json = part.text().get();
+                                        try {
+                                            Map<String, Object> ruleExpression = mapper.readValue(json,
+                                                    new TypeReference<Map<String, Object>>() {
+                                                    });
+                                            Rule rule = new Rule();
+                                            rule.setId(UUID.randomUUID().toString());
+                                            rule.setName((String) ruleExpression.get("ruleName"));
+                                            rule.setEventName(eventName);
+                                            rule.setDescription(ruleDescription);
+                                            rule.setConditionExpr((String) ruleExpression.get("conditionExpr"));
+                                            rule.setEnabled(true);
+                                            rule.setPriority(0);
+
+                                            ruleRepository.save(rule);
+                                            System.out.println("Saved rule: " + rule.getName() + " with expression: "
+                                                    + rule.getConditionExpr());
+                                        } catch (Exception e) {
+                                            logger.error("Error parsing schedule JSON");
+                                            continue;
+                                        }
+                                    }
+                                }
+                            } catch (Exception e) {
+                                System.err.println("Error parsing rule processor output: " + e.getMessage());
+                                e.printStackTrace();
                             }
-                        } catch (Exception e) {
-                            System.err.println("Error parsing rule processor output: " + e.getMessage());
-                            e.printStackTrace();
                         }
-                    }
-                }, error -> {
-                    System.err.println("Rule processor agent call failed: " + error.getMessage());
-                });
+                    }, error -> {
+                        System.err.println("Rule processor agent call failed: " + error.getMessage());
+                    });
         } catch (Exception e) {
             System.err.println("Error invoking rule processor agent: " + e.getMessage());
             throw new AgentApplicationException("Error invoking rule processor agent", e);

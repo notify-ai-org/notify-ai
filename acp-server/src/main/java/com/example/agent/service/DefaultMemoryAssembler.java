@@ -159,7 +159,10 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
             java.util.concurrent.CompletableFuture<com.google.adk.events.Event> future =
                     new java.util.concurrent.CompletableFuture<>();
 
-            orchestrator.createTaskFlowable(agentId, null, prompt, null)
+            String taskId = UUID.randomUUID().toString();
+            com.example.agent.models.AgentContext context = com.example.agent.AgentContextHolder.getContext();
+
+            orchestrator.createTaskFlowable(agentId, taskId, prompt, context)
                 .firstElement().subscribe(
                     future::complete,
                     future::completeExceptionally);

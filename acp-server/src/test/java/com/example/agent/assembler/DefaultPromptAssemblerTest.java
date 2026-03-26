@@ -38,14 +38,15 @@ class DefaultPromptAssemblerTest {
         promptAssembler = new DefaultPromptAssembler(tokenEstimator);
 
         testRequest = new DecisionRequest(
-                DecisionType.ESCALATE,
+                DecisionType.EMIT,
                 List.of(new EntityRef("user", "user-1")),
                 new EventRef("event-1", "ORDER_CREATED", "HIGH", Instant.now()),
                 7, // timeWindowDays
                 2000, // tokenBudget
                 5000, // latencyBudgetMs
                 "en_US", // locale
-                "UTC"); // timezone
+                "UTC", // timezone
+                null); // sessionId
 
         Fact fact = mock(Fact.class);
         lenient().when(fact.factId()).thenReturn("fact-1");

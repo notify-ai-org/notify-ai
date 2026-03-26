@@ -1,9 +1,10 @@
 package com.example.agent.service;
 
 import com.example.agent.AgentSessionRepository;
+import com.example.agent.SessionEventRepository;
 import com.example.agent.models.AgentSessionEntity;
+import com.example.agent.models.SessionEventEntity;
 import com.example.agent.util.ObjectMapperFactory;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.adk.events.Event;
 import com.google.adk.sessions.BaseSessionService;
@@ -16,13 +17,14 @@ import io.reactivex.rxjava3.core.Completable;
 import io.reactivex.rxjava3.core.Maybe;
 import io.reactivex.rxjava3.core.Single;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.Callable;
@@ -36,11 +38,62 @@ import java.util.concurrent.ConcurrentMap;
 @Service
 public class SessionService implements BaseSessionService {
 
+    private static final Logger log = LoggerFactory.getLogger(SessionService.class);
+
     private final AgentSessionRepository repository;
+    private final SessionEventRepository sessionEventRepository;
     private final ObjectMapper mapper = ObjectMapperFactory.create();
 
-    public SessionService(AgentSessionRepository repository) {
+    public SessionService(AgentSessionRepository repository, SessionEventRepository sessionEventRepository) {
         this.repository = repository;
+        this.sessionEventRepository = sessionEventRepository;
+    }
+
+    /**
+     * Persists a single ADK Event as a structured {@link SessionEventEntity} row
+     * linked to the given session.
+     * Safe to call after each agent turn to ensure query-able event history.
+     */
+    @Transactional
+    public void appendEvent(String sessionId, Event event) {
+        Optional<AgentSessionEntity> sessionOpt = repository.findBySessionId(sessionId);
+        if (sessionOpt.isEmpty()) {
+            log.warn("appendEvent: session '{}' not found — skipping persistence", sessionId);
+            return;
+        }
+
+        AgentSessionEntity session = sessionOpt.get();
+
+        SessionEventEntity entity = new SessionEventEntity();
+        entity.setSession(session);
+        entity.setInvocationId(event.invocationId());
+        entity.setAuthor(event.author());
+        entity.setOccurredAt(Instant.now());
+
+        // Extract role and first text part from event content
+        event.content().ifPresent(content -> {
+            // role from Content
+            content.role().ifPresent(entity::setRole);
+
+            // First text part as preview
+            content.parts().ifPresent(parts -> {
+                if (!parts.isEmpty()) {
+                    parts.get(0).text().ifPresent(text -> {
+                        // Truncate to 2000 chars for storage efficiency
+                        entity.setTextContent(text.length() > 2000 ? text.substring(0, 2000) : text);
+                    });
+                }
+            });
+        });
+
+        // Store raw JSON for full replay capability
+        try {
+            entity.setRawJson(mapper.writeValueAsString(event.toJson()));
+        } catch (Exception e) {
+            log.warn("appendEvent: failed to serialise raw event for session '{}': {}", sessionId, e.getMessage());
+        }
+
+        sessionEventRepository.save(entity);
     }
 
     @Transactional(readOnly = true)
@@ -69,7 +122,6 @@ public class SessionService implements BaseSessionService {
                     e.setClientId(clientId);
                     e.setUserId(userId);
                     e.setScope(scope);
-                    e.setHistoryJson("[]");
                     e.setCreatedAt(Instant.now());
                     e.setUpdatedAt(Instant.now());
                     return repository.save(e);
@@ -81,30 +133,7 @@ public class SessionService implements BaseSessionService {
         return repository.save(session);
     }
 
-    /**
-     * Append a history entry (JSON object) to the session's historyJson array.
-     * historyJson is expected to be a JSON array string.
-     */
-    @Transactional
-    public void appendHistory(String sessionId, String clientId, Object historyEntry) {
-        repository.findBySessionIdAndClientId(sessionId, clientId).ifPresent(e -> {
-            try {
-                List<Object> list = new ArrayList<>();
-                String prev = e.getHistoryJson();
-                if (prev != null && !prev.isBlank()) {
-                    list = mapper.readValue(prev, new TypeReference<List<Object>>() {
-                    });
-                }
-                list.add(historyEntry);
-                e.setHistoryJson(mapper.writeValueAsString(list));
-                e.setUpdatedAt(Instant.now());
-                repository.save(e);
-            } catch (Exception ex) {
-                throw new RuntimeException("Failed to append session history", ex);
-            }
-        });
-    }
-
+    @SuppressWarnings("null")
     @Override
     public Single<Session> createSession(String appName, String userId, ConcurrentMap<String, Object> state,
             String sessionId) {
@@ -121,19 +150,8 @@ public class SessionService implements BaseSessionService {
                             e.setClientId(appName);
                             e.setUserId(userId);
                             e.setScope(""); // or some default scope, adjust as needed
-                            e.setHistoryJson("[]");
                             e.setCreatedAt(Instant.now());
                             e.setUpdatedAt(Instant.now());
-                            // Save initial state in history if nonempty
-                            if (state != null && !state.isEmpty()) {
-                                try {
-                                    List<Object> historyList = new ArrayList<>();
-                                    historyList.add(Map.of("state", state));
-                                    e.setHistoryJson(mapper.writeValueAsString(historyList));
-                                } catch (Exception ex) {
-                                    // ignore, just use as empty array
-                                }
-                            }
                             return repository.save(e);
                         });
                 // Populate fields for Session interface

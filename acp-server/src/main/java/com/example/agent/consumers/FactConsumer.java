@@ -100,23 +100,25 @@ public class FactConsumer {
                     Part.fromText("Extract facts from the following raw logs."),
                     Part.fromText(mapper.writeValueAsString(payload)));
 
-            com.example.agent.models.AgentContext context = com.example.agent.models.AgentContext.builder().session(this.logToFactsSession).build();
+            com.example.agent.models.AgentContext context = com.example.agent.models.AgentContext.builder()
+                    .session(this.logToFactsSession).build();
             orchestrator.createTaskFlowable(agentId, UUID.randomUUID().toString(), prompt, context)
-                .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
-                .subscribe(events -> {
-                    for (com.google.adk.events.Event agentEvent : events) {
-                        agentEvent.content().flatMap(Content::parts).ifPresent(parts -> {
-                            for (Part part : parts) {
-                                part.text().ifPresent(json -> {
-                                    List<Fact> facts = persistFactsFromJson(json, tenantId, sourceType, correlationId);
-                                    if (!facts.isEmpty()) {
-                                        pageAssembler.buildPages(facts);
-                                    }
-                                });
-                            }
-                        });
-                    }
-                }, Throwable::printStackTrace);
+                    .buffer(bufferTimeout.toMillis(), TimeUnit.MILLISECONDS)
+                    .subscribe(events -> {
+                        for (com.google.adk.events.Event agentEvent : events) {
+                            agentEvent.content().flatMap(Content::parts).ifPresent(parts -> {
+                                for (Part part : parts) {
+                                    part.text().ifPresent(json -> {
+                                        List<Fact> facts = persistFactsFromJson(json, tenantId, sourceType,
+                                                correlationId);
+                                        if (!facts.isEmpty()) {
+                                            pageAssembler.buildPages(facts);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    }, Throwable::printStackTrace);
 
         } catch (Exception e) {
             throw new AgentApplicationException("Fact extraction initiation failed", e);
@@ -144,7 +146,7 @@ public class FactConsumer {
                         new TypeReference<List<Map<String, Object>>>() {
                         });
             } catch (Exception e) {
-                logger.error("Error parsing schedule JSON: {}", json, e);
+                logger.error("Error parsing schedule JSON");
                 return result;
             }
             for (Map<String, Object> f : facts) {

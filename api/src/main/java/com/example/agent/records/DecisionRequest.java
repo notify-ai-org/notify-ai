@@ -11,5 +11,6 @@ public record DecisionRequest(
                 int tokenBudget,
                 int latencyBudgetMs,
                 String locale,
-                String timezone) {
+                String timezone,
+                String sessionId) {
 }

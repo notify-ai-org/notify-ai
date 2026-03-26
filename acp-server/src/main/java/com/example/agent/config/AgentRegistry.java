@@ -21,7 +21,6 @@ import org.springframework.core.io.ResourceLoader;
 
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,7 +29,22 @@ import java.util.concurrent.ConcurrentHashMap;
 public class AgentRegistry {
 
     private final Map<String, String> registry = new ConcurrentHashMap<>();
+
+    /**
+     * Model name → context-window token limit, loaded from {@code agents/models.json}.
+     * Used to derive the {@code tokenBudget} for context assembly.
+     */
+    private final Map<String, Integer> modelTokenLimits = new ConcurrentHashMap<>();
+
+    /**
+     * Agent functional ID → resolved token limit (from the model assigned to that agent).
+     * Populated during {@link #loadAgents(AgentOrchestrator)}.
+     */
+    private final Map<String, Integer> agentTokenLimits = new ConcurrentHashMap<>();
+
+    private static final int DEFAULT_TOKEN_LIMIT = 8000;
     private final ResourceLoader resourceLoader;
+    private final com.example.agent.tools.ToolConfig toolConfig;
 
     // Constants for Agent IDs
     public static final String MESSAGE_TEMPLATE_AGENT_ID = "MessageTemplate";
@@ -39,9 +53,11 @@ public class AgentRegistry {
     public static final String EVENT_PROCESSOR_AGENT_ID = "EventProcessor";
     public static final String LOG_TO_FACTS_AGENT_ID = "LogToFacts";
     public static final String MEMORY_SUMMARIZER_AGENT_ID = "MemorySummarizer";
+    public static final String EVENT_SUMMARIZER_AGENT_ID = "EventSummarizer";
 
-    public AgentRegistry(ResourceLoader resourceLoader) {
+    public AgentRegistry(ResourceLoader resourceLoader, com.example.agent.tools.ToolConfig toolConfig) {
         this.resourceLoader = resourceLoader;
+        this.toolConfig = toolConfig;
     }
 
     public void put(String name, String id) {
@@ -52,11 +68,43 @@ public class AgentRegistry {
         return registry.get(name);
     }
 
+    /**
+     * Returns the context-window token limit for the model assigned to the given agent.
+     * Falls back to {@value #DEFAULT_TOKEN_LIMIT} if the agent or model is unknown.
+     */
+    public int getTokenLimitForAgent(String agentId) {
+        return agentTokenLimits.getOrDefault(agentId, DEFAULT_TOKEN_LIMIT);
+    }
+
+    /**
+     * Returns the token limit for a model by name.
+     * Falls back to {@value #DEFAULT_TOKEN_LIMIT} if unknown.
+     */
+    public int getTokenLimitForModel(String modelName) {
+        return modelTokenLimits.getOrDefault(modelName, DEFAULT_TOKEN_LIMIT);
+    }
+
     @Bean
     public ApplicationRunner agentLoader(AgentOrchestrator agentOrchestrator) {
         return args -> {
+            loadModelTokenLimits();
             loadAgents(agentOrchestrator);
         };
+    }
+
+    /** Loads {@code agents/models.json} into {@link #modelTokenLimits}. */
+    private void loadModelTokenLimits() {
+        try {
+            ObjectMapper mapper = ObjectMapperFactory.create();
+            Resource resource = resourceLoader.getResource("classpath:agents/models.json");
+            try (InputStream is = resource.getInputStream()) {
+                Map<String, Integer> limits = mapper.readValue(is, new TypeReference<Map<String, Integer>>() {});
+                modelTokenLimits.putAll(limits);
+                System.out.println("Loaded token limits for " + limits.size() + " models from models.json");
+            }
+        } catch (Exception e) {
+            System.err.println("Could not load models.json — using default token limit of " + DEFAULT_TOKEN_LIMIT);
+        }
     }
 
     private void loadAgents(AgentOrchestrator agentOrchestrator) {
@@ -72,23 +120,24 @@ public class AgentRegistry {
             for (AgentConfig config : configs) {
                 try {
                     Class<?> inputClass = Class.forName(config.getInputClass());
-                    Class<?> outputClass = Class.forName(config.getOutputClass());
-
                     Schema inputSchema = SchemaUtil.schemaForClass(inputClass, config.getInputSchemaTitle(),
                             config.getInputSchemaDescription());
 
-                    Schema outputSchema;
-                    if ("ARRAY".equalsIgnoreCase(config.getOutputType())) {
-                        outputSchema = Schema.builder()
-                                .title(config.getOutputSchemaTitle())
-                                .type(Type.Known.ARRAY)
-                                .description(config.getOutputSchemaDescription())
-                                .items(SchemaUtil.schemaForClass(outputClass, config.getOutputSchemaTitle() + "Item",
-                                        "Item for " + config.getOutputSchemaTitle()))
-                                .build();
-                    } else {
-                        outputSchema = SchemaUtil.schemaForClass(outputClass, config.getOutputSchemaTitle(),
-                                config.getOutputSchemaDescription());
+                    Schema outputSchema = null;
+                    if (config.getOutputClass() != null && !config.getOutputClass().isBlank()) {
+                        Class<?> outputClass = Class.forName(config.getOutputClass());
+                        if ("ARRAY".equalsIgnoreCase(config.getOutputType())) {
+                            outputSchema = Schema.builder()
+                                    .title(config.getOutputSchemaTitle())
+                                    .type(Type.Known.ARRAY)
+                                    .description(config.getOutputSchemaDescription())
+                                    .items(SchemaUtil.schemaForClass(outputClass, config.getOutputSchemaTitle() + "Item",
+                                            "Item for " + config.getOutputSchemaTitle()))
+                                    .build();
+                        } else {
+                            outputSchema = SchemaUtil.schemaForClass(outputClass, config.getOutputSchemaTitle(),
+                                    config.getOutputSchemaDescription());
+                        }
                     }
 
                     String prompt = loadPrompt(config.getResourcePath() + "/prompt.md");
@@ -106,18 +155,32 @@ public class AgentRegistry {
                                 .build();
                     }
 
-                    LlmAgent agent = LlmAgent.builder()
+                    java.util.List<com.google.adk.tools.BaseTool> agentTools = new java.util.ArrayList<>();
+                    if (config.getTools() != null && !config.getTools().isEmpty()) {
+                        for (String toolName : config.getTools()) {
+                            agentTools.add(com.google.adk.tools.FunctionTool.create(toolConfig, toolName));
+                        }
+                    }
+
+                    LlmAgent.Builder agentBuilder = LlmAgent.builder()
                             .name(config.getName())
                             .description(config.getDescription())
                             .model(model)
                             .inputSchema(inputSchema)
-                            .outputSchema(outputSchema)
                             .instruction(prompt)
                             .exampleProvider(example)
-                            .tools(Collections.emptyList())
-                            .outputKey(config.getOutputKey())
-                            .generateContentConfig(generateContentConfig)
-                            .build();
+                            .tools(agentTools)
+                            .generateContentConfig(generateContentConfig);
+
+                    // ADK 0.2.0: outputSchema cannot co-exist with tools or transfers
+                    if (agentTools.isEmpty() && outputSchema != null) {
+                        agentBuilder.outputSchema(outputSchema)
+                                .outputKey(config.getOutputKey())
+                                .disallowTransferToParent(true)
+                                .disallowTransferToPeers(true);
+                    }
+
+                    LlmAgent agent = agentBuilder.build();
 
                     int instanceCount = config.getInstances() > 0 ? config.getInstances() : 1;
 
@@ -128,6 +191,10 @@ public class AgentRegistry {
                     }
 
                     registry.put(config.getId(), config.getId()); // Map functional ID to functional ID (type)
+
+                    // Track per-agent token limit using the agent's model
+                    int tokenLimit = modelTokenLimits.getOrDefault(model, DEFAULT_TOKEN_LIMIT);
+                    agentTokenLimits.put(config.getId(), tokenLimit);
 
                 } catch (Exception e) {
                     System.err.println("Failed to load agent: " + config.getName() + " Error: " + e.getMessage());

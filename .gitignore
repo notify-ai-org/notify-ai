@@ -7,7 +7,10 @@
 /examples/ecommerce-app/target
 /examples/banking-app/target
 
+# Local overrides — never commit sensitive config
+/acp-server/src/main/resources/application-local.properties
 
-
+# Minikube / Kubernetes secrets
+/k8s/minikube-secrets-template.yaml
 
 

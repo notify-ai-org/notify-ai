@@ -47,26 +47,27 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
     private final DomainContentService domainContentService;
     private final String[] skipPaths;
 
-    @Value("${acp.auth.jwt.secret:wsws}")
     @ManagedConfiguration(key = "acp.auth.jwt.secret", source = ConfigSource.CONFIG_MAP)
     String secret;
-    @Value("${acp.auth.jwt.required-scope:agent:invoke}")
     @ManagedConfiguration(key = "acp.auth.jwt.required-scope", source = ConfigSource.CONFIG_MAP)
-    String requiredScope = "invoke";
+    String requiredScope;
+
+    private final SecretKey key;
 
     public AgentAuthenticationFilter(
             SessionService sessionService,
             DomainContentService domainContentService,
-            @Value("${acp.auth.skip-paths:/api/client/register,/api/auth/token/refresh,/actuator/health,/actuator/info}") String skipPathsCsv) {
+            @Value("${acp.auth.skip-paths:/api/client/register,/api/auth/token/refresh,/actuator/health,/actuator/info}") String skipPathsCsv,
+            @Value("${acp.auth.jwt.secret:wsws}") String secret,
+            @Value("${acp.auth.jwt.required-scope:agent:invoke}") String requiredScope) {
         this.sessionService = sessionService;
         this.domainContentService = domainContentService;
         this.skipPaths = skipPathsCsv == null ? new String[0] : skipPathsCsv.split("\\s*,\\s*");
-        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
-        this.key = Keys.hmacShaKeyFor(bytes);
+        this.secret = secret;
         this.requiredScope = requiredScope == null || requiredScope.isBlank() ? null : requiredScope;
+        byte[] bytes = this.secret.getBytes(StandardCharsets.UTF_8);
+        this.key = Keys.hmacShaKeyFor(bytes);
     }
-
-    private final SecretKey key;
 
     /**
      * @return JwtClaims with clientId, userId, scopes, and raw token; or null if
@@ -179,13 +180,11 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
             String rawToken;
 
             if (claims != null && claims.getClientId() != null && !claims.getClientId().isBlank()) {
-                // Authenticated request — use real credentials
                 clientId = claims.getClientId();
                 userId = claims.getUserId();
                 scopes = claims.getScopes() != null ? claims.getScopes() : Collections.emptyList();
                 rawToken = claims.getRawToken();
             } else {
-                // No valid token — fall back to dummy credentials for development
                 clientId = DEFAULT_CLIENT_ID;
                 userId = DEFAULT_USER_ID;
                 scopes = List.of(DEFAULT_SCOPE);
@@ -210,15 +209,17 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
 
             AgentContextHolder.setContext(ctx);
 
-            try {
-                filterChain.doFilter(request, response);
-            } finally {
-                AgentContextHolder.clear();
-            }
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\":\"auth_error\"}");
+            return;
+        }
+
+        try {
+            filterChain.doFilter(request, response);
+        } finally {
+            AgentContextHolder.clear();
         }
     }
 }
