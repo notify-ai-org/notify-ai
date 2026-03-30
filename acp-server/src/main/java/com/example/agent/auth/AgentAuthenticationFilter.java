@@ -12,8 +12,11 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 
+import java.time.Duration;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import com.example.agent.annotations.ManagedConfiguration;
@@ -45,23 +48,38 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
 
     private final SessionService sessionService;
     private final DomainContentService domainContentService;
+    private final StringRedisTemplate redisTemplate;
     private final String[] skipPaths;
 
     @ManagedConfiguration(key = "acp.auth.jwt.secret", source = ConfigSource.CONFIG_MAP)
     String secret;
     @ManagedConfiguration(key = "acp.auth.jwt.required-scope", source = ConfigSource.CONFIG_MAP)
     String requiredScope;
+    
+    @Value("${acp.idempotency.retry-count:5}")
+    @ManagedConfiguration(key = "acp.idempotency.retry-count", source = ConfigSource.CONFIG_MAP)
+    private int idempotencyRetryCount;
+
+    @Value("${acp.idempotency.retry-interval-ms:500}")
+    @ManagedConfiguration(key = "acp.idempotency.retry-interval-ms", source = ConfigSource.CONFIG_MAP)
+    private long idempotencyRetryIntervalMs;
+
+    @Value("${acp.idempotency.expiry-seconds:86400}")
+    @ManagedConfiguration(key = "acp.idempotency.expiry-seconds", source = ConfigSource.CONFIG_MAP)
+    private long idempotencyExpirySeconds;
 
     private final SecretKey key;
 
     public AgentAuthenticationFilter(
             SessionService sessionService,
             DomainContentService domainContentService,
+            StringRedisTemplate redisTemplate,
             @Value("${acp.auth.skip-paths:/api/client/register,/api/auth/token/refresh,/actuator/health,/actuator/info}") String skipPathsCsv,
             @Value("${acp.auth.jwt.secret:wsws}") String secret,
             @Value("${acp.auth.jwt.required-scope:agent:invoke}") String requiredScope) {
         this.sessionService = sessionService;
         this.domainContentService = domainContentService;
+        this.redisTemplate = redisTemplate;
         this.skipPaths = skipPathsCsv == null ? new String[0] : skipPathsCsv.split("\\s*,\\s*");
         this.secret = secret;
         this.requiredScope = requiredScope == null || requiredScope.isBlank() ? null : requiredScope;
@@ -208,6 +226,53 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
             ctx.setDomainContentJson(domainJson);
 
             AgentContextHolder.setContext(ctx);
+            
+            // --- IDEMPOTENCY LAYER ---
+            String idempotencyKey = request.getHeader("X-Idempotency-Key");
+            if (idempotencyKey == null || idempotencyKey.isBlank()) {
+                idempotencyKey = request.getHeader("Idempotency-Key");
+            }
+
+            if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+                String redisKey = "idempotency:" + clientId + ":" + idempotencyKey;
+                boolean lockAcquired = false;
+                
+                for (int i = 0; i < idempotencyRetryCount; i++) {
+                    Boolean isNew = redisTemplate.opsForValue().setIfAbsent(redisKey, "PROCESSING", Duration.ofSeconds(idempotencyExpirySeconds));
+                    if (Boolean.TRUE.equals(isNew)) {
+                        lockAcquired = true;
+                        break;
+                    } else {
+                        String status = redisTemplate.opsForValue().get(redisKey);
+                        if ("COMPLETED".equals(status)) {
+                            response.setStatus(HttpServletResponse.SC_CONFLICT);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"Duplicate request detected (Idempotency Key).\"}");
+                            return;
+                        }
+                        try {
+                            Thread.sleep(idempotencyRetryIntervalMs);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
+                }
+                
+                if (!lockAcquired) {
+                    String status = redisTemplate.opsForValue().get(redisKey);
+                    response.setStatus(HttpServletResponse.SC_CONFLICT);
+                    response.setContentType("application/json");
+                    if ("COMPLETED".equals(status)) {
+                        response.getWriter().write("{\"error\":\"Duplicate request detected (Idempotency Key).\"}");
+                    } else {
+                        response.getWriter().write("{\"error\":\"Concurrent duplicate request is still processing.\"}");
+                    }
+                    return;
+                }
+                
+                request.setAttribute("Idempotency-Redis-Key", redisKey);
+            }
 
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -218,6 +283,16 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
 
         try {
             filterChain.doFilter(request, response);
+            String redisKey = (String) request.getAttribute("Idempotency-Redis-Key");
+            if (redisKey != null) {
+                redisTemplate.opsForValue().set(redisKey, "COMPLETED", Duration.ofSeconds(idempotencyExpirySeconds));
+            }
+        } catch (Exception filterError) {
+            String redisKey = (String) request.getAttribute("Idempotency-Redis-Key");
+            if (redisKey != null) {
+                redisTemplate.delete(redisKey); // clean state for retry
+            }
+            throw filterError;
         } finally {
             AgentContextHolder.clear();
         }

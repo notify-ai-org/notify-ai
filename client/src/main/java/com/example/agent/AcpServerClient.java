@@ -77,39 +77,57 @@ public class AcpServerClient {
      * POST /api/vocabulary with List of ClassModelDto. acp-server expects List&lt;ClassModel&gt; (same JSON shape).
      */
     public int postVocabulary(List<ClassModel> list, String bearerToken) throws Exception {
+        return postVocabulary(list, bearerToken, null);
+    }
+
+    public int postVocabulary(List<ClassModel> list, String bearerToken, String idempotencyKey) throws Exception {
         if (list == null || list.isEmpty()) return 0;
         String json = mapper.writeValueAsString(list);
-        return post("/api/vocabulary", json, bearerToken);
+        return post("/api/vocabulary", json, bearerToken, idempotencyKey);
     }
 
     /**
      * POST /api/vocabulary/rules/process with rule map (eventName, ruleName, ruleDescription, payload).
      */
     public int postRule(Map<String, Object> ruleMap, String bearerToken) throws Exception {
+        return postRule(ruleMap, bearerToken, null);
+    }
+
+    public int postRule(Map<String, Object> ruleMap, String bearerToken, String idempotencyKey) throws Exception {
         if (ruleMap == null) return 0;
         String json = mapper.writeValueAsString(ruleMap);
-        return post("/api/vocabulary/rules/process", json, bearerToken);
+        return post("/api/vocabulary/rules/process", json, bearerToken, idempotencyKey);
     }
 
     /**
      * POST /api/event with List of EventCaptureDto. acp-server expects List&lt;EventCapture&gt; (same JSON shape).
      */
     public int postEventCaptures(List<EventCapture> list, String bearerToken) throws Exception {
-        if (list == null || list.isEmpty()) return 0;
-        String json = mapper.writeValueAsString(list);
-        return post("/api/event", json, bearerToken);
+        return postEventCaptures(list, bearerToken, null);
     }
 
-    private int post(String path, String json, String bearerToken) throws Exception {
+    public int postEventCaptures(List<EventCapture> list, String bearerToken, String idempotencyKey) throws Exception {
+        if (list == null || list.isEmpty()) return 0;
+        String json = mapper.writeValueAsString(list);
+        return post("/api/event", json, bearerToken, idempotencyKey);
+    }
+
+
+
+    private int post(String path, String json, String bearerToken, String idempotencyKey) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder()
             .uri(URI.create(baseUrl + path))
             .header("Content-Type", "application/json")
             .timeout(Duration.ofSeconds(30))
             .POST(HttpRequest.BodyPublishers.ofString(json));
         if (bearerToken != null && !bearerToken.isEmpty()) b.header("Authorization", "Bearer " + bearerToken);
+        if (idempotencyKey != null && !idempotencyKey.isBlank()) b.header("X-Idempotency-Key", idempotencyKey);
 
         HttpResponse<String> r = httpClient.send(b.build(), HttpResponse.BodyHandlers.ofString());
-        if (r.statusCode() >= 400) throw new RuntimeException("POST " + path + " failed: " + r.statusCode() + " " + r.body());
+        // 409 Conflict is safely returned if the idiosyncrasy filter blocks as duplicate
+        if (r.statusCode() >= 400 && r.statusCode() != 409) {
+             throw new RuntimeException("POST " + path + " failed: " + r.statusCode() + " " + r.body());
+        }
         return r.statusCode();
     }
 }

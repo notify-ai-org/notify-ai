@@ -43,7 +43,7 @@ public class AgentSessionEntity {
      * Structured session events — one row per ADK event for efficient
      * interval-based retrieval.
      */
-    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
     @com.fasterxml.jackson.annotation.JsonIgnore
     private java.util.List<SessionEventEntity> sessionEvents = new java.util.ArrayList<>();
 

@@ -31,13 +31,15 @@ public class AgentRegistry {
     private final Map<String, String> registry = new ConcurrentHashMap<>();
 
     /**
-     * Model name → context-window token limit, loaded from {@code agents/models.json}.
+     * Model name → context-window token limit, loaded from
+     * {@code agents/models.json}.
      * Used to derive the {@code tokenBudget} for context assembly.
      */
     private final Map<String, Integer> modelTokenLimits = new ConcurrentHashMap<>();
 
     /**
-     * Agent functional ID → resolved token limit (from the model assigned to that agent).
+     * Agent functional ID → resolved token limit (from the model assigned to that
+     * agent).
      * Populated during {@link #loadAgents(AgentOrchestrator)}.
      */
     private final Map<String, Integer> agentTokenLimits = new ConcurrentHashMap<>();
@@ -69,7 +71,8 @@ public class AgentRegistry {
     }
 
     /**
-     * Returns the context-window token limit for the model assigned to the given agent.
+     * Returns the context-window token limit for the model assigned to the given
+     * agent.
      * Falls back to {@value #DEFAULT_TOKEN_LIMIT} if the agent or model is unknown.
      */
     public int getTokenLimitForAgent(String agentId) {
@@ -98,7 +101,8 @@ public class AgentRegistry {
             ObjectMapper mapper = ObjectMapperFactory.create();
             Resource resource = resourceLoader.getResource("classpath:agents/models.json");
             try (InputStream is = resource.getInputStream()) {
-                Map<String, Integer> limits = mapper.readValue(is, new TypeReference<Map<String, Integer>>() {});
+                Map<String, Integer> limits = mapper.readValue(is, new TypeReference<Map<String, Integer>>() {
+                });
                 modelTokenLimits.putAll(limits);
                 System.out.println("Loaded token limits for " + limits.size() + " models from models.json");
             }
@@ -131,7 +135,8 @@ public class AgentRegistry {
                                     .title(config.getOutputSchemaTitle())
                                     .type(Type.Known.ARRAY)
                                     .description(config.getOutputSchemaDescription())
-                                    .items(SchemaUtil.schemaForClass(outputClass, config.getOutputSchemaTitle() + "Item",
+                                    .items(SchemaUtil.schemaForClass(outputClass,
+                                            config.getOutputSchemaTitle() + "Item",
                                             "Item for " + config.getOutputSchemaTitle()))
                                     .build();
                         } else {

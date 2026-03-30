@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "vocab_terms", uniqueConstraints = @UniqueConstraint(columnNames = { "term", "parent_id" }))
+@Table(name = "vocab_terms")
 @Data
 public class Vocabulary {
     @Id

@@ -24,9 +24,8 @@ public interface FactRepository extends JpaRepository<FactEntity, Long> {
                 :factId, :tenantId, :subject, :predicate, :object,
                 :observedAt, :severity, :confidence, :correlationId, now()
                 )
-                ON CONFLICT (fact_id)
-                DO UPDATE SET
-                confidence = GREATEST(fact.confidence, EXCLUDED.confidence)
+                ON DUPLICATE KEY UPDATE
+                confidence = GREATEST(confidence, VALUES(confidence))
             """, nativeQuery = true)
     void upsertNative(
             String factId,

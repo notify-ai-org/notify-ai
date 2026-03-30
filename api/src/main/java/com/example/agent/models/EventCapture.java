@@ -43,6 +43,14 @@ public class EventCapture extends RawLog {
 
     private String serviceName; // service name
 
+    // Agent outputs
+    @Column(columnDefinition = "TEXT")
+    private String agentThoughtProcess;
+
+    // We store the bullet points as a single comma-separated text string to natively match SQL rows
+    @Column(columnDefinition = "TEXT")
+    private String bulletReasons;
+
     /** Lifecycle status of this capture. */
     @Enumerated(EnumType.STRING)
     private CaptureStatus status;

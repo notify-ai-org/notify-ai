@@ -54,8 +54,9 @@ public class VocabularyConsumer {
         this.ruleRepository = ruleRepository;
     }
 
-    private void processClasses(List<ClassModel> classes) throws JsonProcessingException {
-        // Prefetch all existing vocabulary into memory to avoid multiple DB calls
+    @Transactional
+    public void processClasses(List<ClassModel> classes) throws JsonProcessingException {
+        // Prefetch all existing vocabulary into memory as a performance cache
         List<Vocabulary> allVocabEntries = repo.findAll();
 
         // Separate into root (class) and child (attribute) caches
@@ -72,41 +73,50 @@ public class VocabularyConsumer {
         }
 
         for (ClassModel classModel : classes) {
-            // 1. Get or create the class vocabulary
+            // 1. Get or create the class vocabulary — DB lookup is authoritative
             String classNameLower = classModel.getClassName().toLowerCase();
-            Vocabulary classVocab = classCache.get(classNameLower);
-            if (classVocab == null) {
-                classVocab = new Vocabulary();
-                classVocab.setTerm(classModel.getClassName());
-                classCache.put(classNameLower, classVocab);
-            }
+            Vocabulary classVocab = classCache.computeIfAbsent(classNameLower,
+                    k -> repo.findByTermIgnoreCaseAndParent(classModel.getClassName(), null)
+                            .orElseGet(() -> {
+                                Vocabulary v = new Vocabulary();
+                                v.setTerm(classModel.getClassName());
+                                return v;
+                            }));
 
             classVocab.setDescription(classModel.getClassDescription());
 
-            // Super class lookup from cache
+            // Super class lookup (cache-first, then DB)
             if (classModel.getSuperClass() != null) {
-                Vocabulary parentClassVocab = classCache.get(classModel.getSuperClass().toLowerCase());
+                String superClassLower = classModel.getSuperClass().toLowerCase();
+                Vocabulary parentClassVocab = classCache.computeIfAbsent(superClassLower,
+                        k -> repo.findByTermIgnoreCaseAndParent(classModel.getSuperClass(), null)
+                                .orElse(null));
                 classVocab.setParent(parentClassVocab);
             }
 
-            classVocab = repo.save(classVocab);
+            classVocab = repo.saveAndFlush(classVocab);  // flush so parent is visible to attribute SELECT
+            // Refresh the cache with the now-persisted instance (has a DB id)
+            classCache.put(classNameLower, classVocab);
 
-            // 2. Process attributes with cache lookup
+            // 2. Process attributes — DB lookup guards against duplicate key violations
             if (classModel.getAttributes() != null) {
+                final Vocabulary savedClassVocab = classVocab;
                 for (AttributeModel attr : classModel.getAttributes()) {
-                    String attrKey = classVocab.getId() + ":" + attr.getName().toLowerCase();
-                    Vocabulary attrVocab = attributeCacheByParent.get(attrKey);
+                    String attrKey = savedClassVocab.getId() + ":" + attr.getName().toLowerCase();
 
-                    if (attrVocab == null) {
-                        attrVocab = new Vocabulary();
-                        attrVocab.setTerm(attr.getName());
-                        attrVocab.setParent(classVocab);
-                        attributeCacheByParent.put(attrKey, attrVocab);
-                    }
+                    Vocabulary attrVocab = attributeCacheByParent.computeIfAbsent(attrKey,
+                            k -> repo.findByTermIgnoreCaseAndParent(attr.getName(), savedClassVocab)
+                                    .orElseGet(() -> {
+                                        Vocabulary v = new Vocabulary();
+                                        v.setTerm(attr.getName());
+                                        v.setParent(savedClassVocab);
+                                        return v;
+                                    }));
 
                     attrVocab.setDescription(attr.getDescription());
                     attrVocab.setType(attr.getType());
-                    repo.save(attrVocab);
+                    Vocabulary saved = repo.save(attrVocab);
+                    attributeCacheByParent.put(attrKey, saved);
                 }
             }
         }
@@ -116,7 +126,6 @@ public class VocabularyConsumer {
      * REST endpoint to create or update a vocabulary entry.
      */
     @PostMapping
-    @Transactional
     public Mono<ResponseEntity<Map<String, Object>>> createVocabulary(@RequestBody List<ClassModel> classes) {
         if (classes == null || classes.isEmpty()) {
             return Mono.just(ResponseEntity.badRequest()

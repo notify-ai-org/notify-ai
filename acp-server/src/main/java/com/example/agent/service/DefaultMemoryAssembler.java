@@ -4,15 +4,7 @@ import com.example.agent.MemoryPageRepository;
 import com.example.agent.enums.PageType;
 import com.example.agent.interfaces.MemoryAssembler;
 import com.example.agent.records.*;
-import com.example.agent.util.ObjectMapperFactory;
-import com.example.agent.AgentOrchestrator;
 import com.example.agent.annotations.ManagedConfiguration;
-import com.example.agent.config.AgentRegistry;
-import com.example.agent.models.dto.MemorySummarizationRequestDto;
-import com.example.agent.models.dto.MemorySummarizationResponseDto;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.genai.types.Content;
-import com.google.genai.types.Part;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -34,27 +26,19 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
     private int maxFactsPerPage;
 
     private final EmbeddingService embeddingService;
-
     private final MemoryPageRepository pageRepo;
-    private final AgentOrchestrator orchestrator;
-    private final AgentRegistry agentRegistry;
-    private final ObjectMapper mapper = ObjectMapperFactory.create();
 
     public DefaultMemoryAssembler(
             @Value("${agent.memory.window-size:1h}") Duration windowSize,
             @Value("${agent.memory.inactivity-timeout:30m}") Duration inactivityTimeout,
             @Value("${agent.memory.max-facts:50}") int maxFactsPerPage,
             MemoryPageRepository pageRepo,
-            EmbeddingService embeddingService,
-            AgentOrchestrator orchestrator,
-            AgentRegistry agentRegistry) {
+            EmbeddingService embeddingService) {
 
         this.windowSize = windowSize;
         this.inactivityTimeout = inactivityTimeout;
         this.maxFactsPerPage = maxFactsPerPage;
         this.pageRepo = pageRepo;
-        this.orchestrator = orchestrator;
-        this.agentRegistry = agentRegistry;
         this.embeddingService = embeddingService;
     }
 
@@ -147,41 +131,10 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
         if (page.summary() == null || page.summary().isBlank()) {
             return "No facts to summarize.";
         }
-
-        try {
-            MemorySummarizationRequestDto request = new MemorySummarizationRequestDto();
-            request.setFacts(page.summary());
-
-            String agentId = agentRegistry.get(AgentRegistry.MEMORY_SUMMARIZER_AGENT_ID);
-            Content prompt = Content.fromParts(Part.fromText(mapper.writeValueAsString(request)));
-
-            // Use CompletableFuture to bridge the callback to a blocking call
-            java.util.concurrent.CompletableFuture<com.google.adk.events.Event> future =
-                    new java.util.concurrent.CompletableFuture<>();
-
-            String taskId = UUID.randomUUID().toString();
-            com.example.agent.models.AgentContext context = com.example.agent.AgentContextHolder.getContext();
-
-            orchestrator.createTaskFlowable(agentId, taskId, prompt, context)
-                .firstElement().subscribe(
-                    future::complete,
-                    future::completeExceptionally);
-
-            com.google.adk.events.Event event = future.get(30, java.util.concurrent.TimeUnit.SECONDS);
-
-            if (event.content().isPresent() && event.content().get().parts().isPresent()) {
-                List<Part> parts = event.content().get().parts().get();
-                if (!parts.isEmpty() && parts.get(0).text().isPresent()) {
-                    String jsonResponse = parts.get(0).text().get();
-                    MemorySummarizationResponseDto response = mapper.readValue(jsonResponse,
-                            MemorySummarizationResponseDto.class);
-                    return response.getSummary();
-                }
-            }
-            return "Failed to parse summary from agent.";
-        } catch (Exception e) {
-            return "Error summarizing memory: " + e.getMessage();
-        }
+        
+        // Simpler approach: Return the raw chronologically appended bullet points
+        // as the final memory block instead of requiring a secondary LLM step.
+        return page.summary();
     }
 
     @Override

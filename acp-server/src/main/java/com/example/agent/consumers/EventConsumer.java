@@ -63,6 +63,7 @@ public class EventConsumer {
     private final NotificationJobRepository notificationJobRepository;
     private final AgentRegistry agentRegistry;
     private final EventRepository eventRepository;
+    private final com.example.agent.FactRepository factRepository;
     private final RetrievalPlanner retrievalPlanner;
     private final PromptAssembler promptAssembler;
 
@@ -79,6 +80,7 @@ public class EventConsumer {
             AgentOrchestrator agentOrchestrator,
             NotificationDispatcher notificationDispatcher, NotificationJobRepository notificationJobRepository,
             AgentRegistry agentRegistry, EventRepository eventRepository,
+            com.example.agent.FactRepository factRepository,
             RetrievalPlanner retrievalPlanner, PromptAssembler promptAssembler) {
         this.eventCaptureRepository = eventCaptureRepository;
         this.eventScheduleRepository = eventScheduleRepository;
@@ -88,6 +90,7 @@ public class EventConsumer {
         this.notificationJobRepository = notificationJobRepository;
         this.agentRegistry = agentRegistry;
         this.eventRepository = eventRepository;
+        this.factRepository = factRepository;
         this.retrievalPlanner = retrievalPlanner;
         this.promptAssembler = promptAssembler;
     }
@@ -188,8 +191,9 @@ public class EventConsumer {
                 PromptPackage pkg = promptAssembler.assemble(decisionReq, bundle);
 
                 // Build the enriched prompt: system context first, then raw event JSON
+                String maxLimitsSysProp = "\n\nCRITICAL: You must limit your thoughtProcess value strictly under 100 words in your JSON response to prevent context exhaustion.";
                 Content prompt = Content.fromParts(
-                        Part.fromText(pkg.userPrompt()),
+                        Part.fromText(pkg.userPrompt() + maxLimitsSysProp),
                         Part.fromText("\n\n## Event Capture\n" + inputJson));
 
                 logger.debug("Assembled context prompt with {} token estimate", bundle.tokenEstimate());
@@ -234,6 +238,35 @@ public class EventConsumer {
                                 logger.info("Event '{}' suppressed by agent.", capture.getEvent().getName());
                                 continue;
                             }
+                            
+                            // Extract Reasoning and Facts Data
+                            Map<String, Object> reasoningObj = (Map<String, Object>) processedEvent.get("reasoning");
+                            if (reasoningObj != null) {
+                                if (reasoningObj.containsKey("thoughtProcess") && reasoningObj.get("thoughtProcess") != null) {
+                                    capture.setAgentThoughtProcess(String.valueOf(reasoningObj.get("thoughtProcess")));
+                                }
+                                if (reasoningObj.containsKey("bulletReasons") && reasoningObj.get("bulletReasons") instanceof List) {
+                                    @SuppressWarnings("unchecked")
+                                    List<String> bullets = (List<String>) reasoningObj.get("bulletReasons");
+                                    capture.setBulletReasons(String.join(", ", bullets));
+                                }
+                                
+                                if (reasoningObj.containsKey("factsUsed") && reasoningObj.get("factsUsed") instanceof List) {
+                                    @SuppressWarnings("unchecked")
+                                    List<String> factsUsed = (List<String>) reasoningObj.get("factsUsed");
+                                    AgentContext ctxNow = AgentContextHolder.getContext();
+                                    for (String factString : factsUsed) {
+                                        com.example.agent.models.FactEntity factE = new com.example.agent.models.FactEntity();
+                                        factE.setClientId((ctxNow != null && ctxNow.getSource() != null) ? ctxNow.getSource() : "default");
+                                        factE.setSourceType("ACP_EVENT_PROCESSOR");
+                                        factE.setFactType("EVENT_PROCESSOR_OBSERVATION");
+                                        factE.setSentence(factString);
+                                        factE.setCorrelationId(capture.getCorrelationId());
+                                        factRepository.save(factE);
+                                    }
+                                }
+                            }
+                            eventCaptureRepository.save(capture);
 
                             Object eventTypeObj = processedEvent.get("eventType");
                             @SuppressWarnings("unchecked")

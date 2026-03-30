@@ -112,12 +112,23 @@ public class EventProcessingResultDto {
     }
 
     public static class Reasoning {
+        @com.fasterxml.jackson.annotation.JsonProperty(required = false)
+        @com.fasterxml.jackson.annotation.JsonPropertyDescription("Agent internal thought process (Maximum 100 words)")
+        private String thoughtProcess;
         @com.fasterxml.jackson.annotation.JsonProperty(required = true)
         private List<String> bulletReasons;
         @com.fasterxml.jackson.annotation.JsonProperty(required = true)
         private List<String> memoryUsed;
         @com.fasterxml.jackson.annotation.JsonProperty(required = true)
         private List<String> factsUsed;
+
+        public String getThoughtProcess() {
+            return thoughtProcess;
+        }
+
+        public void setThoughtProcess(String thoughtProcess) {
+            this.thoughtProcess = thoughtProcess;
+        }
 
         public List<String> getBulletReasons() {
             return bulletReasons;

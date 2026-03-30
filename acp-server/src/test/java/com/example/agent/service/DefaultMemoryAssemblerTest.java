@@ -16,10 +16,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.example.agent.AgentOrchestrator;
 import com.example.agent.MemoryPageRepository;
 import com.example.agent.MemoryPageRepository.SearchResult;
-import com.example.agent.config.AgentRegistry;
 import com.example.agent.enums.PageType;
 import com.example.agent.records.*;
 
@@ -37,12 +35,6 @@ class DefaultMemoryAssemblerTest {
         @Mock
         private EmbeddingService embeddingService;
 
-        @Mock
-        private AgentOrchestrator orchestrator;
-
-        @Mock
-        private AgentRegistry agentRegistry;
-
         private DefaultMemoryAssembler memoryAssembler;
         private Fact testFact;
         private MemoryPage testPage;
@@ -54,9 +46,7 @@ class DefaultMemoryAssemblerTest {
                                 Duration.ofMinutes(30),
                                 50,
                                 pageRepo,
-                                embeddingService,
-                                orchestrator,
-                                agentRegistry);
+                                embeddingService);
 
                 testFact = new Fact(
                                 "fact-1",
