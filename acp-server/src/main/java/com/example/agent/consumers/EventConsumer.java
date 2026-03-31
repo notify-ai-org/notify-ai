@@ -168,18 +168,19 @@ public class EventConsumer {
                 // Extract sessionId from agent context if present
                 AgentContext agentCtx = AgentContextHolder.getContext();
                 String sessionId = (agentCtx != null && agentCtx.getSession() != null)
-                        ? agentCtx.getSession().id() : null;
+                        ? agentCtx.getSession().id()
+                        : null;
 
                 // Build a DecisionRequest to pass to the planner/assembler pipeline
                 DecisionRequest decisionReq = new DecisionRequest(
                         DecisionType.EMIT,
-                        List.of(),               // entities not available on EventCapture
+                        List.of(), // entities not available on EventCapture
                         new EventRef(
                                 capture.getCorrelationId(),
                                 capture.getEvent() != null ? capture.getEvent().getEventType() : null,
                                 "NORMAL",
                                 capture.getOccuredAt() != null ? capture.getOccuredAt() : Instant.now()),
-                        30,                      // timeWindowDays
+                        30, // timeWindowDays
                         tokenBudget,
                         (int) bufferTimeout.toMillis(),
                         "en_US",
@@ -238,26 +239,31 @@ public class EventConsumer {
                                 logger.info("Event '{}' suppressed by agent.", capture.getEvent().getName());
                                 continue;
                             }
-                            
+
                             // Extract Reasoning and Facts Data
                             Map<String, Object> reasoningObj = (Map<String, Object>) processedEvent.get("reasoning");
                             if (reasoningObj != null) {
-                                if (reasoningObj.containsKey("thoughtProcess") && reasoningObj.get("thoughtProcess") != null) {
+                                if (reasoningObj.containsKey("thoughtProcess")
+                                        && reasoningObj.get("thoughtProcess") != null) {
                                     capture.setAgentThoughtProcess(String.valueOf(reasoningObj.get("thoughtProcess")));
                                 }
-                                if (reasoningObj.containsKey("bulletReasons") && reasoningObj.get("bulletReasons") instanceof List) {
+                                if (reasoningObj.containsKey("bulletReasons")
+                                        && reasoningObj.get("bulletReasons") instanceof List) {
                                     @SuppressWarnings("unchecked")
                                     List<String> bullets = (List<String>) reasoningObj.get("bulletReasons");
                                     capture.setBulletReasons(String.join(", ", bullets));
                                 }
-                                
-                                if (reasoningObj.containsKey("factsUsed") && reasoningObj.get("factsUsed") instanceof List) {
+
+                                if (reasoningObj.containsKey("factsUsed")
+                                        && reasoningObj.get("factsUsed") instanceof List) {
                                     @SuppressWarnings("unchecked")
                                     List<String> factsUsed = (List<String>) reasoningObj.get("factsUsed");
                                     AgentContext ctxNow = AgentContextHolder.getContext();
                                     for (String factString : factsUsed) {
                                         com.example.agent.models.FactEntity factE = new com.example.agent.models.FactEntity();
-                                        factE.setClientId((ctxNow != null && ctxNow.getSource() != null) ? ctxNow.getSource() : "default");
+                                        factE.setClientId(
+                                                (ctxNow != null && ctxNow.getSource() != null) ? ctxNow.getSource()
+                                                        : "default");
                                         factE.setSourceType("ACP_EVENT_PROCESSOR");
                                         factE.setFactType("EVENT_PROCESSOR_OBSERVATION");
                                         factE.setSentence(factString);

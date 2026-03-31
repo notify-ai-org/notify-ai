@@ -94,7 +94,7 @@ public class VocabularyConsumer {
                 classVocab.setParent(parentClassVocab);
             }
 
-            classVocab = repo.saveAndFlush(classVocab);  // flush so parent is visible to attribute SELECT
+            classVocab = repo.saveAndFlush(classVocab); // flush so parent is visible to attribute SELECT
             // Refresh the cache with the now-persisted instance (has a DB id)
             classCache.put(classNameLower, classVocab);
 

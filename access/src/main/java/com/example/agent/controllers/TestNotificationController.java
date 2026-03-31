@@ -15,12 +15,17 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 
+import com.example.agent.consumers.EventConsumer;
+import com.example.agent.models.Event;
+import com.example.agent.models.EventCapture;
+
 @RestController
 @RequestMapping("/api/test/notification")
 @RequiredArgsConstructor
 public class TestNotificationController {
 
         private final NotificationDispatcher notificationDispatcher;
+        private final EventConsumer eventConsumer;
 
         @PostMapping
         public ResponseEntity<Map<String, Object>> createDummyJob(
@@ -131,6 +136,88 @@ public class TestNotificationController {
                                         "message", "Dispatched dummy SMS notification job",
                                         "jobId", job.getId(),
                                         "channel", job.getChannel()));
+                } catch (Exception e) {
+                        return ResponseEntity.internalServerError().body(Map.of(
+                                        "status", "ERROR",
+                                        "message", e.getMessage()));
+                }
+        }
+
+        @PostMapping("/events/bulk")
+        public ResponseEntity<Map<String, Object>> createDummyBulkEvents(
+                        @RequestBody(required = false) Map<String, Object> requestParams) {
+
+                int count = (requestParams != null && requestParams.containsKey("count"))
+                                ? Integer.parseInt(requestParams.get("count").toString())
+                                : 100;
+
+                try {
+                        java.util.List<EventCapture> captures = new java.util.ArrayList<>();
+                        for (int i = 0; i < count; i++) {
+                                EventCapture capture = new EventCapture();
+                                capture.setId(UUID.randomUUID().toString());
+                                capture.setCorrelationId("test-corr-" + System.currentTimeMillis() + "-" + i);
+                                capture.setOccuredAt(java.time.Instant.now());
+                                capture.setPayload(Map.of("testKey", "testValue" + i));
+
+                                Event event = new Event();
+                                event.setEventType("TEST_EVENT");
+                                event.setName("dummy_event_" + i);
+                                capture.setEvent(event);
+
+                                captures.add(capture);
+                        }
+
+                        eventConsumer.enqueueEventProcessing(captures);
+
+                        return ResponseEntity.accepted().body(Map.of(
+                                        "status", "SUCCESS",
+                                        "count", captures.size(),
+                                        "message", "Dispatched " + count + " dummy event captures synchronously for background processing"));
+                } catch (Exception e) {
+                        return ResponseEntity.internalServerError().body(Map.of(
+                                        "status", "ERROR",
+                                        "message", e.getMessage()));
+                }
+        }
+
+        @PostMapping("/events/noise")
+        public ResponseEntity<Map<String, Object>> createNoiseEvents(
+                        @RequestBody(required = false) Map<String, Object> requestParams) {
+
+                int count = (requestParams != null && requestParams.containsKey("count"))
+                                ? Integer.parseInt(requestParams.get("count").toString())
+                                : 1; // Default to 1 noise event, can handle bulk if count > 1
+
+                try {
+                        java.util.List<EventCapture> captures = new java.util.ArrayList<>();
+                        for (int i = 0; i < count; i++) {
+                                EventCapture capture = new EventCapture();
+                                capture.setId(UUID.randomUUID().toString());
+                                capture.setCorrelationId("noise-corr-" + System.currentTimeMillis() + "-" + i);
+                                capture.setOccuredAt(java.time.Instant.now());
+                                // Payload is pure noise/heartbeat to trigger Agent suppression
+                                capture.setPayload(Map.of(
+                                                "sensorData", "0x0000",
+                                                "diagnostics", "Routine heartbeat check. No anomalies detected.",
+                                                "logLevel", "TRACE",
+                                                "relevance", "IGNORE"
+                                ));
+
+                                Event event = new Event();
+                                event.setEventType("SYSTEM_HEARTBEAT");
+                                event.setName("background_noise_ping_" + i);
+                                capture.setEvent(event);
+
+                                captures.add(capture);
+                        }
+
+                        eventConsumer.enqueueEventProcessing(captures);
+
+                        return ResponseEntity.accepted().body(Map.of(
+                                        "status", "SUCCESS",
+                                        "count", captures.size(),
+                                        "message", "Dispatched " + count + " NOISE event captures specifically targeted for Agent suppression"));
                 } catch (Exception e) {
                         return ResponseEntity.internalServerError().body(Map.of(
                                         "status", "ERROR",

@@ -226,7 +226,24 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
             ctx.setDomainContentJson(domainJson);
 
             AgentContextHolder.setContext(ctx);
-            
+
+            String requestUri = request.getRequestURI();
+            if (DEFAULT_CLIENT_ID.equals(clientId)) {
+                if (!requestUri.startsWith("/api/trial")) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"access_denied\", \"message\":\"Default session can only access Trial Agent\"}");
+                    return;
+                }
+            } else {
+                if (requestUri.startsWith("/api/admin/") && !scopes.contains("admin")) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"insufficient_scope\", \"message\":\"Admin privileges required\"}");
+                    return;
+                }
+            }
+
             // --- IDEMPOTENCY LAYER ---
             String idempotencyKey = request.getHeader("X-Idempotency-Key");
             if (idempotencyKey == null || idempotencyKey.isBlank()) {

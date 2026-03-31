@@ -21,7 +21,7 @@ import java.util.Map;
  * list entities pending validation.
  */
 @RestController
-@RequestMapping("/api/validation")
+@RequestMapping("/api/admin/validation")
 @RequiredArgsConstructor
 public class ValidationController {
 

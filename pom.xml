@@ -16,6 +16,7 @@
         <module>annotations</module>
         <module>api</module>
         <module>acp-server</module>
+        <module>access</module>
         <module>client</module>
         <module>engine</module>
         <module>examples/ecommerce-app</module>
