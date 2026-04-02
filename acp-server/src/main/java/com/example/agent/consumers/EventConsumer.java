@@ -130,7 +130,7 @@ public class EventConsumer {
      * Uses RxJava Flowables to construct a sequential execution pipeline.
      */
     @SuppressWarnings("null")
-    private void enqueueEventProcessing(List<EventCapture> captures) {
+    public void enqueueEventProcessing(List<EventCapture> captures) {
         for (EventCapture capture : captures) {
             if (capture == null || capture.getEvent() == null) {
                 throw new RuntimeException("Event capture is required with an eventName");
@@ -203,7 +203,7 @@ public class EventConsumer {
                 io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> eventProcessFlowable = agentOrchestrator
                         .createTaskFlowable(
                                 agentRegistry.get(AgentRegistry.EVENT_PROCESSOR_AGENT_ID),
-                                UUID.randomUUID().toString(), prompt, AgentContextHolder.getContext());
+                                capture.getId(), prompt, AgentContextHolder.getContext());
 
                 // 2. Chain downstream tasks based on processor result
                 eventProcessFlowable.flatMap(agentEvent -> {
@@ -237,6 +237,8 @@ public class EventConsumer {
                             String resultStatus = (String) processedEvent.get("result");
                             if ("suppressed".equalsIgnoreCase(resultStatus)) {
                                 logger.info("Event '{}' suppressed by agent.", capture.getEvent().getName());
+                                capture.setStatus(CaptureStatus.SUPPRESSED);
+                                eventCaptureRepository.save(capture);
                                 continue;
                             }
 
@@ -272,6 +274,8 @@ public class EventConsumer {
                                     }
                                 }
                             }
+
+                            capture.setStatus(CaptureStatus.PROCESSED);
                             eventCaptureRepository.save(capture);
 
                             Object eventTypeObj = processedEvent.get("eventType");
@@ -335,10 +339,16 @@ public class EventConsumer {
                 }).subscribe(
                         result -> {
                             /* Terminal elements dropped or logged */ },
-                        error -> logger.error("Event processing pipeline failed: " + error.getMessage(), error));
+                        error -> {
+                            logger.error("Event processing pipeline failed: " + error.getMessage(), error);
+                            capture.setStatus(CaptureStatus.FAILED);
+                            eventCaptureRepository.save(capture);
+                        });
 
             } catch (Exception e) {
                 logger.error("Error enqueuing event processing: " + e.getMessage(), e);
+                capture.setStatus(CaptureStatus.FAILED);
+                eventCaptureRepository.save(capture);
             }
         }
     }
@@ -379,7 +389,7 @@ public class EventConsumer {
 
             return agentOrchestrator.createTaskFlowable(
                     agentRegistry.get(AgentRegistry.MESSAGE_TEMPLATE_AGENT_ID),
-                    UUID.randomUUID().toString(), prompt, AgentContextHolder.getContext())
+                    capture.getId(), prompt, AgentContextHolder.getContext())
                     .doOnNext(agentEvent -> {
                         if (agentEvent.content().isEmpty() || agentEvent.content().get().parts().isEmpty()
                                 || agentEvent.content().get().parts().get().isEmpty()) {
@@ -429,14 +439,15 @@ public class EventConsumer {
                     job.setScheduleId(existingSchedule.getId());
                     notificationJobRepository.save(job);
                     capture.setStatus(CaptureStatus.DISPATCHED);
-                    eventCaptureRepository.save(capture);
                     try {
                         notificationDispatcher.scheduleJob(existingSchedule);
                         logger.info("Scheduled reused EventSchedule for '{}' (ID: {})", capture.getEvent().getName(),
                                 existingSchedule.getId());
                     } catch (Exception e) {
+                        capture.setStatus(CaptureStatus.FAILED);
                         logger.error("Failed to schedule reused EventSchedule: {}", e.getMessage(), e);
                     }
+                    eventCaptureRepository.save(capture);
                 }
 
             }
@@ -458,7 +469,7 @@ public class EventConsumer {
 
             return agentOrchestrator.createTaskFlowable(
                     agentRegistry.get(AgentRegistry.EVENT_SCHEDULER_AGENT_ID),
-                    UUID.randomUUID().toString(), prompt, AgentContextHolder.getContext())
+                    capture.getId(), prompt, AgentContextHolder.getContext())
                     .doOnNext(agentEvent -> {
                         if (agentEvent.content().isEmpty() || agentEvent.content().get().parts().isEmpty()
                                 || agentEvent.content().get().parts().get().isEmpty()) {

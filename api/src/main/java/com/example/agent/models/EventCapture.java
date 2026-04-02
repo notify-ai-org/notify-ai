@@ -53,6 +53,7 @@ public class EventCapture extends RawLog {
 
     /** Lifecycle status of this capture. */
     @Enumerated(EnumType.STRING)
+    @Column(name = "status", columnDefinition = "VARCHAR(32)")
     private CaptureStatus status;
 
     // Subject and Rule execution results

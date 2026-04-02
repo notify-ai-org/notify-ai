@@ -223,6 +223,24 @@ public class ManagedConfigService implements BeanPostProcessor {
         }
     }
 
+    public void updateConfigMap(Map<String, Object> configMap) throws Exception {
+        for (Map.Entry<String, Object> entry : configMap.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            List<FieldTarget> targets = registry.get(key);
+            if (targets != null) {
+                try {
+                    applyValue(key, value.toString());
+                } catch (Exception e) {
+                    log.error("Failed to refresh ConfigMap key {}={} : {}",
+                            key, value,
+                            e.getMessage());
+                    throw e;
+                }
+            }
+        }
+    }
+
     // -----------------------------------------------------------------------
     // Internals
     // -----------------------------------------------------------------------

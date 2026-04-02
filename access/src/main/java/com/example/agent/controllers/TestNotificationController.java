@@ -4,7 +4,6 @@ import com.example.agent.NotificationDispatcher;
 import com.example.agent.models.NotificationJob;
 import com.example.agent.models.NotificationJob.DispatchMode;
 import com.example.agent.models.NotificationJob.NotificationPriority;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,11 +20,16 @@ import com.example.agent.models.EventCapture;
 
 @RestController
 @RequestMapping("/api/test/notification")
-@RequiredArgsConstructor
 public class TestNotificationController {
 
         private final NotificationDispatcher notificationDispatcher;
         private final EventConsumer eventConsumer;
+
+        public TestNotificationController(NotificationDispatcher notificationDispatcher,
+                        EventConsumer eventConsumer) {
+                this.notificationDispatcher = notificationDispatcher;
+                this.eventConsumer = eventConsumer;
+        }
 
         @PostMapping
         public ResponseEntity<Map<String, Object>> createDummyJob(
@@ -173,7 +177,8 @@ public class TestNotificationController {
                         return ResponseEntity.accepted().body(Map.of(
                                         "status", "SUCCESS",
                                         "count", captures.size(),
-                                        "message", "Dispatched " + count + " dummy event captures synchronously for background processing"));
+                                        "message", "Dispatched " + count
+                                                        + " dummy event captures synchronously for background processing"));
                 } catch (Exception e) {
                         return ResponseEntity.internalServerError().body(Map.of(
                                         "status", "ERROR",
@@ -201,8 +206,7 @@ public class TestNotificationController {
                                                 "sensorData", "0x0000",
                                                 "diagnostics", "Routine heartbeat check. No anomalies detected.",
                                                 "logLevel", "TRACE",
-                                                "relevance", "IGNORE"
-                                ));
+                                                "relevance", "IGNORE"));
 
                                 Event event = new Event();
                                 event.setEventType("SYSTEM_HEARTBEAT");
@@ -212,12 +216,13 @@ public class TestNotificationController {
                                 captures.add(capture);
                         }
 
-                        eventConsumer.enqueueEventProcessing(captures);
+                        eventConsumer.processEvents(captures);
 
                         return ResponseEntity.accepted().body(Map.of(
                                         "status", "SUCCESS",
                                         "count", captures.size(),
-                                        "message", "Dispatched " + count + " NOISE event captures specifically targeted for Agent suppression"));
+                                        "message", "Dispatched " + count
+                                                        + " NOISE event captures specifically targeted for Agent suppression"));
                 } catch (Exception e) {
                         return ResponseEntity.internalServerError().body(Map.of(
                                         "status", "ERROR",

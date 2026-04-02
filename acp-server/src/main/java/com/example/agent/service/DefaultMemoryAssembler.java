@@ -56,9 +56,9 @@ public class DefaultMemoryAssembler implements MemoryAssembler {
             return List.of();
         }
 
-        // 1. Group facts by namespace
+        // 1. Group facts by namespace (fallback to "general" if factType is null)
         Map<String, List<Fact>> byNamespace = newFacts.stream()
-                .collect(Collectors.groupingBy(Fact::factType));
+                .collect(Collectors.groupingBy(f -> f.factType() != null ? f.factType() : "general"));
 
         List<MemoryPage> updatedPages = new ArrayList<>();
 

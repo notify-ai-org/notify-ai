@@ -229,7 +229,7 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
 
             String requestUri = request.getRequestURI();
             if (DEFAULT_CLIENT_ID.equals(clientId)) {
-                if (!requestUri.startsWith("/api/trial")) {
+                if (!requestUri.startsWith("/api/trial") && !requestUri.startsWith("/api/test/notification")) {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType("application/json");
                     response.getWriter().write("{\"error\":\"access_denied\", \"message\":\"Default session can only access Trial Agent\"}");

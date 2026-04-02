@@ -7,6 +7,8 @@ public enum CaptureStatus {
     /** The capture has been received and is being processed by the agent. */
     PROCESSING,
 
+    PROCESSED,
+
     /** A notification job was successfully dispatched for this capture. */
     DISPATCHED,
 

@@ -1,0 +1,145 @@
+{
+  "info": {
+    "name": "Notify-ai Test Endpoints",
+    "description": "Collection of all automated testing endpoints bounding the NotificationDispatcher and EventConsumer queues. Requires an active Auth JWT.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Dispatch Webhook Job",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/test/notification",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "test", "notification"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"channel\": \"WEBHOOK\",\n  \"template\": \"Manual dummy payload string\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Dispatch Bulk Email Jobs",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/test/notification/email",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "test", "notification", "email"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"target\": \"test@example.com\",\n  \"template\": \"Email verification test layout\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Dispatch SMS Job",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/test/notification/sms",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "test", "notification", "sms"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"target\": \"+1234567890\",\n  \"template\": \"SMS dummy message verification\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Simulate Bulk Event Captures",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/test/notification/events/bulk",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "test", "notification", "events", "bulk"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"count\": 100\n}"
+        }
+      }
+    },
+    {
+      "name": "Simulate System Noise Agent Suppression",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{jwt_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8080/api/test/notification/events/noise",
+          "host": ["localhost"],
+          "port": "8080",
+          "path": ["api", "test", "notification", "events", "noise"]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"count\": 10\n}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "jwt_token",
+      "value": "replace_with_your_active_token"
+    }
+  ]
+}

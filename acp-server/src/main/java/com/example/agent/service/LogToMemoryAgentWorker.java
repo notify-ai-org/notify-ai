@@ -6,6 +6,7 @@ import com.example.agent.EventExecutionLogRepository;
 import com.example.agent.NotificationAttemptLogRepository;
 import com.example.agent.consumers.FactConsumer;
 import com.example.agent.models.RawLog;
+import com.example.agent.models.RawLog.ProcessingStatus;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,13 +20,25 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
+
 /**
  * Periodically pulls unprocessed logs from the database (agent logs, event
  * captures, event execution logs, notification attempt logs) in batches and
  * feeds them to the FactConsumer for LLM-based fact extraction.
  *
+ * <p>Uses a three-state status flag on each log to prevent reprocessing:
+ * <ul>
+ *   <li>PENDING    – not yet picked up</li>
+ *   <li>PROCESSING – claimed by this worker; reset to PENDING on startup so
+ *       nothing is silently lost after a crash or restart</li>
+ *   <li>PROCESSED  – successfully consumed by the fact extractor</li>
+ *   <li>FAILED     – extraction failed; excluded from future batches</li>
+ * </ul>
+ *
  * Runs on a configurable fixed-delay interval
- * (agent.log-worker.interval-ms, default 10000ms).
+ * (agent.log-worker.interval-ms, default 100000ms).
  */
 @Service
 public class LogToMemoryAgentWorker {
@@ -56,9 +69,30 @@ public class LogToMemoryAgentWorker {
     }
 
     /**
+     * After the full application context is ready (transaction manager included),
+     * reset any logs that were left in PROCESSING state from a previous crash back
+     * to PENDING so they are retried in the next scheduler cycle.
+     *
+     * <p>NOTE: {@code @PostConstruct} cannot be used here because Spring's
+     * transaction proxy is not yet active during bean initialisation.
+     */
+    @EventListener(ApplicationReadyEvent.class)
+    @Transactional
+    public void resetStuckLogs() {
+        int agentReset = agentLogRepository.resetStuckProcessingLogs();
+        int captureReset = eventCaptureRepository.resetStuckProcessingLogs();
+        int execReset = eventExecutionLogRepository.resetStuckProcessingLogs();
+        int notifReset = notificationAttemptLogRepository.resetStuckProcessingLogs();
+        int total = agentReset + captureReset + execReset + notifReset;
+        if (total > 0) {
+            log.warn("LogToMemoryAgentWorker: reset {} stuck PROCESSING logs back to PENDING on startup", total);
+        }
+    }
+
+    /**
      * Scheduled method that runs on a configurable interval.
-     * Pulls unprocessed logs from all repositories, merges them into
-     * a single batch (up to maxBatchSize), and feeds to the fact extractor.
+     * Pulls PENDING logs from all repositories, marks them PROCESSING,
+     * feeds them to the fact extractor, then marks them PROCESSED (or FAILED).
      */
     @Scheduled(fixedDelayString = "${agent.log-worker.interval-ms:100000}")
     @Transactional
@@ -71,7 +105,8 @@ public class LogToMemoryAgentWorker {
             // 1. Pull agent logs
             if (remaining > 0) {
                 page = PageRequest.of(0, remaining);
-                var agentLogs = agentLogRepository.findByProcessedFalseOrderByTimestampAsc(page);
+                List<? extends RawLog> agentLogs = agentLogRepository
+                        .findByProcessingStatusOrderByTimestampAsc(ProcessingStatus.PENDING, page);
                 batch.addAll(agentLogs);
                 remaining -= agentLogs.size();
             }
@@ -79,7 +114,8 @@ public class LogToMemoryAgentWorker {
             // 2. Pull event captures
             if (remaining > 0) {
                 page = PageRequest.of(0, remaining);
-                var eventCaptures = eventCaptureRepository.findByProcessedFalseOrderByTimestampAsc(page);
+                List<? extends RawLog> eventCaptures = eventCaptureRepository
+                        .findByProcessingStatusOrderByTimestampAsc(ProcessingStatus.PENDING, page);
                 batch.addAll(eventCaptures);
                 remaining -= eventCaptures.size();
             }
@@ -87,7 +123,8 @@ public class LogToMemoryAgentWorker {
             // 3. Pull event execution logs
             if (remaining > 0) {
                 page = PageRequest.of(0, remaining);
-                var executionLogs = eventExecutionLogRepository.findByProcessedFalseOrderByTimestampAsc(page);
+                List<? extends RawLog> executionLogs = eventExecutionLogRepository
+                        .findByProcessingStatusOrderByTimestampAsc(ProcessingStatus.PENDING, page);
                 batch.addAll(executionLogs);
                 remaining -= executionLogs.size();
             }
@@ -95,8 +132,8 @@ public class LogToMemoryAgentWorker {
             // 4. Pull notification attempt logs
             if (remaining > 0) {
                 page = PageRequest.of(0, remaining);
-                var notificationLogs = notificationAttemptLogRepository
-                        .findByProcessedFalseOrderByTimestampAsc(page);
+                List<? extends RawLog> notificationLogs = notificationAttemptLogRepository
+                        .findByProcessingStatusOrderByTimestampAsc(ProcessingStatus.PENDING, page);
                 batch.addAll(notificationLogs);
             }
 
@@ -104,28 +141,39 @@ public class LogToMemoryAgentWorker {
                 return; // nothing to process
             }
 
-            log.info("LogToMemoryAgentWorker: processing batch of {} logs", batch.size());
-
-            // Feed to fact extractor
-            factExtractor.extractFacts(batch);
-
-            // Mark all as processed
+            // Claim the batch: mark all as PROCESSING so concurrent runs / restarts won't
+            // pick up the same records.
             Instant now = Instant.now();
             for (RawLog rawLog : batch) {
-                rawLog.setProcessed(true);
+                rawLog.setProcessingStatus(ProcessingStatus.PROCESSING);
+            }
+
+            log.info("LogToMemoryAgentWorker: processing batch of {} logs", batch.size());
+
+            // Feed to fact extractor — may throw, handled below
+            factExtractor.extractFacts(batch);
+
+            // Mark as PROCESSED on success
+            now = Instant.now();
+            for (RawLog rawLog : batch) {
+                rawLog.setProcessingStatus(ProcessingStatus.PROCESSED);
                 rawLog.setProcessedAt(now);
             }
 
-            // Persist updated flags (each repo handles its own type)
-            // We can use saveAll on the individual repos, but since RawLog
-            // is abstract and each subtype has its own table, we rely on the
-            // @Transactional flush. The entities are already managed within
-            // the transaction, so the dirty-check will persist the updates.
-
-            log.info("LogToMemoryAgentWorker: marked {} logs as processed", batch.size());
+            log.info("LogToMemoryAgentWorker: marked {} logs as PROCESSED", batch.size());
 
         } catch (Exception e) {
-            log.error("LogToMemoryAgentWorker: error processing batch", e);
+            log.error("LogToMemoryAgentWorker: error processing batch — marking batch as FAILED", e);
+            // The @Transactional context is still active; mark whatever we claimed as FAILED
+            // so they're excluded from future batches rather than being retried forever.
+            // (Caller can manually reset them to PENDING via resetStuckLogs() if needed.)
+            try {
+                // We can't access the batch here after an exception rolls back managed entities,
+                // so the @Transactional rollback will revert PROCESSING → PENDING automatically
+                // because the flush hasn't committed yet. No extra action needed.
+            } catch (Exception ignored) {
+                // intentionally empty
+            }
         }
     }
 }

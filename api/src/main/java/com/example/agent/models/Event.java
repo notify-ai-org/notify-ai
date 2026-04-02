@@ -18,6 +18,7 @@ public class Event extends BaseEntity {
     private int priority; // resolve conflicts, tie-breaker
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "status", columnDefinition = "VARCHAR(32)")
     private EventStatus status; // NEW, PROCESSED, FAILED
 
     private String scheduleIntent;

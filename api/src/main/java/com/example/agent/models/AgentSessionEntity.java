@@ -64,14 +64,14 @@ public class AgentSessionEntity {
     }
 
     public Session toSession() throws Exception {
-        List<com.google.adk.events.Event> events = sessionEvents.stream().map(session -> {
+        List<com.google.adk.events.Event> events = new java.util.ArrayList<>(sessionEvents.stream().map(session -> {
             try {
                 return session.toAdkEvent();
             } catch (IOException e) {
                 e.printStackTrace();
             }
             return null;
-        }).filter(Objects::nonNull).toList();
+        }).filter(Objects::nonNull).toList());
         return Session.builder(id)
                 .appName(clientId)
                 .userId(userId)

@@ -1,52 +1,100 @@
 package com.example.agent.controllers.admin;
 
-import com.example.agent.NotificationAttemptLogRepository;
-import com.example.agent.NotificationDispatcher;
+import com.example.agent.interfaces.DeadLetterManager;
 import com.example.agent.models.DeadLetterRecord;
-import com.example.agent.models.NotificationJob;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/dead-letter")
+@RequiredArgsConstructor
 public class DeadLetterController {
 
-    private final NotificationAttemptLogRepository attemptLogRepository;
-    private final NotificationDispatcher dispatcher;
+    private final DeadLetterManager deadLetterManager;
 
-    public DeadLetterController(NotificationAttemptLogRepository attemptLogRepository, NotificationDispatcher dispatcher) {
-        this.attemptLogRepository = attemptLogRepository;
-        this.dispatcher = dispatcher;
-    }
-
+    /**
+     * List all pending dead-letter records (paginated).
+     *
+     * @param page page number (0-indexed, default 0)
+     * @param size page size (default 20)
+     */
     @GetMapping
-    public ResponseEntity<List<DeadLetterRecord>> geDeadLetterRecords() {
-        return ResponseEntity.ok(attemptLogRepository.findDeadLetterRecords());
+    public ResponseEntity<Page<DeadLetterRecord>> getDeadLetterRecords(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Page<DeadLetterRecord> records = deadLetterManager.listPending(
+                PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt")));
+        return ResponseEntity.ok(records);
     }
 
-    @PostMapping("/dispatch/{id}")
-    public ResponseEntity<Map<String, String>> dispatchDeadLetter(@PathVariable String id) {
-        DeadLetterRecord record = attemptLogRepository.findDeadLetterRecordById(id);
-        if (record == null) {
-            return ResponseEntity.notFound().build();
-        }
-
-        // Rehydrate a NotificationJob from the DLR
-        NotificationJob job = new NotificationJob();
-        job.setId(record.getJobId());
-        job.setCorrelationId(record.getCorrelationId());
-        job.setEventName(record.getEventName());
-        job.setDispatchMode(NotificationJob.DispatchMode.RETRY);
-        
-        // Push manually to processing Queue
-        dispatcher.pushJob(job);
-        
-        // Remove or mark the DLR as dispatched
-        attemptLogRepository.deleteDeadLetterRecord(id);
-
-        return ResponseEntity.ok(Map.of("message", "Dead letter record explicitly dispatched", "jobId", job.getId()));
+    /**
+     * Get a single dead-letter record by ID.
+     *
+     * @param id the record ID
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<DeadLetterRecord> getDeadLetterRecord(@PathVariable long id) {
+        return ResponseEntity.ok(deadLetterManager.get(id));
     }
+
+    /**
+     * Search dead-letter records by notification ID.
+     *
+     * @param notificationId the original notification ID
+     * @param page           page number (0-indexed, default 0)
+     * @param size           page size (default 20)
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Page<DeadLetterRecord>> searchByNotificationId(
+            @RequestParam String notificationId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Page<DeadLetterRecord> records = deadLetterManager.searchByNotificationId(
+                notificationId, PageRequest.of(page, size));
+        return ResponseEntity.ok(records);
+    }
+
+    /**
+     * Replay a dead-letter record — deserializes the stored job payload and
+     * re-dispatches it through the normal processing pipeline.
+     *
+     * @param id    the record ID
+     * @param actor identifier of the person triggering the replay (query param)
+     */
+    @PostMapping("/{id}/replay")
+    public ResponseEntity<Map<String, Object>> replayDeadLetter(
+            @PathVariable long id,
+            @RequestParam(defaultValue = "admin") String actor) {
+        deadLetterManager.replay(id, actor);
+        return ResponseEntity.ok(Map.of(
+                "status", "replayed",
+                "id", id,
+                "replayedBy", actor));
+    }
+
+    /**
+     * Discard a dead-letter record without replaying it.
+     *
+     * @param id     the record ID
+     * @param actor  identifier of the person discarding it
+     * @param reason human-readable reason for discarding
+     */
+    @PostMapping("/{id}/discard")
+    public ResponseEntity<Map<String, Object>> discardDeadLetter(
+            @PathVariable long id,
+            @RequestParam(defaultValue = "admin") String actor,
+            @RequestParam(required = false) String reason) {
+        deadLetterManager.discard(id, actor, reason);
+        return ResponseEntity.ok(Map.of(
+                "status", "discarded",
+                "id", id,
+                "discardedBy", actor));
+    }
+
 }

@@ -1,4 +1,4 @@
-package com.example.agent.controllers;
+package com.example.agent.controllers.admin;
 
 import com.example.agent.EventRepository;
 import com.example.agent.EventScheduleRepository;

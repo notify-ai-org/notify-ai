@@ -1,30 +1,29 @@
 package com.example.agent.controllers.admin;
 
-import com.example.agent.service.DomainContentService;
+import com.example.agent.service.ManagedConfigService;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/config")
 public class ConfigController {
 
-    private final DomainContentService domainContentService;
+    private final ManagedConfigService managedConfigService;
 
-    public ConfigController(DomainContentService domainContentService) {
-        this.domainContentService = domainContentService;
+    public ConfigController(ManagedConfigService managedConfigService) {
+        this.managedConfigService = managedConfigService;
     }
 
-    @GetMapping("/{key}")
-    public ResponseEntity<Map<String, Object>> getConfig(@PathVariable String key) {
-        return ResponseEntity.ok(Map.of("key", key, "value", domainContentService.getConfig(key) != null ? domainContentService.getConfig(key) : "null"));
+    @PostMapping("/apply")
+    public ResponseEntity<Map<String, String>> setConfig(@RequestBody Map<String, Object> payload) {
+        try {
+            managedConfigService.updateConfigMap(payload);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of("message", "Failed to update configuration"));
+        }
+        return ResponseEntity.ok(Map.of("message", "Configuration dynamically updated"));
     }
 
-    @PostMapping("/{key}")
-    public ResponseEntity<Map<String, String>> setConfig(@PathVariable String key, @RequestBody Map<String, String> payload) {
-        String value = payload.get("value");
-        domainContentService.updateConfigMap(key, value);
-        return ResponseEntity.ok(Map.of("message", "Configuration dynamically updated", "key", key, "value", value));
-    }
 }

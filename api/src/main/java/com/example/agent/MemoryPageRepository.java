@@ -42,6 +42,9 @@ public class MemoryPageRepository {
 
     private final StatefulRedisConnection<String, String> connection;
 
+    /** False when the Redis instance does not have the RediSearch module loaded. */
+    private boolean rediSearchAvailable = false;
+
     @Value("${redis.vector.dim:3072}")
     private int vectorDim;
 
@@ -78,10 +81,14 @@ public class MemoryPageRepository {
                     new CommandArgs<>(StringCodec.UTF8));
             if (indexes != null && indexes.stream().anyMatch(o -> INDEX.equals(o.toString()))) {
                 log.info("RediSearch index '{}' already exists, skipping creation.", INDEX);
+                rediSearchAvailable = true;
                 return;
             }
         } catch (Exception e) {
-            log.warn("Could not list RediSearch indexes, will attempt to create '{}': {}", INDEX, e.getMessage());
+            log.warn("RediSearch module not available ({}). Vector search is disabled. "
+                    + "Run Redis Stack to enable semantic memory.", e.getMessage());
+            rediSearchAvailable = false;
+            return; // bail out — no point trying FT.CREATE either
         }
 
         // Create the index
@@ -104,9 +111,10 @@ public class MemoryPageRepository {
                             .add("DIM").add(String.valueOf(vectorDim))
                             .add("DISTANCE_METRIC").add("COSINE"));
             log.info("Created RediSearch index '{}' with VECTOR DIM={}.", INDEX, vectorDim);
+            rediSearchAvailable = true;
         } catch (Exception e) {
-            // Index may already exist if concurrent startup — log and continue
             log.warn("Failed to create RediSearch index '{}': {}", INDEX, e.getMessage());
+            rediSearchAvailable = false;
         }
     }
 
@@ -180,7 +188,7 @@ public class MemoryPageRepository {
     }
 
     private boolean isDuplicate(MemoryPage page) {
-        if (page.embedding() == null) {
+        if (page.embedding() == null || !rediSearchAvailable) {
             return false;
         }
 
@@ -222,6 +230,11 @@ public class MemoryPageRepository {
             int k,
             Optional<String> namespace,
             Optional<String> correlationId) {
+
+        if (!rediSearchAvailable) {
+            log.debug("knnSearch skipped: RediSearch module not available.");
+            return Collections.emptyList();
+        }
 
         RedisCommands<String, String> cmd = connection.sync();
 

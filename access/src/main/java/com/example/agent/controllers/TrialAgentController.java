@@ -42,13 +42,15 @@ public class TrialAgentController {
     public TrialAgentController(AgentOrchestrator agentOrchestrator, NotificationDispatcher dispatcher) {
         this.agentOrchestrator = agentOrchestrator;
         this.dispatcher = dispatcher;
-        
+
         // Define JSON schema for strict LLM output
-        Schema subjectsSchema = Schema.builder().type(Type.ARRAY).items(Schema.builder().type(Type.STRING).build()).build();
+        Schema subjectsSchema = Schema.builder().type(Type.Known.ARRAY)
+                .items(Schema.builder().type(Type.Known.STRING).build()).build();
         Schema responseSchema = Schema.builder()
-                .type(Type.OBJECT)
-                .putProperty("message", Schema.builder().type(Type.STRING).build())
-                .putProperty("subjects", subjectsSchema)
+                .type(Type.Known.OBJECT)
+                .properties(Map.of(
+                        "message", Schema.builder().type(Type.Known.STRING).build(),
+                        "subjects", subjectsSchema))
                 .build();
 
         GenerateContentConfig config = GenerateContentConfig.builder()
@@ -59,17 +61,18 @@ public class TrialAgentController {
         this.trialAgent = LlmAgent.builder()
                 .name("trial_agent")
                 .model("gemini-2.5-pro")
-                .systemInstruction(Content.fromText(
+                .instruction(
                         "You are a Trial Agent demonstrating the Notify-ai capabilities. " +
-                        "You ONLY accept explicit prompt requests similar to: 'Send me a hi on given number/email-id on email/SMS/whatsapp'. " +
-                        "If the user input is off-topic, output message: 'Sorry, I can only send trial messages via email/SMS/whatsapp' and an empty subjects list. " +
-                        "Otherwise, produce a user-friendly message specifying 'Notify-ai' as the sender. Ensure JSON compliance output."
-                ))
+                                "You ONLY accept explicit prompt requests similar to: 'Send me a hi on given number/email-id on email/SMS/whatsapp'. "
+                                +
+                                "If the user input is off-topic, output message: 'Sorry, I can only send trial messages via email/SMS/whatsapp' and an empty subjects list. "
+                                +
+                                "Otherwise, produce a user-friendly message specifying 'Notify-ai' as the sender. Ensure JSON compliance output.")
                 .generateContentConfig(config)
                 .build();
-                
+
         // Register the ephemeral agent in orchestrator proxy map pool
-        this.agentOrchestrator.registerAgent(this.trialAgent);
+        this.agentOrchestrator.registerAgent("TRIAL_AGENT", this.trialAgent);
     }
 
     @PostMapping
@@ -79,35 +82,41 @@ public class TrialAgentController {
             return Mono.just(ResponseEntity.badRequest().body(Map.of("error", "Message cannot be empty")));
         }
 
-        Content prompt = Content.fromText(userMessage);
-        
+        Content prompt = Content.fromParts(Part.fromText(userMessage));
+
         io.reactivex.rxjava3.core.Flowable<Event> flowable = agentOrchestrator.createTaskFlowable(
-                trialAgent,
+                "TRIAL_AGENT",
                 UUID.randomUUID().toString(),
                 prompt,
-                AgentContextHolder.getContext() != null ? AgentContextHolder.getContext() : new AgentContext()
-        );
+                AgentContextHolder.getContext() != null ? AgentContextHolder.getContext() : new AgentContext());
 
-        return Mono.from(flowable.lastOrError().toObservable()).map(event -> {
-            if (event.content().isEmpty() || event.content().get().parts().isEmpty() || event.content().get().parts().get().isEmpty()) {
-                return ResponseEntity.internalServerError().body((Map<String, Object>)Map.of("error", "Agent returned empty response"));
+        Mono<Event> eventMono = Mono.from(flowable.lastOrError().toFlowable());
+
+        return eventMono.map(event -> {
+            if (event.content().isEmpty() || event.content().get().parts().isEmpty()
+                    || event.content().get().parts().get().isEmpty()) {
+                return (ResponseEntity<Map<String, Object>>) ResponseEntity.internalServerError()
+                        .<Map<String, Object>>body(Map.of("error", "Agent returned empty response"));
             }
 
             Part part = event.content().get().parts().get().get(0);
             if (part.text().isEmpty()) {
-                return ResponseEntity.internalServerError().body((Map<String, Object>)Map.of("error", "No text in agent part"));
+                return (ResponseEntity<Map<String, Object>>) ResponseEntity.internalServerError()
+                        .<Map<String, Object>>body(Map.of("error", "No text in agent part"));
             }
 
             String json = part.text().get();
             try {
-                Map<String, Object> output = mapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+                Map<String, Object> output = mapper.readValue(json, new TypeReference<Map<String, Object>>() {
+                });
                 String message = (String) output.get("message");
                 @SuppressWarnings("unchecked")
                 List<String> subjects = (List<String>) output.get("subjects");
 
                 // Check if it's the off-topic fallback response
                 if (message != null && message.contains("Sorry, I can only send trial messages")) {
-                     return ResponseEntity.badRequest().body(Map.of("error", message));
+                    return (ResponseEntity<Map<String, Object>>) ResponseEntity.badRequest()
+                            .<Map<String, Object>>body(Map.of("error", message));
                 }
 
                 // Inject Trial Job to Notification Dispatcher natively
@@ -118,22 +127,24 @@ public class TrialAgentController {
                 job.setChannel("EMAIL"); // Fallback, would natively deduce and parse
                 job.setDispatchMode(NotificationJob.DispatchMode.EVENT);
                 job.setTemplate(message);
-                
+
                 // Set the specific destination using target parameter from input or fallback
-                job.getAttributes().put("trialTarget", userMessage); 
+                job.getAttributes().put("trialTarget", userMessage);
 
                 dispatcher.pushJob(job);
 
-                return ResponseEntity.ok(Map.of(
-                        "status", "DISPATCHED",
-                        "jobId", job.getId() != null ? job.getId() : UUID.randomUUID().toString(),
-                        "agentResponse", output
-                ));
+                return (ResponseEntity<Map<String, Object>>) ResponseEntity.ok()
+                        .<Map<String, Object>>body(Map.of(
+                                "status", "DISPATCHED",
+                                "jobId", job.getId() != null ? job.getId() : UUID.randomUUID().toString(),
+                                "agentResponse", output));
 
             } catch (Exception e) {
                 logger.error("Failed to parse or dispatch Trial Agent output: " + json, e);
-                return ResponseEntity.internalServerError().body(Map.of("error", "Failed to process agent payload"));
+                return (ResponseEntity<Map<String, Object>>) ResponseEntity.internalServerError()
+                        .<Map<String, Object>>body(Map.of("error", "Failed to process agent payload"));
             }
-        }).onErrorReturn(ResponseEntity.internalServerError().body(Map.of("error", "Timeout or orchestrator execution failure")));
+        }).onErrorReturn(ResponseEntity.internalServerError()
+                .<Map<String, Object>>body(Map.of("error", "Timeout or orchestrator execution failure")));
     }
 }

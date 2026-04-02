@@ -13,4 +13,6 @@
 # Minikube / Kubernetes secrets
 /k8s/minikube-secrets-template.yaml
 
-
+# Access Module target and Test Controller
+/access/target
+/access/src/main/java/com/example/agent/controllers/TestNotificationController.java
