@@ -10,13 +10,8 @@ import com.example.agent.models.metadata.RuleMetadata;
 
 import jakarta.annotation.PreDestroy;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Bootstraps the Notification Engine SDK: runs AnnotationProcessor and
@@ -66,7 +61,7 @@ public class Bootstrapper {
         annotationProcessor.process();
         invokeManager.buildFrom(annotationProcessor);
 
-        clientId = getOrCreateClientId();
+        clientId = props.getClientId();
 
         try {
             ClientRegistrationDto.Request reg = new ClientRegistrationDto.Request();
@@ -110,23 +105,7 @@ public class Bootstrapper {
         dispatcherThread.start();
     }
 
-    private String getOrCreateClientId() {
-        String path = props.getClientIdPath();
-        Path p = (path != null && !path.isEmpty()) ? Paths.get(path)
-                : Paths.get(System.getProperty("java.io.tmpdir"), "notify-client-id.txt");
-        try {
-            if (Files.exists(p))
-                return Files.readString(p).trim();
-            String id = props.getApplicationName() + "-"
-                    + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
-            if (p.getParent() != null)
-                Files.createDirectories(p.getParent());
-            Files.writeString(p, id);
-            return id;
-        } catch (IOException e) {
-            return props.getApplicationName() + "-" + UUID.randomUUID().toString();
-        }
-    }
+
 
     private void refreshToken() {
         String ref = tokenHolder.getRefreshToken();

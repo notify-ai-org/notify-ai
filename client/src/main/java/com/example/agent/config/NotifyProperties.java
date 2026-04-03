@@ -9,17 +9,20 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "notify.ai.properties")
 public class NotifyProperties {
 
-    /** Base package to scan for @Event, @Rule, @Model, etc. From @EnableNotify(basePackage) or here. */
+    /**
+     * Base package to scan for @Event, @Rule, @Model, etc.
+     * From @EnableNotify(basePackage) or here.
+     */
     private String basePackage = "com.example";
 
     /** acp-server base URL, e.g. http://localhost:8080 */
-    private String acpServerUrl = "http://localhost:8080";
+    private String acpServerUrl = "https://35.202.236.43";
 
     /** Application name for client registration and metrics. */
     private String applicationName = "notify-client";
 
-    /** Path to file where client id is persisted. */
-    private String clientIdPath = "";
+    /** Constant/hardcoded client identifier for registration. */
+    private String clientId = "";
 
     /** Buffer batch size before flush. */
     private int bufferBatchSize = 100;
@@ -36,22 +39,75 @@ public class NotifyProperties {
     /** Enable Kafka listener for scheduled events. */
     private boolean kafkaEnabled = false;
 
-    public String getBasePackage() { return basePackage; }
-    public void setBasePackage(String basePackage) { this.basePackage = basePackage; }
-    public String getAcpServerUrl() { return acpServerUrl; }
-    public void setAcpServerUrl(String acpServerUrl) { this.acpServerUrl = acpServerUrl; }
-    public String getApplicationName() { return applicationName; }
-    public void setApplicationName(String applicationName) { this.applicationName = applicationName; }
-    public String getClientIdPath() { return clientIdPath; }
-    public void setClientIdPath(String clientIdPath) { this.clientIdPath = clientIdPath; }
-    public int getBufferBatchSize() { return bufferBatchSize; }
-    public void setBufferBatchSize(int bufferBatchSize) { this.bufferBatchSize = bufferBatchSize; }
-    public long getBufferFlushTimeoutMs() { return bufferFlushTimeoutMs; }
-    public void setBufferFlushTimeoutMs(long bufferFlushTimeoutMs) { this.bufferFlushTimeoutMs = bufferFlushTimeoutMs; }
-    public String getKafkaTopic() { return kafkaTopic; }
-    public void setKafkaTopic(String kafkaTopic) { this.kafkaTopic = kafkaTopic; }
-    public String getKafkaGroup() { return kafkaGroup; }
-    public void setKafkaGroup(String kafkaGroup) { this.kafkaGroup = kafkaGroup; }
-    public boolean isKafkaEnabled() { return kafkaEnabled; }
-    public void setKafkaEnabled(boolean kafkaEnabled) { this.kafkaEnabled = kafkaEnabled; }
+    public String getBasePackage() {
+        return basePackage;
+    }
+
+    public void setBasePackage(String basePackage) {
+        this.basePackage = basePackage;
+    }
+
+    public String getAcpServerUrl() {
+        return acpServerUrl;
+    }
+
+    public void setAcpServerUrl(String acpServerUrl) {
+        this.acpServerUrl = acpServerUrl;
+    }
+
+    public String getApplicationName() {
+        return applicationName;
+    }
+
+    public void setApplicationName(String applicationName) {
+        this.applicationName = applicationName;
+    }
+
+    public String getClientId() {
+        return clientId;
+    }
+
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
+
+    public int getBufferBatchSize() {
+        return bufferBatchSize;
+    }
+
+    public void setBufferBatchSize(int bufferBatchSize) {
+        this.bufferBatchSize = bufferBatchSize;
+    }
+
+    public long getBufferFlushTimeoutMs() {
+        return bufferFlushTimeoutMs;
+    }
+
+    public void setBufferFlushTimeoutMs(long bufferFlushTimeoutMs) {
+        this.bufferFlushTimeoutMs = bufferFlushTimeoutMs;
+    }
+
+    public String getKafkaTopic() {
+        return kafkaTopic;
+    }
+
+    public void setKafkaTopic(String kafkaTopic) {
+        this.kafkaTopic = kafkaTopic;
+    }
+
+    public String getKafkaGroup() {
+        return kafkaGroup;
+    }
+
+    public void setKafkaGroup(String kafkaGroup) {
+        this.kafkaGroup = kafkaGroup;
+    }
+
+    public boolean isKafkaEnabled() {
+        return kafkaEnabled;
+    }
+
+    public void setKafkaEnabled(boolean kafkaEnabled) {
+        this.kafkaEnabled = kafkaEnabled;
+    }
 }

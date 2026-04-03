@@ -1,5 +1,6 @@
 package com.example.agent.auth;
 
+import com.example.agent.ClientRepository;
 import com.example.agent.AgentContextHolder;
 import com.example.agent.models.AgentContext;
 import com.example.agent.models.AgentSessionEntity;
@@ -48,6 +49,7 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
 
     private final SessionService sessionService;
     private final DomainContentService domainContentService;
+    private final ClientRepository clientRepository;
     private final StringRedisTemplate redisTemplate;
     private final String[] skipPaths;
 
@@ -55,7 +57,7 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
     String secret;
     @ManagedConfiguration(key = "acp.auth.jwt.required-scope", source = ConfigSource.CONFIG_MAP)
     String requiredScope;
-    
+
     @Value("${acp.idempotency.retry-count:5}")
     @ManagedConfiguration(key = "acp.idempotency.retry-count", source = ConfigSource.CONFIG_MAP)
     private int idempotencyRetryCount;
@@ -73,12 +75,14 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
     public AgentAuthenticationFilter(
             SessionService sessionService,
             DomainContentService domainContentService,
+            ClientRepository clientRepository,
             StringRedisTemplate redisTemplate,
-            @Value("${acp.auth.skip-paths:/api/client/register,/api/auth/token/refresh,/actuator/health,/actuator/info}") String skipPathsCsv,
+            @Value("${acp.auth.skip-paths:/client/register,/auth/token/refresh,/api/auth/token/refresh,/actuator/health,/actuator/info}") String skipPathsCsv,
             @Value("${acp.auth.jwt.secret:wsws}") String secret,
             @Value("${acp.auth.jwt.required-scope:agent:invoke}") String requiredScope) {
         this.sessionService = sessionService;
         this.domainContentService = domainContentService;
+        this.clientRepository = clientRepository;
         this.redisTemplate = redisTemplate;
         this.skipPaths = skipPathsCsv == null ? new String[0] : skipPathsCsv.split("\\s*,\\s*");
         this.secret = secret;
@@ -202,6 +206,17 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
                 userId = claims.getUserId();
                 scopes = claims.getScopes() != null ? claims.getScopes() : Collections.emptyList();
                 rawToken = claims.getRawToken();
+
+                // MANDATORY CLIENT VALIDATION
+                if (!DEFAULT_CLIENT_ID.equals(clientId)) {
+                    if (clientRepository.findByClientId(clientId).isEmpty()) {
+                        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                        response.setContentType("application/json");
+                        response.getWriter()
+                                .write("{\"error\":\"unauthorized_client\", \"message\":\"Client ID not recognized\"}");
+                        return;
+                    }
+                }
             } else {
                 clientId = DEFAULT_CLIENT_ID;
                 userId = DEFAULT_USER_ID;
@@ -229,17 +244,20 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
 
             String requestUri = request.getRequestURI();
             if (DEFAULT_CLIENT_ID.equals(clientId)) {
-                if (!requestUri.startsWith("/api/trial") && !requestUri.startsWith("/api/test/notification")) {
+                if (!requestUri.startsWith("/client/register") && !requestUri.startsWith("/api/trial")
+                        && !requestUri.startsWith("/api/test/notification")) {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType("application/json");
-                    response.getWriter().write("{\"error\":\"access_denied\", \"message\":\"Default session can only access Trial Agent\"}");
+                    response.getWriter().write(
+                            "{\"error\":\"access_denied\", \"message\":\"Default session can only access Trial Agent\"}");
                     return;
                 }
             } else {
                 if (requestUri.startsWith("/api/admin/") && !scopes.contains("admin")) {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     response.setContentType("application/json");
-                    response.getWriter().write("{\"error\":\"insufficient_scope\", \"message\":\"Admin privileges required\"}");
+                    response.getWriter()
+                            .write("{\"error\":\"insufficient_scope\", \"message\":\"Admin privileges required\"}");
                     return;
                 }
             }
@@ -253,9 +271,10 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
             if (idempotencyKey != null && !idempotencyKey.isBlank()) {
                 String redisKey = "idempotency:" + clientId + ":" + idempotencyKey;
                 boolean lockAcquired = false;
-                
+
                 for (int i = 0; i < idempotencyRetryCount; i++) {
-                    Boolean isNew = redisTemplate.opsForValue().setIfAbsent(redisKey, "PROCESSING", Duration.ofSeconds(idempotencyExpirySeconds));
+                    Boolean isNew = redisTemplate.opsForValue().setIfAbsent(redisKey, "PROCESSING",
+                            Duration.ofSeconds(idempotencyExpirySeconds));
                     if (Boolean.TRUE.equals(isNew)) {
                         lockAcquired = true;
                         break;
@@ -275,7 +294,7 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
                         }
                     }
                 }
-                
+
                 if (!lockAcquired) {
                     String status = redisTemplate.opsForValue().get(redisKey);
                     response.setStatus(HttpServletResponse.SC_CONFLICT);
@@ -287,7 +306,7 @@ public class AgentAuthenticationFilter extends OncePerRequestFilter {
                     }
                     return;
                 }
-                
+
                 request.setAttribute("Idempotency-Redis-Key", redisKey);
             }
 
