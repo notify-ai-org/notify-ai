@@ -10,17 +10,18 @@ COPY api/pom.xml api/
 COPY acp-server/pom.xml acp-server/
 COPY client/pom.xml client/
 COPY engine/pom.xml engine/
+COPY access/pom.xml access/
 COPY examples/ecommerce-app/pom.xml examples/ecommerce-app/
 COPY examples/banking-app/pom.xml examples/banking-app/
 
 # Download dependencies offline to optimize build time
-RUN mvn dependency:go-offline -B
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
 
 # Copy the rest of the source code
 COPY . .
 
 # Build the project, skipping tests to speed up the process
-RUN mvn clean package -DskipTests
+RUN --mount=type=cache,target=/root/.m2 mvn clean package -DskipTests -T 1C
 
 # Stage 2: Create the runtime image using GraalVM JDK
 FROM ghcr.io/graalvm/jdk-community:17
@@ -29,7 +30,7 @@ WORKDIR /app
 
 # Copy the built jar from the builder stage
 # The spring-boot-maven-plugin repackages the jar to be executable
-COPY --from=builder /app/acp-server/target/vocabulary-agent-acp-server-*-SNAPSHOT.jar app.jar
+COPY --from=builder /app/access/target/vocabulary-agent-access-*-SNAPSHOT.jar app.jar
 
 # Expose the port the application runs on
 EXPOSE 8080

@@ -1,0 +1,10 @@
+.git
+.gitignore
+.github
+.idea
+.vscode
+*.iml
+*.log
+target/
+*/target/
+**/target/

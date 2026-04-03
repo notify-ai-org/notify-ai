@@ -9,7 +9,6 @@ import com.google.adk.agents.BaseAgent;
 import com.google.adk.agents.InvocationContext;
 import com.google.adk.artifacts.InMemoryArtifactService;
 import com.google.adk.events.Event;
-import com.google.adk.flows.llmflows.BaseLlmFlow;
 import com.google.adk.runner.Runner;
 import com.google.adk.sessions.Session;
 import com.google.genai.types.Content;
@@ -141,16 +140,20 @@ public class AgentWrapper {
         // Use the modified session object for the run
         return runner.runAsync(context.userId(), session.id(), prompt)
                 .doOnNext(event -> {
+                    sessionService.appendEvent(session.id(), event);
                     lastActivityAt = Instant.now();
                     logger.fine(String.format("Agent %s emitted event: %s", agentId, event.toJson()));
                     persistSnapshot();
                 })
                 .doOnComplete(() -> {
+                    currentTaskId = null;
                     transitionTo(AgentStage.COMPLETED, "Execution completed successfully", Map.of("taskId", taskId));
                 })
                 .doOnError(error -> {
                     this.lastError = (Exception) error;
-                    String errorMsg = error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName();
+                    currentTaskId = null;
+                    String errorMsg = error.getMessage() != null ? error.getMessage()
+                            : error.getClass().getSimpleName();
                     transitionTo(AgentStage.FAILED, "Execution failed: " + errorMsg,
                             Map.of("taskId", taskId, "error", errorMsg));
                 });

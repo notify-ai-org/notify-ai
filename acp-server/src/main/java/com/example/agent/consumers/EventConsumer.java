@@ -234,15 +234,7 @@ public class EventConsumer {
                         }
 
                         for (Map<String, Object> processedEvent : processedEvents) {
-                            String resultStatus = (String) processedEvent.get("result");
-                            if ("suppressed".equalsIgnoreCase(resultStatus)) {
-                                logger.info("Event '{}' suppressed by agent.", capture.getEvent().getName());
-                                capture.setStatus(CaptureStatus.SUPPRESSED);
-                                eventCaptureRepository.save(capture);
-                                continue;
-                            }
-
-                            // Extract Reasoning and Facts Data
+                            // Extract Reasoning and Facts Data first
                             Map<String, Object> reasoningObj = (Map<String, Object>) processedEvent.get("reasoning");
                             if (reasoningObj != null) {
                                 if (reasoningObj.containsKey("thoughtProcess")
@@ -273,6 +265,14 @@ public class EventConsumer {
                                         factRepository.save(factE);
                                     }
                                 }
+                            }
+
+                            String resultStatus = (String) processedEvent.get("result");
+                            if ("suppressed".equalsIgnoreCase(resultStatus)) {
+                                logger.info("Event '{}' suppressed by agent.", capture.getEvent().getName());
+                                capture.setStatus(CaptureStatus.SUPPRESSED);
+                                eventCaptureRepository.save(capture);
+                                continue;
                             }
 
                             capture.setStatus(CaptureStatus.PROCESSED);
@@ -341,6 +341,7 @@ public class EventConsumer {
                             /* Terminal elements dropped or logged */ },
                         error -> {
                             logger.error("Event processing pipeline failed: " + error.getMessage(), error);
+                            capture.setBulletReasons(error.getMessage());
                             capture.setStatus(CaptureStatus.FAILED);
                             eventCaptureRepository.save(capture);
                         });
