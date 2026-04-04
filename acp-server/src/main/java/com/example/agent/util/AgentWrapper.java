@@ -315,27 +315,6 @@ public class AgentWrapper {
             if (snapshotRepo != null) {
                 snapshotRepo.save(snapshot);
             }
-
-            if (redisConnection != null) {
-                try {
-                    RedisCommands<String, String> commands = redisConnection.sync();
-                    Map<String, String> hash = new HashMap<>();
-                    hash.put("agentId", agentId);
-                    hash.put("agentName", agent.name());
-                    hash.put("agentType", agentType);
-                    hash.put("stage", currentStage.get().name());
-                    hash.put("createdAt", createdAt.toString());
-                    hash.put("lastActivityAt", lastActivityAt.toString());
-                    if (currentTaskId != null) {
-                        hash.put("currentTaskId", currentTaskId);
-                    }
-                    hash.put("state", stateJson);
-
-                    commands.hset("agent:snapshot:" + agentId, hash);
-                } catch (Exception e) {
-                    logger.warning("Failed to persist agent snapshot to Redis: " + e.getMessage());
-                }
-            }
         } catch (Exception e) {
             logger.warning("Failed to persist agent snapshot: " + e.getMessage());
         }

@@ -6,12 +6,10 @@ metadata:
     app: vocab-agent
 data:
   # ─── Database ──────────────────────────────────────────────────────────────
-  DB_HOST: "35.244.35.149"           # Replace with your Cloud SQL or Postgres host
   DB_PORT: "3306"
   DB_NAME: "agent"
 
   # ─── Redis ─────────────────────────────────────────────────────────────────
-  REDIS_HOST: "redis-19139.crce263.ap-south-1-1.ec2.cloud.redislabs.com"
   REDIS_PORT: "19139"
   REDIS_USERNAME: "test"
   REDIS_VECTOR_DIM: "3072"
@@ -56,10 +54,4 @@ data:
 # Sensitive values should be stored in a Kubernetes Secret, not ConfigMap.
 # Create this Secret manually (do NOT commit to Git):
 #
-# kubectl create secret generic vocab-agent-secrets \
-#   --from-literal=DB_USER=<your-db-user> \
-#   --from-literal=DB_PASSWORD=<your-db-password> \
-#   --from-literal=REDIS_PASSWORD=<your-redis-password> \
-#   --from-literal=OPENAI_API_KEY=<your-openai-key> \
-#   --from-literal=ANTHROPIC_API_KEY=<your-anthropic-key> \
-#   --from-literal=ACP_JWT_SECRET=<your-jwt-secret-min-32-chars>
+
