@@ -56,8 +56,8 @@ logging:
 connector:
   channel:
     WEBHOOK:
-      clazz: "com.example.agent.connectors.WebhookConnector"
+      clazz: "com.notify.agent.connectors.WebhookConnector"
       instances: 1
     EMAIL:
-      clazz: "com.example.agent.connectors.SmtpEmailConnector"
+      clazz: "com.notify.agent.connectors.SmtpEmailConnector"
       instances: 1

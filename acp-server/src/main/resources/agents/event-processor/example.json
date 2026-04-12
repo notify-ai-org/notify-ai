@@ -17,7 +17,7 @@
     "callStack": {
       "frames": [
         {
-          "className": "com.example.OrderService",
+          "className": "com.notify.OrderService",
           "methodName": "createOrder",
           "lineNumber": 42,
           "fileName": "OrderService.java"

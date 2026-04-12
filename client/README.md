@@ -8,12 +8,12 @@ Client SDK that attaches to a Spring Boot application to send vocabulary, rules,
 
 ```xml
 <dependency>
-  <groupId>com.example</groupId>
+  <groupId>com.notify</groupId>
   <artifactId>vocabulary-agent-client</artifactId>
   <version>1.0-SNAPSHOT</version>
 </dependency>
 <dependency>
-  <groupId>com.example</groupId>
+  <groupId>com.notify</groupId>
   <artifactId>vocabulary-agent-annotations</artifactId>
   <version>1.0-SNAPSHOT</version>
 </dependency>

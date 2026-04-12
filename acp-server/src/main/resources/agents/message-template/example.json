@@ -1,6 +1,6 @@
 {
   "input": {
-    "eventType": "com.example.order.created",
+    "eventType": "com.notify.order.created",
     "description": "An event representing the creation of a customer order.",
     "payload": {
       "orderId": "1234567890",
