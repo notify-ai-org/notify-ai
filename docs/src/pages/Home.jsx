@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, useInView } from 'framer-motion';
 
 /* ── Reusable section that alternates image/text sides ── */
-const FeatureSection = ({ title, description, imgSrc, imgAlt, reverse = false, index }) => {
+const FeatureSection = ({ title, bullets, imgSrc, imgAlt, reverse = false, index, tight = false }) => {
   const ref = React.useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-60px' });
   return (
@@ -14,14 +14,15 @@ const FeatureSection = ({ title, description, imgSrc, imgAlt, reverse = false, i
       style={{
         display: 'flex',
         flexDirection: reverse ? 'row-reverse' : 'row',
-        gap: '4rem',
+        gap: '2rem',
         alignItems: 'center',
-        marginBottom: '7rem',
+        justifyContent: tight ? 'flex-end' : 'flex-start',
+        marginBottom: '5rem',
         flexWrap: 'wrap',
       }}
     >
       {/* Text */}
-      <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+      <div style={{ flex: '1 1 300px', minWidth: 0, maxWidth: tight ? '440px' : 'none' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
           <span style={{
             width: '1.75rem', height: '1.75rem', borderRadius: '0.4rem',
@@ -35,9 +36,14 @@ const FeatureSection = ({ title, description, imgSrc, imgAlt, reverse = false, i
         <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 700, marginBottom: '1rem', lineHeight: 1.25 }}>
           {title}
         </h2>
-        <p style={{ color: '#94a3b8', lineHeight: 1.75, fontSize: '1.05rem' }}>
-          {description}
-        </p>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {bullets.map((b, i) => (
+            <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', color: '#94a3b8', lineHeight: 1.7, fontSize: '1rem' }}>
+              <span style={{ flexShrink: 0, marginTop: '0.35rem', width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#facc15', display: 'inline-block' }} />
+              {b}
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* Image */}
@@ -46,96 +52,90 @@ const FeatureSection = ({ title, description, imgSrc, imgAlt, reverse = false, i
         whileInView={{ opacity: 1, scale: 1 }}
         viewport={{ once: true }}
         transition={{ duration: 0.7, delay: 0.15 }}
-        style={{ flex: '1 1 320px', minWidth: 0 }}
+        style={{ flex: '1 1 280px', minWidth: 0, maxWidth: '400px' }}
       >
         <div style={{
-          borderRadius: '1.25rem',
+          borderRadius: '1rem',
           overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
+          border: '1px solid rgba(234,179,8,0.18)',
+          boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
           position: 'relative',
         }}>
-          {/* fade overlay */}
+          {/* golden tint overlay */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(251,146,60,0.10) 100%)',
+            zIndex: 1, pointerEvents: 'none',
+            mixBlendMode: 'color',
+          }} />
+          {/* edge fade */}
           <div style={{
             position: 'absolute', inset: 0,
             background: reverse
-              ? 'linear-gradient(to right, rgba(10,10,12,0.25) 0%, transparent 50%)'
-              : 'linear-gradient(to left, rgba(10,10,12,0.25) 0%, transparent 50%)',
-            zIndex: 1, pointerEvents: 'none',
+              ? 'linear-gradient(to right, rgba(10,10,12,0.3) 0%, transparent 55%)'
+              : 'linear-gradient(to left, rgba(10,10,12,0.3) 0%, transparent 55%)',
+            zIndex: 2, pointerEvents: 'none',
           }} />
           <img
             src={imgSrc}
             alt={imgAlt}
-            style={{ width: '100%', display: 'block', objectFit: 'cover' }}
+            style={{
+              width: '100%', display: 'block', objectFit: 'cover',
+              filter: 'sepia(0.55) saturate(1.8) hue-rotate(5deg) brightness(0.92)',
+            }}
           />
         </div>
       </motion.div>
     </motion.div>
   );
 };
-
-/* ── Channel badge ── */
-const ChannelBadge = ({ label, color, icon }) => (
-  <div style={{
-    display: 'flex', alignItems: 'center', gap: '0.6rem',
-    padding: '0.65rem 1.1rem',
-    borderRadius: '0.75rem',
-    border: `1px solid ${color}33`,
-    backgroundColor: `${color}11`,
-    color: color,
-    fontWeight: 600,
-    fontSize: '0.9rem',
-    whiteSpace: 'nowrap',
-  }}>
-    <span style={{ fontSize: '1.1rem' }}>{icon}</span>
-    {label}
-  </div>
-);
-
 /* ── Main Home component ── */
 const Home = ({ onOpenPricing, onGoToDocs }) => {
   const features = [
     {
       title: 'Event Processing',
-      description:
-        'This agent decides whether to send a notification corresponding to an emitted event, based on past events, and domain experience based on episodic and long term memory.',
+      bullets: [
+        'Decides whether to send a notification for each emitted event.',
+        'Leverages episodic memory to factor in past event history.',
+        'Uses long-term domain knowledge for context-aware decisions.',
+      ],
       img: '/event_processing.png',
       alt: 'Event Processing',
       reverse: false,
     },
     {
       title: 'Template Generation',
-      description:
-        'This agent generates business oriented and user oriented templates with respect to the notification channel and other instructions.',
+      bullets: [
+        'Produces business-oriented and user-oriented message templates.',
+        'Adapts tone and format to the target notification channel.',
+        'Respects custom instructions passed alongside the event.',
+      ],
       img: '/template_generation.png',
       alt: 'Template Generation',
       reverse: true,
     },
     {
       title: 'Scheduling',
-      description:
-        'This agent schedules a deferred notification with respect to logic of interval duration and repetition.',
+      bullets: [
+        'Schedules deferred notifications with configurable delay logic.',
+        'Supports repeat intervals, day-of-week windows, and time-of-day ranges.',
+        'Immediate, delayed, and CRON-style dispatch strategies.',
+      ],
       img: '/scheduling.png',
       alt: 'Scheduling',
       reverse: false,
     },
     {
       title: 'Rule Processing',
-      description:
-        'Define procedural business rules related to notification generation and dispatch in natural language, which are translated into fast executable expressions by an agent, resulting in less context overhead and improved performance.',
+      bullets: [
+        'Define business rules in plain natural language.',
+        'Rules are translated into fast executable expressions by an AI agent.',
+        'Reduces context overhead and improves notification dispatch performance.',
+      ],
       img: '/rule_processing.png',
       alt: 'Rule Processing',
       reverse: true,
     },
-  ];
-
-  const channels = [
-    { label: 'Email', color: '#60a5fa', icon: '✉️' },
-    { label: 'SMS', color: '#4ade80', icon: '💬' },
-    { label: 'Push Notification', color: '#f97316', icon: '🔔' },
-    { label: 'Webhook', color: '#a78bfa', icon: '🔗' },
-    { label: 'Custom Connector', color: '#facc15', icon: '🔌' },
-    { label: 'In-App', color: '#f472b6', icon: '📱' },
   ];
 
   return (
@@ -280,16 +280,17 @@ const Home = ({ onOpenPricing, onGoToDocs }) => {
             <FeatureSection
               key={f.title}
               title={f.title}
-              description={f.description}
+              bullets={f.bullets}
               imgSrc={f.img}
               imgAlt={f.alt}
               reverse={f.reverse}
               index={i + 1}
+              tight={!f.reverse}
             />
           ))}
 
           {/* ── Configurable Connectors (special grid layout) ── */}
-          <ConnectorsSection channels={channels} />
+          <ConnectorsSection />
         </section>
 
         {/* ── DOCS section ── */}
@@ -361,19 +362,29 @@ const DocCard = ({ title, description, badge, badgeColor, onClick }) => {
   );
 };
 
-const ConnectorsSection = ({ channels }) => {
+const ConnectorsSection = () => {
   const ref = React.useRef(null);
   const isInView = useInView(ref, { once: true, margin: '-60px' });
+
+  const channels = [
+    { label: 'Email',            icon: '✉️' },
+    { label: 'SMS',              icon: '💬' },
+    { label: 'Push Notification',icon: '🔔' },
+    { label: 'Webhook',          icon: '🔗' },
+    { label: 'In-App',           icon: '📱' },
+    { label: 'Custom Connector', icon: '🔌' },
+  ];
+
   return (
     <motion.div
       ref={ref}
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
       initial={{ opacity: 0, y: 40 }}
       transition={{ duration: 0.6 }}
-      style={{ display: 'flex', flexDirection: 'row', gap: '4rem', alignItems: 'center', marginBottom: '7rem', flexWrap: 'wrap' }}
+      style={{ display: 'flex', flexDirection: 'row', gap: '2rem', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '5rem', flexWrap: 'wrap' }}
     >
       {/* Left: text */}
-      <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+      <div style={{ flex: '1 1 300px', minWidth: 0, maxWidth: '440px' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
           <span style={{
             width: '1.75rem', height: '1.75rem', borderRadius: '0.4rem',
@@ -385,30 +396,47 @@ const ConnectorsSection = ({ channels }) => {
         <h2 style={{ fontSize: 'clamp(1.5rem, 3vw, 2rem)', fontWeight: 700, marginBottom: '1rem', lineHeight: 1.25 }}>
           Configurable Connectors
         </h2>
-        <p style={{ color: '#94a3b8', lineHeight: 1.75, fontSize: '1.05rem', marginBottom: '2rem' }}>
-          Supports a variety of channels, and this support is extensible by the ability to write custom connectors which are used by the engine to dispatch notifications.
-        </p>
+        <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+          {channels.map((ch) => (
+            <li key={ch.label} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#94a3b8', lineHeight: 1.7, fontSize: '1rem' }}>
+              <span style={{ flexShrink: 0, width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#facc15', display: 'inline-block' }} />
+              <span style={{ marginRight: '0.35rem' }}>{ch.icon}</span>
+              {ch.label}
+            </li>
+          ))}
+        </ul>
       </div>
 
-      {/* Right: channel grid + image */}
-      <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+      {/* Right: image */}
+      <div style={{ flex: '1 1 280px', minWidth: 0, maxWidth: '400px' }}>
         <div style={{
-          borderRadius: '1.25rem', overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 25px 60px rgba(0,0,0,0.5)',
-          marginBottom: '1.5rem', position: 'relative',
+          borderRadius: '1rem',
+          overflow: 'hidden',
+          border: '1px solid rgba(234,179,8,0.18)',
+          boxShadow: '0 16px 48px rgba(0,0,0,0.5)',
+          position: 'relative',
         }}>
+          {/* golden tint overlay */}
           <div style={{
             position: 'absolute', inset: 0,
-            background: 'linear-gradient(to left, rgba(10,10,12,0.25) 0%, transparent 50%)',
+            background: 'linear-gradient(135deg, rgba(234,179,8,0.18) 0%, rgba(251,146,60,0.10) 100%)',
             zIndex: 1, pointerEvents: 'none',
+            mixBlendMode: 'color',
           }} />
-          <img src="/connectors.png" alt="Connectors" style={{ width: '100%', display: 'block', objectFit: 'cover' }} />
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.6rem' }}>
-          {channels.map((ch) => (
-            <ChannelBadge key={ch.label} {...ch} />
-          ))}
+          {/* edge fade */}
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'linear-gradient(to left, rgba(10,10,12,0.3) 0%, transparent 55%)',
+            zIndex: 2, pointerEvents: 'none',
+          }} />
+          <img
+            src="/connectors.png"
+            alt="Connectors"
+            style={{
+              width: '100%', display: 'block', objectFit: 'cover',
+              filter: 'sepia(0.55) saturate(1.8) hue-rotate(5deg) brightness(0.92)',
+            }}
+          />
         </div>
       </div>
     </motion.div>

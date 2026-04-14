@@ -70,10 +70,10 @@ const PricingModal = ({ onClose }) => {
       exit={{ opacity: 0 }}
       style={{
         position: 'fixed', inset: 0, zIndex: 200,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
         backgroundColor: 'rgba(0,0,0,0.75)',
         backdropFilter: 'blur(6px)',
-        padding: '1.5rem',
+        padding: '2rem 1.5rem',
         overflowY: 'auto',
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
