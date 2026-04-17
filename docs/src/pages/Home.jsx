@@ -16,7 +16,7 @@ const FeatureSection = ({ title, bullets, imgSrc, imgAlt, reverse = false, index
         flexDirection: reverse ? 'row-reverse' : 'row',
         gap: '2rem',
         alignItems: 'center',
-        justifyContent: tight ? 'flex-end' : 'flex-start',
+        justifyContent: 'center',
         marginBottom: '5rem',
         flexWrap: 'wrap',
       }}
@@ -158,6 +158,41 @@ const Home = ({ onOpenPricing, onGoToDocs }) => {
 
       <div style={{ position: 'relative', zIndex: 1 }}>
         {/* ── Hero ── */}
+        <style>
+          {`
+            .hero-text-wrapper {
+              width: 55%;
+            }
+            .hero-diagram-wrapper {
+              right: -5%;
+              width: 75%;
+            }
+            .hero-mobile-dim {
+              display: none;
+            }
+            
+            @media (max-width: 768px) {
+              .hero-text-wrapper {
+                width: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+              }
+              .hero-diagram-wrapper {
+                right: -40% !important;
+                width: 160% !important;
+              }
+              .hero-mobile-dim {
+                display: block;
+                position: absolute;
+                inset: 0;
+                background: rgba(10, 10, 12, 0.75);
+                z-index: 1;
+                pointer-events: none;
+              }
+            }
+          `}
+        </style>
         <section style={{
           minHeight: '92vh',
           display: 'flex',
@@ -165,11 +200,10 @@ const Home = ({ onOpenPricing, onGoToDocs }) => {
           padding: '6rem 2rem',
           maxWidth: '1200px',
           margin: '0 auto',
-          gap: '4rem',
-          flexWrap: 'wrap',
+          position: 'relative',
         }}>
           {/* Left: text */}
-          <div style={{ flex: '1 1 380px', minWidth: 0 }}>
+          <div className="hero-text-wrapper" style={{ position: 'relative', zIndex: 10 }}>
             <motion.div
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
@@ -253,23 +287,36 @@ const Home = ({ onOpenPricing, onGoToDocs }) => {
 
           {/* Right: architecture image */}
           <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
+            className="hero-diagram-wrapper"
+            initial={{ opacity: 0, x: 30, y: '-50%' }}
+            animate={{ opacity: 1, x: 0, y: '-50%' }}
             transition={{ delay: 0.35, duration: 0.6 }}
-            style={{ flex: '1 1 340px', minWidth: 0 }}
+            style={{
+              position: 'absolute',
+              top: '50%',
+              zIndex: 0,
+            }}
           >
             <div style={{
               borderRadius: '1.5rem', overflow: 'hidden',
               border: '1px solid rgba(255,255,255,0.08)',
+              background: 'linear-gradient(to left, rgba(10,10,12,0.3) 0%, transparent 60%)',
               boxShadow: '0 30px 80px rgba(0,0,0,0.6)',
               position: 'relative',
             }}>
               <div style={{
                 position: 'absolute', inset: 0,
-                background: 'linear-gradient(to left, rgba(10,10,12,0.3) 0%, transparent 60%)',
+                background: 'linear-gradient(to left, rgba(10,10,12,0.3) 0%, transparent 100%)',
                 zIndex: 1, pointerEvents: 'none',
               }} />
-              <img src="/architecture.jpeg" alt="System Architecture" style={{ width: '100%', display: 'block' }} />
+              {/* Fade out the left edge sharply so it sits neatly behind the text */}
+              <div style={{
+                position: 'absolute', inset: 0,
+                background: 'linear-gradient(to right, #0a0a0c 0%, transparent 15%)',
+                zIndex: 1, pointerEvents: 'none',
+              }} />
+              <div className="hero-mobile-dim" />
+              <img src="/architecture.jpeg" alt="System Architecture" style={{ width: '100%', display: 'block', opacity: 0.8 }} />
             </div>
           </motion.div>
         </section>
@@ -367,11 +414,11 @@ const ConnectorsSection = () => {
   const isInView = useInView(ref, { once: true, margin: '-60px' });
 
   const channels = [
-    { label: 'Email',            icon: '✉️' },
-    { label: 'SMS',              icon: '💬' },
-    { label: 'Push Notification',icon: '🔔' },
-    { label: 'Webhook',          icon: '🔗' },
-    { label: 'In-App',           icon: '📱' },
+    { label: 'Email', icon: '✉️' },
+    { label: 'SMS', icon: '💬' },
+    { label: 'Push Notification', icon: '🔔' },
+    { label: 'Webhook', icon: '🔗' },
+    { label: 'In-App', icon: '📱' },
     { label: 'Custom Connector', icon: '🔌' },
   ];
 
@@ -381,7 +428,7 @@ const ConnectorsSection = () => {
       animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
       initial={{ opacity: 0, y: 40 }}
       transition={{ duration: 0.6 }}
-      style={{ display: 'flex', flexDirection: 'row', gap: '2rem', alignItems: 'center', justifyContent: 'flex-end', marginBottom: '5rem', flexWrap: 'wrap' }}
+      style={{ display: 'flex', flexDirection: 'row', gap: '2rem', alignItems: 'center', justifyContent: 'center', marginBottom: '5rem', flexWrap: 'wrap' }}
     >
       {/* Left: text */}
       <div style={{ flex: '1 1 300px', minWidth: 0, maxWidth: '440px' }}>
