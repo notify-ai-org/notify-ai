@@ -1,20 +1,13 @@
-package com.notify.agent.service;
+package com.notify.agent;
 
 import com.notify.agent.ClientRepository;
 import com.notify.agent.models.ClientEntity;
 import com.notify.agent.models.ClientRegistrationDto;
 import com.notify.agent.models.TokenRefreshDto;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -24,20 +17,19 @@ import java.util.Optional;
 public class ClientService {
 
     private final ClientRepository clientRepository;
-    private final SecretKey key;
+    private final JwtService jwtService;
     private final long tokenExpiryMs;
     private final long refreshExpiryMs;
 
     public ClientService(
             ClientRepository clientRepository,
-            @Value("${acp.auth.jwt.secret:wsws}") String secret,
+            JwtService jwtService,
             @Value("${acp.auth.jwt.expiry-ms:3600000}") long tokenExpiryMs,
             @Value("${acp.auth.jwt.refresh-expiry-ms:604800000}") long refreshExpiryMs) {
         this.clientRepository = clientRepository;
+        this.jwtService = jwtService;
         this.tokenExpiryMs = tokenExpiryMs;
         this.refreshExpiryMs = refreshExpiryMs;
-        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
-        this.key = Keys.hmacShaKeyFor(bytes);
     }
 
     /**
@@ -47,14 +39,16 @@ public class ClientService {
     @Transactional
     public ClientRegistrationDto.Response register(ClientRegistrationDto.Request request) {
         ClientEntity client = clientRepository.findByClientId(request.getClientId())
-                .orElseThrow(() -> new RuntimeException("Invalid or pre-registered API key strictly required for registration. Client ID: " + request.getClientId()));
+                .orElseThrow(() -> new RuntimeException(
+                        "Invalid or pre-registered API key strictly required for registration. Client ID: "
+                                + request.getClientId()));
 
         client.setApplicationName(request.getApplicationName());
         client.setBasePackage(request.getBasePackage());
         clientRepository.save(client);
 
-        String token = generateToken(client, tokenExpiryMs);
-        String refreshToken = generateToken(client, refreshExpiryMs);
+        String token = jwtService.generateAccessToken(client.getClientId(), client.getTenantId(), null);
+        String refreshToken = jwtService.generateRefreshToken(client.getClientId(), client.getTenantId());
 
         ClientRegistrationDto.Response response = new ClientRegistrationDto.Response();
         response.setClientId(client.getClientId());
@@ -76,7 +70,7 @@ public class ClientService {
             throw new RuntimeException("Invalid client ID");
         }
 
-        String newToken = generateToken(client.get(), tokenExpiryMs);
+        String newToken = jwtService.generateAccessToken(client.get().getClientId(), client.get().getTenantId(), null);
 
         TokenRefreshDto.Response response = new TokenRefreshDto.Response();
         response.setToken(newToken);
@@ -85,17 +79,4 @@ public class ClientService {
         return response;
     }
 
-    private String generateToken(ClientEntity client, long expiryMs) {
-        Map<String, Object> claims = new HashMap<>();
-        claims.put("client_id", client.getClientId());
-        claims.put("scope", "agent:invoke"); // Default scope
-
-        return Jwts.builder()
-                .claims(claims)
-                .subject(client.getApplicationName())
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + expiryMs))
-                .signWith(key)
-                .compact();
-    }
 }

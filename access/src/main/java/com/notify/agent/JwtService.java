@@ -1,4 +1,4 @@
-package com.notify.agent.service;
+package com.notify.agent;
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
@@ -44,7 +44,7 @@ public class JwtService {
         if (extraClaims != null) {
             claims.putAll(extraClaims);
         }
-        
+
         return Jwts.builder()
                 .claims(claims)
                 .subject(userId)

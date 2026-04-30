@@ -1,8 +1,9 @@
 package com.notify.agent.controllers;
 
+import com.notify.agent.ClientService;
 import com.notify.agent.models.ClientRegistrationDto;
 import com.notify.agent.models.TokenRefreshDto;
-import com.notify.agent.service.ClientService;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 

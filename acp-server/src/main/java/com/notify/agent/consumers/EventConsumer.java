@@ -95,17 +95,6 @@ public class EventConsumer {
         this.promptAssembler = promptAssembler;
     }
 
-    @Transactional
-    public void onMessage(String raw) {
-        try {
-            List<EventCapture> captures = mapper.readValue(raw, new TypeReference<List<EventCapture>>() {
-            });
-            enqueueEventProcessing(captures);
-        } catch (Exception e) {
-            throw new AgentApplicationException("Failed processing vocabulary event", e);
-        }
-    }
-
     /**
      * REST endpoint to process event captures.
      * Enqueues event processing tasks and returns immediately.
