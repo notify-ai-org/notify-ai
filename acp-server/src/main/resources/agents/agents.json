@@ -49,18 +49,13 @@
     {
         "id": "MessageTemplate",
         "name": "MessageTemplateGenerator",
-        "description": "Generates message templates for different communication channels (e.g., EMAIL, SMS) based on order or business event data.",
+        "description": "Generates message templates for different communication channels (e.g., EMAIL, SMS) based on order or business event data. For EMAIL, generates rich HTML bodies with ${CONTENT_KEY} placeholders resolved from domain content. For other channels, generates plain-text templates.",
         "resourcePath": "agents/message-template",
         "model": "gemini-2.5-pro",
         "inputSchemaTitle": "MessageTemplateRequest",
         "inputSchemaDescription": "Represents an Event and its payload used for template generation.",
         "inputClass": "com.notify.agent.models.dto.MessageTemplateRequestDto",
-        "outputSchemaTitle": "Templates",
-        "outputSchemaDescription": "A list of message templates of specified channels related to the event.",
-        "outputClass": "com.notify.agent.models.MessageTemplate",
-        "outputType": "ARRAY",
-        "tools": [],
-        "outputKey": "templates"
+        "tools": ["getDomainContentKeys", "saveMissingContentKeys", "getVocabularyForTemplate"]
     },
     {
         "id": "RuleProcessor",

@@ -3,9 +3,14 @@ package com.notify.agent.consumers;
 import com.notify.agent.config.KafkaConfig;
 import com.notify.agent.models.EventCapture;
 import com.notify.agent.AgentContextHolder;
+import com.notify.agent.ClientRepository;
+import com.notify.agent.models.AgentContext;
+import com.notify.agent.service.IdempotencyService;
+import com.notify.agent.service.IdempotencyService.AcquireResult;
+import com.notify.agent.service.JwtService;
+import com.notify.agent.service.SessionService;
 
 import jakarta.annotation.PreDestroy;
-import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
@@ -14,16 +19,20 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Component
-@RequiredArgsConstructor
 abstract class KafkaNotifyConsumer {
     private static final Logger log = LoggerFactory.getLogger(KafkaNotifyConsumer.class);
 
     private final KafkaConfig kafkaConfig;
+    private final JwtService jwtService;
+    private final SessionService sessionService;
+    private final IdempotencyService idempotencyService;
+    private final ClientRepository clientRepository;
 
     private static final String TOPIC = "notify-v1-events";
 
@@ -33,6 +42,17 @@ abstract class KafkaNotifyConsumer {
     private volatile boolean running = false;
     private final Set<String> committedPartitions = ConcurrentHashMap.newKeySet();
     protected AtomicLong messageCount = new AtomicLong(0);
+
+    public KafkaNotifyConsumer(KafkaConfig kafkaConfig, ExecutorService executorService,
+            JwtService jwtService, SessionService sessionService,
+            IdempotencyService idempotencyService, ClientRepository clientRepository) {
+        this.kafkaConfig = kafkaConfig;
+        this.executorService = executorService;
+        this.jwtService = jwtService;
+        this.sessionService = sessionService;
+        this.idempotencyService = idempotencyService;
+        this.clientRepository = clientRepository;
+    }
 
     private KafkaConsumer<String, EventCapture> createKafkaConsumer() {
         return kafkaConfig.kafkaConsumer();
@@ -170,10 +190,12 @@ abstract class KafkaNotifyConsumer {
     }
 
     private void processRecords(KafkaConsumer<String, EventCapture> consumer,
-            ConsumerRecords<String, EventCapture> records) {
+            ConsumerRecords<String, EventCapture> records) throws Exception {
         log.info("Processing {} records from Kafka", records.count());
-        
+
         Map<String, List<EventCapture>> groupedByTenant = new HashMap<>();
+        // Store the first bearer token seen per tenantId (from Kafka record headers)
+        Map<String, String> tenantTokens = new HashMap<>();
 
         for (ConsumerRecord<String, EventCapture> record : records) {
             String messageKey = record.key();
@@ -191,18 +213,135 @@ abstract class KafkaNotifyConsumer {
                 String[] keyParts = messageKey.split(":");
                 String tenantId = keyParts.length > 0 ? keyParts[0] : "unknown";
                 groupedByTenant.computeIfAbsent(tenantId, k -> new ArrayList<>()).add(messageValue);
+
+                // Extract bearer token from Kafka headers (first token per tenant wins)
+                if (!tenantTokens.containsKey(tenantId)) {
+                    org.apache.kafka.common.header.Header authHeader = record.headers().lastHeader("Authorization");
+                    if (authHeader == null)
+                        authHeader = record.headers().lastHeader("X-Auth-Token");
+                    if (authHeader != null && authHeader.value() != null) {
+                        tenantTokens.put(tenantId,
+                                new String(authHeader.value(), StandardCharsets.UTF_8));
+                    }
+                }
             }
         }
 
         for (Map.Entry<String, List<EventCapture>> entry : groupedByTenant.entrySet()) {
             String tenantId = entry.getKey();
             List<EventCapture> captures = entry.getValue();
-            
-            AgentContextHolder.getContext().setTenantId(tenantId);
+
+            // --- JWT validation + client check ---
+            String rawBearerToken = tenantTokens.get(tenantId);
+            JwtService.JwtClaims claims = jwtService.validateAndExtract(rawBearerToken);
+
+            String clientId;
+            String userId;
+            List<String> resolvedScopes;
+            String resolvedRawToken;
+
+            if (claims != null) {
+                // JWT present and valid — verify clientId matches the tenantId from message key
+                if (claims.getClientId() == null || !claims.getClientId().equals(tenantId)) {
+                    log.warn("Skipping tenant group '{}': JWT clientId '{}' does not match message tenantId",
+                            tenantId, claims.getClientId());
+                    continue;
+                }
+                clientId = claims.getClientId();
+                userId = claims.getUserId() != null ? claims.getUserId() : "kafka-consumer";
+                resolvedScopes = claims.getScopes() != null ? claims.getScopes() : List.of("agent:invoke");
+                resolvedRawToken = claims.getRawToken();
+            } else {
+                // No JWT header or invalid token — fall back to ClientRepository-only check
+                // (used for internal/system-generated messages without a user token)
+                if (rawBearerToken != null) {
+                    log.warn("Skipping tenant group '{}': JWT header present but invalid/expired", tenantId);
+                    continue;
+                }
+                log.debug("No JWT header for tenant '{}'; applying ClientRepository-only validation", tenantId);
+                clientId = tenantId;
+                userId = "kafka-consumer";
+                resolvedScopes = List.of("agent:invoke");
+                resolvedRawToken = null;
+            }
+
+            // ClientRepository check — always applied regardless of JWT presence
+            com.notify.agent.models.ClientEntity clientEntity = clientRepository.findByClientId(clientId).orElse(null);
+            if (clientEntity == null) {
+                log.warn("Skipping tenant group '{}': no registered client found", tenantId);
+                continue;
+            }
+            if (clientEntity.isExpired()) {
+                log.warn("Skipping tenant group '{}': client has expired", tenantId);
+                continue;
+            }
+
+            // --- Context + session creation ---
+            String sessionId = "kafka-" + tenantId;
+            com.notify.agent.models.AgentSessionEntity sessionEntity = sessionService
+                    .findBySessionIdAndClientId(sessionId, clientId)
+                    .orElseGet(() -> sessionService.createOrGet(
+                            sessionId, clientId, userId,
+                            String.join(" ", resolvedScopes)));
+
+            AgentContext ctx = new AgentContext();
+            ctx.setSession(sessionEntity.toSession());
+            ctx.setSource(clientId);
+            ctx.setTenantId(tenantId);
+            ctx.setAuthToken(resolvedRawToken);
+            ctx.setRoles(new java.util.HashSet<>(resolvedScopes));
+            AgentContextHolder.setContext(ctx);
+
+            // --- Idempotency per message ---
+            // Filter out any EventCaptures whose correlationId has already been COMPLETED.
+            // Remaining captures are processed and their keys marked COMPLETED after
+            // enqueue.
+            List<EventCapture> pending = new ArrayList<>();
+            List<String> acquiredKeys = new ArrayList<>();
+
+            for (EventCapture capture : captures) {
+                String correlationId = capture.getCorrelationId();
+                if (correlationId == null || correlationId.isBlank()) {
+                    // No idempotency key — always process
+                    pending.add(capture);
+                    acquiredKeys.add(null);
+                    continue;
+                }
+                String[] redisKeyOut = new String[1];
+                AcquireResult result = idempotencyService.acquireLock(tenantId, correlationId, redisKeyOut);
+                switch (result) {
+                    case ACQUIRED -> {
+                        pending.add(capture);
+                        acquiredKeys.add(redisKeyOut[0]);
+                    }
+                    case ALREADY_COMPLETED ->
+                        log.info("Skipping duplicate event (correlationId={}): already completed", correlationId);
+                    case STILL_PROCESSING ->
+                        log.warn("Skipping event (correlationId={}): concurrent processing in-flight", correlationId);
+                    case INTERRUPTED -> {
+                        log.warn("Idempotency check interrupted for correlationId={}; processing anyway",
+                                correlationId);
+                        pending.add(capture);
+                        acquiredKeys.add(redisKeyOut[0]);
+                    }
+                }
+            }
+
             try {
-                enqueueEventProcessing(captures);
+                if (!pending.isEmpty()) {
+                    enqueueEventProcessing(pending);
+                    // Mark each acquired idempotency key as COMPLETED
+                    for (String key : acquiredKeys) {
+                        idempotencyService.markCompleted(key);
+                    }
+                }
+            } catch (Exception ex) {
+                log.error("Error enqueuing events for tenant '{}'; releasing idempotency locks", tenantId, ex);
+                for (String key : acquiredKeys) {
+                    idempotencyService.releaseLock(key);
+                }
             } finally {
-                AgentContextHolder.getContext().setTenantId(null);
+                AgentContextHolder.clear();
             }
         }
 

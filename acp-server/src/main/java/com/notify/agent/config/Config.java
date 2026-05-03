@@ -37,8 +37,11 @@ import com.zaxxer.hikari.HikariDataSource;
 
 import io.lettuce.core.RedisClient;
 import io.lettuce.core.api.StatefulRedisConnection;
+import org.springframework.boot.web.embedded.netty.NettyReactiveWebServerFactory;
+import org.springframework.boot.web.embedded.netty.NettyServerCustomizer;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
+import reactor.netty.resources.LoopResources;
 
 import javax.sql.DataSource;
 import java.time.Duration;
@@ -55,6 +58,12 @@ import java.util.concurrent.TimeUnit;
 @EnableWebSecurity
 @org.springframework.scheduling.annotation.EnableScheduling
 public class Config {
+
+    @Value("${server.netty.select-threads:1}")
+    private int nettySelectThreads;
+
+    @Value("${server.netty.worker-threads:2}")
+    private int nettyWorkerThreads;
 
     @Value("${redis.host}")
     @ManagedConfiguration(key = "redis.host", source = ConfigSource.CONFIG_MAP)
@@ -103,6 +112,36 @@ public class Config {
                 .defaultHeader("Content-Type", "application/json")
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .build();
+    }
+
+    /**
+     * Constrains Reactor Netty's server-side NIO event loop to a fixed thread count.
+     *
+     * <p>selectCount: number of NIO boss/accept threads (1 is sufficient for a
+     *   single-threaded accept architecture).
+     * <p>workerCount: number of NIO I/O worker threads that read/write request data.
+     *   Set to 2 by default; tune via {@code server.netty.worker-threads}.
+     *
+     * <p>Both values default to 1/2 and can be overridden in application properties
+     * without a code change:
+     * <pre>
+     *   server.netty.select-threads=1
+     *   server.netty.worker-threads=2
+     * </pre>
+     */
+    @Bean
+    public NettyReactiveWebServerFactory nettyReactiveWebServerFactory() {
+        NettyReactiveWebServerFactory factory = new NettyReactiveWebServerFactory();
+        factory.addServerCustomizers((NettyServerCustomizer) httpServer -> {
+            LoopResources loopResources = LoopResources.create(
+                    "nio-req",          // thread name prefix — visible in thread dumps
+                    nettySelectThreads, // NIO accept/select thread count
+                    nettyWorkerThreads, // NIO I/O worker thread count
+                    true                // daemon threads
+            );
+            return httpServer.runOn(loopResources);
+        });
+        return factory;
     }
 
     @Bean

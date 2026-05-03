@@ -16,6 +16,9 @@ import com.notify.agent.models.EventSchedule;
 import com.notify.agent.models.MessageTemplate;
 import com.notify.agent.models.NotificationJob;
 import com.notify.agent.util.ObjectMapperFactory;
+
+import jakarta.annotation.PostConstruct;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -23,6 +26,7 @@ import com.google.genai.types.Content;
 import com.google.genai.types.Part;
 
 import com.notify.agent.config.AgentRegistry;
+import com.notify.agent.config.KafkaConfig;
 import com.notify.agent.exceptions.AgentApplicationException;
 import com.notify.agent.interfaces.PromptAssembler;
 import com.notify.agent.interfaces.RetrievalPlanner;
@@ -32,6 +36,7 @@ import com.notify.agent.records.DecisionRequest;
 import com.notify.agent.records.EventRef;
 import com.notify.agent.records.PromptPackage;
 import com.notify.agent.enums.DecisionType;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,10 +55,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+
+import javax.annotation.PreDestroy;
 
 @RestController
 @RequestMapping("/api/event")
-public class EventConsumer {
+public class EventConsumer extends KafkaNotifyConsumer {
     private final ObjectMapper mapper = ObjectMapperFactory.create();
     private final EventCaptureRepository eventCaptureRepository;
     private final EventScheduleRepository eventScheduleRepository;
@@ -81,7 +89,13 @@ public class EventConsumer {
             NotificationDispatcher notificationDispatcher, NotificationJobRepository notificationJobRepository,
             AgentRegistry agentRegistry, EventRepository eventRepository,
             com.notify.agent.FactRepository factRepository,
-            RetrievalPlanner retrievalPlanner, PromptAssembler promptAssembler) {
+            RetrievalPlanner retrievalPlanner, PromptAssembler promptAssembler,
+            KafkaConfig kafkaConfig, ExecutorService executorService,
+            com.notify.agent.service.JwtService jwtService,
+            com.notify.agent.service.SessionService sessionService,
+            com.notify.agent.service.IdempotencyService idempotencyService,
+            com.notify.agent.ClientRepository clientRepository) {
+        super(kafkaConfig, executorService, jwtService, sessionService, idempotencyService, clientRepository);
         this.eventCaptureRepository = eventCaptureRepository;
         this.eventScheduleRepository = eventScheduleRepository;
         this.messageTemplateRepository = messageTemplateRepository;
@@ -93,6 +107,17 @@ public class EventConsumer {
         this.factRepository = factRepository;
         this.retrievalPlanner = retrievalPlanner;
         this.promptAssembler = promptAssembler;
+    }
+
+    @PostConstruct
+    public void init() {
+        start();
+    }
+
+    @Override
+    @PreDestroy
+    public void stop() {
+        super.stop();
     }
 
     /**
@@ -119,6 +144,7 @@ public class EventConsumer {
      * Uses RxJava Flowables to construct a sequential execution pipeline.
      */
     @SuppressWarnings("null")
+    @Override
     public void enqueueEventProcessing(List<EventCapture> captures) {
         for (EventCapture capture : captures) {
             if (capture == null || capture.getEvent() == null) {

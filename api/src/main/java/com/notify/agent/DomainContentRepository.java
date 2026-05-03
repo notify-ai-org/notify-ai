@@ -1,6 +1,7 @@
 package com.notify.agent;
 
 import com.notify.agent.models.DomainContentEntity;
+import com.notify.agent.models.DomainContentEntity.Type;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -11,5 +12,7 @@ public interface DomainContentRepository extends JpaRepository<DomainContentEnti
 
     List<DomainContentEntity> findByClientId(String clientId);
 
-    Optional<DomainContentEntity> findByClientIdAndType(String clientId, DomainContentEntity.Type type);
+    List<DomainContentEntity> findByClientIdAndType(String clientId, DomainContentEntity.Type type);
+
+    Optional<DomainContentEntity> findByClientIdAndTypeAndKeyName(String clientId, Type type, String key);
 }

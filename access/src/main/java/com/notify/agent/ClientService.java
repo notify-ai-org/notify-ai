@@ -4,6 +4,8 @@ import com.notify.agent.ClientRepository;
 import com.notify.agent.models.ClientEntity;
 import com.notify.agent.models.ClientRegistrationDto;
 import com.notify.agent.models.TokenRefreshDto;
+import com.notify.agent.service.JwtService;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
