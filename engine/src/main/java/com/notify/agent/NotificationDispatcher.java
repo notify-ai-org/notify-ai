@@ -6,6 +6,8 @@ import java.util.List;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.quartz.CalendarIntervalScheduleBuilder;
 import org.quartz.CronScheduleBuilder;
 import org.quartz.Job;
@@ -26,7 +28,6 @@ import com.notify.agent.models.NotificationJob;
 import com.notify.agent.models.Event;
 import com.notify.agent.interfaces.DeadLetterManager;
 import com.notify.agent.models.EventSchedule;
-import com.notify.agent.models.MessageTemplate;
 import com.notify.agent.exceptions.ValidationRequiredException;
 
 @Service
@@ -39,9 +40,9 @@ public class NotificationDispatcher {
     private final Scheduler quartzScheduler;
     private final EventScheduleRepository eventScheduleRepository;
     private final EventRepository eventRepository;
-    private final MessageTemplateRepository messageTemplateRepository;
     private final DeadLetterManager deadLetterManager;
     private final NotificationJobRepository notificationJobRepo;
+    private final KafkaProducer<String, EventSchedule> kafkaProducer;
     // --- Cleaner thread for purging expired notification jobs ---
     private Thread cleanerThread;
     private volatile boolean cleanerRunning = true;
@@ -127,10 +128,9 @@ public class NotificationDispatcher {
             // Register TriggerListener
             quartzScheduler.getListenerManager().addTriggerListener(
                     new QueueingTriggerListener(eventScheduleRepository,
-                            this,
                             notificationJobRepo,
-                            messageTemplateRepository,
-                            deadLetterManager));
+                            deadLetterManager,
+                            kafkaProducer));
 
             // Load and schedule all persisted EventSchedules
             List<EventSchedule> schedules = eventScheduleRepository.findAll();
@@ -276,10 +276,9 @@ public class NotificationDispatcher {
     public static class QueueingTriggerListener implements TriggerListener {
 
         private final EventScheduleRepository eventScheduleRepository;
-        private final NotificationDispatcher notificationDispatcher;
         private final NotificationJobRepository notificationJobRepo;
-        private final MessageTemplateRepository messageTemplateRepository;
         private final DeadLetterManager deadLetterManager;
+        private final KafkaProducer<String, EventSchedule> kafkaProducer;
 
         @Override
         public String getName() {
@@ -300,23 +299,8 @@ public class NotificationDispatcher {
                 return;
             }
 
-            String eventName = schedule.getEventName();
-            NotificationJob job = notificationJobRepo.findByEventName(eventName).orElseThrow();
-
-            if (job.getTemplate() == null) {
-                List<MessageTemplate> newTemplates = messageTemplateRepository
-                        .findByEventTypeAndChannel(eventName, job.getChannel());
-                if (newTemplates.isEmpty()) {
-                    logger.error("No Template found for job id : ", job.getId());
-                    throw new RuntimeException("No Template found for job id : " + job.getId());
-                }
-                MessageTemplate newTemplate = newTemplates.get(0);
-                if (newTemplate != null)
-                    job.setTemplate(newTemplate.getTemplate());
-            }
-
             try {
-                notificationDispatcher.pushJob(job);
+                kafkaProducer.send(new ProducerRecord<>("notify.event.schedules", schedule));
             } catch (ValidationRequiredException e) {
                 logger.error("Cannot dispatch job for schedule '{}': {}",
                         schedule.getId(), e.getMessage());

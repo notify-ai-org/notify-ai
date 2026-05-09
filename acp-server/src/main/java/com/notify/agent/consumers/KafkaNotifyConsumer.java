@@ -2,11 +2,15 @@ package com.notify.agent.consumers;
 
 import com.notify.agent.config.KafkaConfig;
 import com.notify.agent.models.EventCapture;
+import com.google.adk.events.Event;
 import com.notify.agent.AgentContextHolder;
 import com.notify.agent.ClientRepository;
 import com.notify.agent.models.AgentContext;
 import com.notify.agent.service.IdempotencyService;
 import com.notify.agent.service.IdempotencyService.AcquireResult;
+
+import io.reactivex.rxjava3.core.Flowable;
+
 import com.notify.agent.service.JwtService;
 import com.notify.agent.service.SessionService;
 
@@ -329,11 +333,22 @@ abstract class KafkaNotifyConsumer {
 
             try {
                 if (!pending.isEmpty()) {
-                    enqueueEventProcessing(pending);
-                    // Mark each acquired idempotency key as COMPLETED
-                    for (String key : acquiredKeys) {
-                        idempotencyService.markCompleted(key);
-                    }
+                    enqueueEventProcessing(pending)
+                            .doOnComplete(() -> {
+                                // Mark each acquired idempotency key as COMPLETED
+                                for (String key : acquiredKeys) {
+                                    idempotencyService.markCompleted(key);
+                                }
+                            })
+                            .subscribe(
+                                    event -> {
+                                        /* Terminal elements dropped or logged */ },
+                                    error -> {
+                                        log.error("Event processing pipeline failed: " + error.getMessage(), error);
+                                        for (String key : acquiredKeys) {
+                                            idempotencyService.releaseLock(key);
+                                        }
+                                    });
                 }
             } catch (Exception ex) {
                 log.error("Error enqueuing events for tenant '{}'; releasing idempotency locks", tenantId, ex);
@@ -357,7 +372,7 @@ abstract class KafkaNotifyConsumer {
         });
     }
 
-    protected abstract void enqueueEventProcessing(List<EventCapture> captures);
+    protected abstract Flowable<com.google.adk.events.Event> enqueueEventProcessing(List<EventCapture> captures);
 
     @PreDestroy
     public void stop() {

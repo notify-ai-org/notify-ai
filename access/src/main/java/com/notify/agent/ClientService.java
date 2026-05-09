@@ -1,6 +1,5 @@
 package com.notify.agent;
 
-import com.notify.agent.ClientRepository;
 import com.notify.agent.models.ClientEntity;
 import com.notify.agent.models.ClientRegistrationDto;
 import com.notify.agent.models.TokenRefreshDto;

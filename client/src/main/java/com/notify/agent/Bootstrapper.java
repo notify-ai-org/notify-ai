@@ -4,6 +4,7 @@ import com.notify.agent.config.NotifyProperties;
 import com.notify.agent.models.ClassModel;
 import com.notify.agent.models.ClientRegistrationDto;
 import com.notify.agent.models.EventCapture;
+import com.notify.agent.models.EventSchedule;
 import com.notify.agent.models.TokenRefreshDto;
 import com.notify.agent.models.metadata.EventMetadata;
 import com.notify.agent.models.metadata.RuleMetadata;
@@ -12,6 +13,9 @@ import jakarta.annotation.PreDestroy;
 
 import java.time.Instant;
 import java.util.List;
+
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.KafkaProducer;
 
 /**
  * Bootstraps the Notification Engine SDK: runs AnnotationProcessor and
@@ -30,6 +34,9 @@ public class Bootstrapper {
     private final TokenHolder tokenHolder;
     private final InvokeManager invokeManager;
     private final MetricsManager metricsManager;
+    private final EventListener eventListener;
+    private final KafkaConsumer<String, EventSchedule> consumer;
+    private final KafkaProducer<String, EventCapture> producer;
 
     private String clientId;
     private Dispatcher dispatcher;
@@ -42,7 +49,8 @@ public class Bootstrapper {
             AcpServerClient acpClient,
             TokenHolder tokenHolder,
             InvokeManager invokeManager,
-            MetricsManager metricsManager) {
+            KafkaConsumer<String, EventSchedule> consumer, KafkaProducer<String, EventCapture> producer,
+            MetricsManager metricsManager, EventListener eventListener) {
         this.props = props;
         this.annotationProcessor = annotationProcessor;
         this.vocabularyManager = vocabularyManager;
@@ -51,6 +59,9 @@ public class Bootstrapper {
         this.tokenHolder = tokenHolder;
         this.invokeManager = invokeManager;
         this.metricsManager = metricsManager;
+        this.eventListener = eventListener;
+        this.consumer = consumer;
+        this.producer = producer;
     }
 
     /**
@@ -99,13 +110,12 @@ public class Bootstrapper {
             buffer.addRule(ev, r.getName(), r.getDescription(), null);
         }
 
-        dispatcher = new Dispatcher(buffer, acpClient, tokenHolder::getToken, this::refreshToken);
+        dispatcher = new Dispatcher(buffer, acpClient, tokenHolder::getToken, this::refreshToken,
+                consumer, producer, eventListener);
         dispatcherThread = new Thread(dispatcher, "notify-dispatcher");
         dispatcherThread.setDaemon(false);
         dispatcherThread.start();
     }
-
-
 
     private void refreshToken() {
         String ref = tokenHolder.getRefreshToken();

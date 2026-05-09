@@ -17,6 +17,7 @@ import com.notify.agent.models.MessageTemplate;
 import com.notify.agent.models.NotificationJob;
 import com.notify.agent.util.ObjectMapperFactory;
 
+import io.reactivex.rxjava3.core.Flowable;
 import jakarta.annotation.PostConstruct;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -51,6 +52,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -132,11 +134,16 @@ public class EventConsumer extends KafkaNotifyConsumer {
                     .body(Map.of("error", "Event captures are required", "status", "BAD_REQUEST")));
         }
 
-        enqueueEventProcessing(request);
+        enqueueEventProcessing(request).blockingSubscribe(
+                result -> {
+                    /* Terminal elements dropped or logged */ },
+                error -> {
+                    logger.error("Event processing pipeline failed: " + error.getMessage(), error);
+                });
 
         return Mono.just(ResponseEntity.accepted().body(Map.of(
-                "message", "Event processing enqueued for " + request.size() + " captures",
-                "status", "ENQUEUED")));
+                "message", "Event processing completed for " + request.size() + " captures",
+                "status", "COMPLETED")));
     }
 
     /**
@@ -145,7 +152,8 @@ public class EventConsumer extends KafkaNotifyConsumer {
      */
     @SuppressWarnings("null")
     @Override
-    public void enqueueEventProcessing(List<EventCapture> captures) {
+    public Flowable<com.google.adk.events.Event> enqueueEventProcessing(List<EventCapture> captures) {
+        List<Flowable<com.google.adk.events.Event>> flowables = new ArrayList<>();
         for (EventCapture capture : captures) {
             if (capture == null || capture.getEvent() == null) {
                 throw new RuntimeException("Event capture is required with an eventName");
@@ -221,7 +229,7 @@ public class EventConsumer extends KafkaNotifyConsumer {
                                 capture.getId(), prompt, AgentContextHolder.getContext());
 
                 // 2. Chain downstream tasks based on processor result
-                eventProcessFlowable.flatMap(agentEvent -> {
+                Flowable<com.google.adk.events.Event> downstreamFlowable = eventProcessFlowable.flatMap(agentEvent -> {
                     if (agentEvent.content().isEmpty() || agentEvent.content().get().parts().isEmpty()
                             || agentEvent.content().get().parts().get().isEmpty()) {
                         return io.reactivex.rxjava3.core.Flowable.empty();
@@ -351,22 +359,24 @@ public class EventConsumer extends KafkaNotifyConsumer {
                     // Process channels in parallel via orchestrator API
                     return agentOrchestrator.createParallelFlowable(downstreamTasks);
 
-                }).subscribe(
-                        result -> {
-                            /* Terminal elements dropped or logged */ },
-                        error -> {
-                            logger.error("Event processing pipeline failed: " + error.getMessage(), error);
-                            capture.setBulletReasons(error.getMessage());
-                            capture.setStatus(CaptureStatus.FAILED);
-                            eventCaptureRepository.save(capture);
-                        });
-
+                }).doOnError(error -> {
+                    logger.error("Event processing pipeline failed: " + error.getMessage(), error);
+                    capture.setBulletReasons(error.getMessage());
+                    capture.setStatus(CaptureStatus.FAILED);
+                    eventCaptureRepository.save(capture);
+                }).doOnComplete(() -> {
+                    logger.info("Event processing completed successfully");
+                    capture.setStatus(CaptureStatus.PROCESSED);
+                    eventCaptureRepository.save(capture);
+                });
+                flowables.add(downstreamFlowable);
             } catch (Exception e) {
-                logger.error("Error enqueuing event processing: " + e.getMessage(), e);
+                logger.error("Error enqueuing event processing: " + e.getMessage());
                 capture.setStatus(CaptureStatus.FAILED);
                 eventCaptureRepository.save(capture);
             }
         }
+        return Flowable.concat(flowables);
     }
 
     private io.reactivex.rxjava3.core.Flowable<com.google.adk.events.Event> buildScheduleAndTemplateFlowable(

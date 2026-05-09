@@ -9,6 +9,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
+import org.apache.kafka.clients.producer.KafkaProducer;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,7 +50,8 @@ class NotificationDispatcherTest {
     private NotificationJobRepository notificationJobRepo;
 
     @Mock
-    private MessageTemplateRepository messageTemplateRepository;
+    @SuppressWarnings("unchecked")
+    private KafkaProducer<String, EventSchedule> kafkaProducer;
 
     @InjectMocks
     private NotificationDispatcher dispatcher;
@@ -266,7 +269,7 @@ class NotificationDispatcherTest {
     void testQueueingTriggerListener_getName_shouldReturnCorrectName() {
         // Arrange
         NotificationDispatcher.QueueingTriggerListener listener = new NotificationDispatcher.QueueingTriggerListener(
-                eventScheduleRepository, dispatcher, notificationJobRepo, messageTemplateRepository, deadLetterManager);
+                eventScheduleRepository, notificationJobRepo, deadLetterManager, kafkaProducer);
 
         // Act
         String name = listener.getName();
@@ -279,7 +282,7 @@ class NotificationDispatcherTest {
     void testQueueingTriggerListener_triggerFired_withDeferredEvent_shouldPushJob() {
         // Arrange
         NotificationDispatcher.QueueingTriggerListener listener = new NotificationDispatcher.QueueingTriggerListener(
-                eventScheduleRepository, dispatcher, notificationJobRepo, messageTemplateRepository, deadLetterManager);
+                eventScheduleRepository, notificationJobRepo, deadLetterManager, kafkaProducer);
 
         Trigger trigger = mock(Trigger.class);
         org.quartz.JobExecutionContext context = mock(org.quartz.JobExecutionContext.class);
@@ -291,25 +294,20 @@ class NotificationDispatcherTest {
         when(jobDetail.getJobDataMap()).thenReturn(jobDataMap);
         when(eventScheduleRepository.findById("schedule-1")).thenReturn(Optional.of(testSchedule));
 
-        NotificationJob deferredJob = NotificationJob.builder()
-                .eventType("deffered")
-                .eventName("test-event")
-                .build();
-        when(notificationJobRepo.findByEventName("test-event")).thenReturn(Optional.of(deferredJob));
-
         // Act
         listener.triggerFired(trigger, context);
 
-        // Assert
+        // Assert — schedule is looked up, then sent to Kafka; notificationJobRepo is not
+        // called in triggerFired (it is only used in triggerMisfired)
         verify(eventScheduleRepository).findById("schedule-1");
-        verify(notificationJobRepo).findByEventName("test-event");
+        verify(kafkaProducer).send(any());
     }
 
     @Test
     void testQueueingTriggerListener_vetoJobExecution_shouldReturnFalse() {
         // Arrange
         NotificationDispatcher.QueueingTriggerListener listener = new NotificationDispatcher.QueueingTriggerListener(
-                eventScheduleRepository, dispatcher, notificationJobRepo, messageTemplateRepository, deadLetterManager);
+                eventScheduleRepository, notificationJobRepo, deadLetterManager, kafkaProducer);
 
         Trigger trigger = mock(Trigger.class);
         org.quartz.JobExecutionContext context = mock(org.quartz.JobExecutionContext.class);
@@ -325,7 +323,7 @@ class NotificationDispatcherTest {
     void testQueueingTriggerListener_triggerComplete_shouldNotThrowException() {
         // Arrange
         NotificationDispatcher.QueueingTriggerListener listener = new NotificationDispatcher.QueueingTriggerListener(
-                eventScheduleRepository, dispatcher, notificationJobRepo, messageTemplateRepository, deadLetterManager);
+                eventScheduleRepository, notificationJobRepo, deadLetterManager, kafkaProducer);
 
         Trigger trigger = mock(Trigger.class);
         org.quartz.JobExecutionContext context = mock(org.quartz.JobExecutionContext.class);

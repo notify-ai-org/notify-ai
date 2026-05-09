@@ -18,8 +18,8 @@ import com.notify.agent.consumers.EventConsumer;
 import com.notify.agent.models.Event;
 import com.notify.agent.models.EventCapture;
 
-@RestController
-@RequestMapping("/api/test/notification")
+// @RestController
+// @RequestMapping("/api/test/notification")
 public class TestNotificationController {
 
         private final NotificationDispatcher notificationDispatcher;

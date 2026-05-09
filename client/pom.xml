@@ -42,9 +42,32 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
+        <!-- Direct Kafka client dependency — AcpServerClient uses KafkaProducer,
+             ProducerConfig, ProducerRecord, etc. directly. Declaring this explicitly
+             avoids "cannot be resolved to a type" errors caused by relying on the
+             transitive kafka-clients JAR that flows through common → spring-kafka. -->
         <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
+            <groupId>org.apache.kafka</groupId>
+            <artifactId>kafka-clients</artifactId>
+        </dependency>
+
+        <!-- Kafka + JwtService + shared auth interfaces via common.
+             Redis is excluded — the client SDK uses TokenHolder (in-memory)
+             and NoOpTokenValidator instead of the Redis implementations. -->
+        <dependency>
+            <groupId>com.notify</groupId>
+            <artifactId>vocabulary-agent-common</artifactId>
+            <version>1.0-SNAPSHOT</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-data-redis</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.commons</groupId>
+                    <artifactId>commons-pool2</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.reflections</groupId>

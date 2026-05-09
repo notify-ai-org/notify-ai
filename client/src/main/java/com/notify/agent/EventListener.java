@@ -2,6 +2,7 @@ package com.notify.agent;
 
 import com.notify.agent.annotations.Event;
 import com.notify.agent.models.EventCapture;
+import com.notify.agent.models.EventSchedule;
 import com.notify.agent.models.dto.RuleResultDto;
 import com.notify.agent.models.dto.SubjectResultDto;
 import com.notify.agent.models.metadata.RuleMetadata;
@@ -13,7 +14,6 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.springframework.kafka.annotation.KafkaListener;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -220,10 +220,12 @@ public class EventListener {
         return results;
     }
 
-    @KafkaListener(topics = "${notify.kafka.topic:notify-scheduled-events}", groupId = "${notify.kafka.group:notify-client-group}")
-    public void onScheduledEvent(String raw) {
+    public void onScheduledEvent(EventSchedule schedule) {
         try {
-            EventCapture dto = mapper.readValue(raw, EventCapture.class);
+
+            EventCapture dto = new EventCapture();
+            dto.getEvent().setName(schedule.getEventName());
+
             if (dto.getOccuredAt() == null)
                 dto.setOccuredAt(Instant.now());
             if (dto.getEvent().getEventType() == null || dto.getEvent().getEventType().isEmpty())
