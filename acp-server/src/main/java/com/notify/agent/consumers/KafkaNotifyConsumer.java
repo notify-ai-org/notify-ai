@@ -58,8 +58,9 @@ abstract class KafkaNotifyConsumer {
         this.clientRepository = clientRepository;
     }
 
+    @SuppressWarnings("unchecked")
     private KafkaConsumer<String, EventCapture> createKafkaConsumer() {
-        return kafkaConfig.kafkaConsumer();
+        return (KafkaConsumer<String, EventCapture>) (KafkaConsumer<?, ?>) kafkaConfig.kafkaConsumer();
     }
 
     public void validateConfiguration() {

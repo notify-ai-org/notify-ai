@@ -1,12 +1,12 @@
 package com.notify.agent;
 
 import com.notify.agent.annotations.Event;
-import com.notify.agent.models.EventCapture;
-import com.notify.agent.models.EventSchedule;
-import com.notify.agent.models.dto.RuleResultDto;
-import com.notify.agent.models.dto.SubjectResultDto;
-import com.notify.agent.models.metadata.RuleMetadata;
-import com.notify.agent.models.subject.Subject;
+import com.notify.agent.client.models.EventCapture;
+import com.notify.agent.client.models.EventSchedule;
+import com.notify.agent.client.models.dto.RuleResultDto;
+import com.notify.agent.client.models.dto.SubjectResultDto;
+import com.notify.agent.client.models.metadata.RuleMetadata;
+import com.notify.agent.client.models.subject.Subject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -92,10 +92,10 @@ public class EventListener {
         StackTraceElement[] limitedStack = Arrays.copyOf(fullStack, Math.min(5, fullStack.length));
 
         // Convert StackTraceElement[] to CallStack
-        com.notify.agent.models.CallStack callStack = new com.notify.agent.models.CallStack();
-        List<com.notify.agent.models.StackFrame> frames = new ArrayList<>();
+        com.notify.agent.client.models.CallStack callStack = new com.notify.agent.client.models.CallStack();
+        List<com.notify.agent.client.models.StackFrame> frames = new ArrayList<>();
         for (StackTraceElement element : limitedStack) {
-            com.notify.agent.models.StackFrame frame = new com.notify.agent.models.StackFrame();
+            com.notify.agent.client.models.StackFrame frame = new com.notify.agent.client.models.StackFrame();
             frame.setClassName(element.getClassName());
             frame.setMethodName(element.getMethodName());
             frame.setLineNumber(element.getLineNumber());
@@ -107,18 +107,24 @@ public class EventListener {
 
         dto.setServiceName(pjp.getTarget().getClass().getSimpleName());
 
-        // Execute subject supplier and capture result
-        SubjectResultDto subjectResult = executeSubjectSupplier(eventKey, pjp.getArgs());
-        dto.setSubjectResult(subjectResult);
+        try {
+            // Execute subject supplier and capture result
+            SubjectResultDto subjectResult = executeSubjectSupplier(eventKey, pjp.getArgs());
+            dto.setSubjectResult(subjectResult);
 
-        // Execute rule-annotated methods and capture results
-        List<RuleResultDto> ruleResults = executeRules(eventKey, pjp.getArgs());
-        dto.setRuleResults(ruleResults);
+            // Execute rule-annotated methods and capture results
+            List<RuleResultDto> ruleResults = executeRules(eventKey, pjp.getArgs());
+            dto.setRuleResults(ruleResults);
+        } catch (Exception e) {
+            // log and continue
+            e.printStackTrace();
+            return null;
+        }
 
         // Set execution result
         if (caughtException != null) {
             // Set exception info
-            com.notify.agent.models.ExceptionInfo exceptionInfo = new com.notify.agent.models.ExceptionInfo();
+            com.notify.agent.client.models.ExceptionInfo exceptionInfo = new com.notify.agent.client.models.ExceptionInfo();
             exceptionInfo.setExceptionType(caughtException.getClass().getName());
             exceptionInfo.setMessage(caughtException.getMessage());
 
@@ -128,13 +134,13 @@ public class EventListener {
             dto.setException(exceptionInfo);
 
             // Set result as failure
-            com.notify.agent.models.ExecutionResult executionResult = new com.notify.agent.models.ExecutionResult();
+            com.notify.agent.client.models.ExecutionResult executionResult = new com.notify.agent.client.models.ExecutionResult();
             executionResult.setSuccess(false);
             executionResult.setReturnValue(null);
             dto.setResult(executionResult);
         } else {
             // Set result as success
-            com.notify.agent.models.ExecutionResult executionResult = new com.notify.agent.models.ExecutionResult();
+            com.notify.agent.client.models.ExecutionResult executionResult = new com.notify.agent.client.models.ExecutionResult();
             executionResult.setSuccess(true);
             try {
                 executionResult.setReturnValue(result != null ? mapper.writeValueAsString(result) : null);

@@ -7,12 +7,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import com.notify.agent.models.Vocabulary;
+import com.notify.agent.client.models.Vocabulary;
 
-import com.notify.agent.models.AttributeModel;
-import com.notify.agent.models.ClassModel;
-import com.notify.agent.models.metadata.ModelMetadata;
-import com.notify.agent.models.metadata.VocabularyFieldMetadata;
+import com.notify.agent.client.models.AttributeModel;
+import com.notify.agent.client.models.ClassModel;
+import com.notify.agent.client.models.metadata.ModelMetadata;
+import com.notify.agent.client.models.metadata.VocabularyFieldMetadata;
 
 /**
  * Extracts vocabulary using the AnnotationProcessor's @Model and @Vocabulary

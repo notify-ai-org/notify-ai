@@ -7,8 +7,8 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.locks.ReentrantLock;
 
-import com.notify.agent.models.ClassModel;
-import com.notify.agent.models.EventCapture;
+import com.notify.agent.client.models.ClassModel;
+import com.notify.agent.client.models.EventCapture;
 
 /**
  * Manages a batch of records to be sent to acp-server. Flushes when either

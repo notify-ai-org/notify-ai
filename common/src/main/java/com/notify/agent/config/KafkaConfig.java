@@ -1,7 +1,6 @@
 package com.notify.agent.config;
 
 import com.notify.agent.annotations.ManagedConfiguration;
-import com.notify.agent.models.EventCapture;
 
 import lombok.Getter;
 
@@ -36,7 +35,7 @@ public class KafkaConfig {
     // Consumer configuration
     // -------------------------------------------------------------------------
 
-    @Value("${kafka.bootstrap-servers}")
+    @Value("${kafka.bootstrap-servers:pkc-41p56.asia-south1.gcp.confluent.cloud:9092}")
     @ManagedConfiguration(key = "kafka.bootstrap-servers")
     private String bootstrapServers;
 
@@ -44,7 +43,7 @@ public class KafkaConfig {
     @ManagedConfiguration(key = "kafka.poll-timeout-ms")
     private long pollTimeoutMs;
 
-    @Value("${kafka.key-deserializer}")
+    @Value("${kafka.key-deserializer:org.apache.kafka.common.serialization.StringDeserializer}")
     @ManagedConfiguration(key = "kafka.key-deserializer")
     private String keyDeserializer;
 
@@ -112,11 +111,11 @@ public class KafkaConfig {
     // Producer configuration
     // -------------------------------------------------------------------------
 
-    @Value("${kafka.producer.key-serializer}")
+    @Value("${kafka.producer.key-serializer:org.apache.kafka.common.serialization.StringSerializer}")
     @ManagedConfiguration(key = "kafka.producer.key-serializer")
     private String keySerializer;
 
-    @Value("${kafka.producer.value-serializer}")
+    @Value("${kafka.producer.value-serializer:org.apache.kafka.common.serialization.StringSerializer}")
     @ManagedConfiguration(key = "kafka.producer.value-serializer")
     private String valueSerializer;
 
@@ -169,12 +168,12 @@ public class KafkaConfig {
     // -------------------------------------------------------------------------
 
     /** PLAINTEXT | SSL | SASL_PLAINTEXT | SASL_SSL */
-    @Value("${kafka.security.protocol:PLAINTEXT}")
+    @Value("${kafka.security.protocol:SASL_SSL}")
     @ManagedConfiguration(key = "kafka.security.protocol")
     private String securityProtocol;
 
     /** PLAIN | SCRAM-SHA-256 | SCRAM-SHA-512 | OAUTHBEARER | GSSAPI */
-    @Value("${kafka.security.sasl-mechanism:}")
+    @Value("${kafka.security.sasl-mechanism:PLAIN}")
     @ManagedConfiguration(key = "kafka.security.sasl-mechanism")
     private String saslMechanism;
 
@@ -243,7 +242,7 @@ public class KafkaConfig {
 
     @Bean
     @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
-    public KafkaConsumer<String, EventCapture> kafkaConsumer() {
+    public KafkaConsumer<String, Object> kafkaConsumer() {
         return new KafkaConsumer<>(consumerProperties());
     }
 
@@ -276,7 +275,7 @@ public class KafkaConfig {
 
     @Bean
     @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
-    public KafkaProducer<String, EventCapture> kafkaProducer() {
+    public KafkaProducer<String, Object> kafkaProducer() {
         return new KafkaProducer<>(producerProperties());
     }
 

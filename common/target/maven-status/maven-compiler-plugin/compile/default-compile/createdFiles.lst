@@ -1,3 +1,5 @@
+com/notify/agent/interfaces/TokenValidator.class
 com/notify/agent/service/JwtService$JwtClaims.class
+com/notify/agent/interfaces/TokenStore.class
 com/notify/agent/config/KafkaConfig.class
 com/notify/agent/service/JwtService.class

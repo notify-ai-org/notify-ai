@@ -21,10 +21,10 @@ import org.apache.kafka.common.TopicPartition;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.notify.agent.models.ClassModel;
-import com.notify.agent.models.EventCapture;
-import com.notify.agent.models.EventSchedule;
-import com.notify.agent.models.subject.Subject;
+import com.notify.agent.client.models.ClassModel;
+import com.notify.agent.client.models.EventCapture;
+import com.notify.agent.client.models.EventSchedule;
+import com.notify.agent.client.models.subject.Subject;
 
 /**
  * Thread that pulls records from the Buffer and sends them to acp-server (or

@@ -16,13 +16,16 @@ public class NotifyProperties {
     private String basePackage = "com.notify";
 
     /** acp-server base URL, e.g. http://localhost:8080 */
-    private String acpServerUrl = "https://35.202.236.43";
+    private String acpServerUrl = "http://localhost:8080";
 
     /** Application name for client registration and metrics. */
     private String applicationName = "notify-client";
 
     /** Constant/hardcoded client identifier for registration. */
     private String clientId = "";
+
+    /** Base64 encoded JSON token for Kafka and client registration. */
+    private String clientToken = "";
 
     /** Buffer batch size before flush. */
     private int bufferBatchSize = 100;
@@ -69,6 +72,14 @@ public class NotifyProperties {
 
     public void setClientId(String clientId) {
         this.clientId = clientId;
+    }
+
+    public String getClientToken() {
+        return clientToken;
+    }
+
+    public void setClientToken(String clientToken) {
+        this.clientToken = clientToken;
     }
 
     public int getBufferBatchSize() {

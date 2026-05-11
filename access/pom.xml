@@ -6,7 +6,7 @@
     <parent>
         <groupId>com.notify</groupId>
         <artifactId>vocabulary-agent-parent</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0.0</version>
     </parent>
     
     <artifactId>vocabulary-agent-access</artifactId>
@@ -37,6 +37,7 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring.boot.version}</version>
                 <executions>
                     <execution>
                         <goals>

@@ -2,8 +2,6 @@ package com.notify.agent.config;
 
 import com.notify.agent.*;
 
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-import org.apache.kafka.clients.producer.KafkaProducer;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -11,8 +9,6 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import com.notify.agent.annotations.EnableNotify;
-import com.notify.agent.models.EventCapture;
-import com.notify.agent.models.EventSchedule;
 
 /**
  * Spring Boot auto-configuration for the Notification Engine Client SDK.
@@ -88,12 +84,11 @@ public class NotifyAutoConfiguration {
             AcpServerClient acpServerClient,
             TokenHolder tokenHolder,
             InvokeManager invokeManager,
-            KafkaConsumer<String, EventSchedule> consumer,
-            KafkaProducer<String, EventCapture> producer,
+            com.notify.agent.config.KafkaConfig kafkaConfig,
             MetricsManager metricsManager,
             EventListener eventListener) {
         return new Bootstrapper(props, annotationProcessor, vocabularyManager, buffer,
-                acpServerClient, tokenHolder, invokeManager, consumer, producer, metricsManager, eventListener);
+                acpServerClient, tokenHolder, invokeManager, kafkaConfig, metricsManager, eventListener);
     }
 
     @Bean

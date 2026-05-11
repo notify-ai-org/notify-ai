@@ -8,7 +8,10 @@ import com.notify.agent.service.JwtService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 
+import java.util.Base64;
 import java.util.Optional;
 
 /**
@@ -39,10 +42,24 @@ public class ClientService {
      */
     @Transactional
     public ClientRegistrationDto.Response register(ClientRegistrationDto.Request request) {
-        ClientEntity client = clientRepository.findByClientId(request.getClientId())
+        String clientId = request.getClientId();
+        if (request.getRawToken() != null && !request.getRawToken().isEmpty()) {
+            try {
+                String decodedJson = new String(Base64.getDecoder().decode(request.getRawToken()));
+                JsonNode node = new ObjectMapper().readTree(decodedJson);
+                if (node.has("clientId")) {
+                    clientId = node.get("clientId").asText();
+                }
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to decode rawToken in registration request", e);
+            }
+        }
+
+        final String finalClientId = clientId;
+        ClientEntity client = clientRepository.findByClientId(finalClientId)
                 .orElseThrow(() -> new RuntimeException(
                         "Invalid or pre-registered API key strictly required for registration. Client ID: "
-                                + request.getClientId()));
+                                + finalClientId));
 
         client.setApplicationName(request.getApplicationName());
         client.setBasePackage(request.getBasePackage());

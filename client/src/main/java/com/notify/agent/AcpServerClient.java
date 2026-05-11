@@ -1,9 +1,9 @@
 package com.notify.agent;
 
-import com.notify.agent.models.ClassModel;
-import com.notify.agent.models.EventCapture;
-import com.notify.agent.models.ClientRegistrationDto;
-import com.notify.agent.models.TokenRefreshDto;
+import com.notify.agent.client.models.ClassModel;
+import com.notify.agent.client.models.EventCapture;
+import com.notify.agent.client.models.ClientRegistrationDto;
+import com.notify.agent.client.models.TokenRefreshDto;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;

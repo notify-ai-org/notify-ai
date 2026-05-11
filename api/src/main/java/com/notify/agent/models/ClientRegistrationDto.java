@@ -9,6 +9,7 @@ public class ClientRegistrationDto {
         private String clientId;
         private String applicationName;
         private String basePackage;
+        private String rawToken;
 
         public String getClientId() { return clientId; }
         public void setClientId(String clientId) { this.clientId = clientId; }
@@ -16,6 +17,8 @@ public class ClientRegistrationDto {
         public void setApplicationName(String applicationName) { this.applicationName = applicationName; }
         public String getBasePackage() { return basePackage; }
         public void setBasePackage(String basePackage) { this.basePackage = basePackage; }
+        public String getRawToken() { return rawToken; }
+        public void setRawToken(String rawToken) { this.rawToken = rawToken; }
     }
 
     public static class Response {

@@ -1,7 +1,7 @@
 package com.notify.agent;
 
 import com.notify.agent.annotations.Callback.When;
-import com.notify.agent.models.metadata.*;
+import com.notify.agent.client.models.metadata.*;
 
 import org.springframework.context.ApplicationContext;
 

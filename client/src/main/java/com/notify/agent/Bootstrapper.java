@@ -1,13 +1,13 @@
 package com.notify.agent;
 
 import com.notify.agent.config.NotifyProperties;
-import com.notify.agent.models.ClassModel;
-import com.notify.agent.models.ClientRegistrationDto;
-import com.notify.agent.models.EventCapture;
-import com.notify.agent.models.EventSchedule;
-import com.notify.agent.models.TokenRefreshDto;
-import com.notify.agent.models.metadata.EventMetadata;
-import com.notify.agent.models.metadata.RuleMetadata;
+import com.notify.agent.client.models.ClassModel;
+import com.notify.agent.client.models.ClientRegistrationDto;
+import com.notify.agent.client.models.EventCapture;
+import com.notify.agent.client.models.EventSchedule;
+import com.notify.agent.client.models.TokenRefreshDto;
+import com.notify.agent.client.models.metadata.EventMetadata;
+import com.notify.agent.client.models.metadata.RuleMetadata;
 
 import jakarta.annotation.PreDestroy;
 
@@ -16,6 +16,17 @@ import java.util.List;
 
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.common.config.SaslConfigs;
+import org.apache.kafka.clients.CommonClientConfigs;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import java.util.Base64;
+import java.util.Map;
+import com.notify.agent.config.KafkaConfig;
 
 /**
  * Bootstraps the Notification Engine SDK: runs AnnotationProcessor and
@@ -35,8 +46,10 @@ public class Bootstrapper {
     private final InvokeManager invokeManager;
     private final MetricsManager metricsManager;
     private final EventListener eventListener;
-    private final KafkaConsumer<String, EventSchedule> consumer;
-    private final KafkaProducer<String, EventCapture> producer;
+    private final KafkaConfig kafkaConfig;
+    
+    private KafkaConsumer<String, EventSchedule> consumer;
+    private KafkaProducer<String, EventCapture> producer;
 
     private String clientId;
     private Dispatcher dispatcher;
@@ -49,7 +62,7 @@ public class Bootstrapper {
             AcpServerClient acpClient,
             TokenHolder tokenHolder,
             InvokeManager invokeManager,
-            KafkaConsumer<String, EventSchedule> consumer, KafkaProducer<String, EventCapture> producer,
+            KafkaConfig kafkaConfig,
             MetricsManager metricsManager, EventListener eventListener) {
         this.props = props;
         this.annotationProcessor = annotationProcessor;
@@ -60,8 +73,7 @@ public class Bootstrapper {
         this.invokeManager = invokeManager;
         this.metricsManager = metricsManager;
         this.eventListener = eventListener;
-        this.consumer = consumer;
-        this.producer = producer;
+        this.kafkaConfig = kafkaConfig;
     }
 
     /**
@@ -72,11 +84,49 @@ public class Bootstrapper {
         annotationProcessor.process();
         invokeManager.buildFrom(annotationProcessor);
 
+        String rawToken = props.getClientToken();
+        String apiKey = "";
+        String apiSecret = "";
         clientId = props.getClientId();
+
+        if (rawToken != null && !rawToken.isEmpty()) {
+            try {
+                String decodedJson = new String(Base64.getDecoder().decode(rawToken));
+                JsonNode node = new ObjectMapper().readTree(decodedJson);
+                if (node.has("clientId")) clientId = node.get("clientId").asText();
+                if (node.has("apiKey")) apiKey = node.get("apiKey").asText();
+                if (node.has("apiSecret")) apiSecret = node.get("apiSecret").asText();
+            } catch (Exception e) {
+                System.err.println("Failed to parse clientToken. Kafka initialization may fail.");
+            }
+        }
+
+        // Initialize Kafka Producer and Consumer dynamically
+        Map<String, Object> producerProps = kafkaConfig.producerProperties();
+        Map<String, Object> consumerProps = kafkaConfig.consumerProperties();
+        
+        if (!apiKey.isEmpty() && !apiSecret.isEmpty()) {
+            String jaasConfig = String.format("org.apache.kafka.common.security.plain.PlainLoginModule required username='%s' password='%s';", apiKey, apiSecret);
+            producerProps.put(SaslConfigs.SASL_JAAS_CONFIG, jaasConfig);
+            consumerProps.put(SaslConfigs.SASL_JAAS_CONFIG, jaasConfig);
+            producerProps.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_SSL");
+            consumerProps.put(CommonClientConfigs.SECURITY_PROTOCOL_CONFIG, "SASL_SSL");
+            producerProps.put(SaslConfigs.SASL_MECHANISM, "PLAIN");
+            consumerProps.put(SaslConfigs.SASL_MECHANISM, "PLAIN");
+        }
+        
+        if (clientId != null && !clientId.isEmpty()) {
+            producerProps.put(ProducerConfig.CLIENT_ID_CONFIG, clientId + "-producer");
+            consumerProps.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId + "-consumer");
+        }
+
+        this.producer = new KafkaProducer<>(producerProps);
+        this.consumer = new KafkaConsumer<>(consumerProps);
 
         try {
             ClientRegistrationDto.Request reg = new ClientRegistrationDto.Request();
             reg.setClientId(clientId);
+            reg.setRawToken(rawToken);
             reg.setApplicationName(props.getApplicationName());
             reg.setBasePackage(props.getBasePackage());
             ClientRegistrationDto.Response resp = acpClient.register(reg, null);

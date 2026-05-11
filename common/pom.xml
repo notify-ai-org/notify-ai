@@ -7,22 +7,21 @@
     <parent>
         <groupId>com.notify</groupId>
         <artifactId>vocabulary-agent-parent</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 
     <artifactId>vocabulary-agent-common</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
 
     <name>Vocabulary Agent Common</name>
     <description>Shared Kafka configuration and JWT service used by acp-server, engine, and client modules</description>
 
     <dependencies>
-        <!-- Shared models, annotations, and repositories -->
         <dependency>
             <groupId>com.notify</groupId>
-            <artifactId>vocabulary-agent-api</artifactId>
+            <artifactId>vocabulary-agent-annotations</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
 

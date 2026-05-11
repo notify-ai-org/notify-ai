@@ -1,7 +1,7 @@
 package com.notify.agent;
 
 import com.notify.agent.annotations.*;
-import com.notify.agent.models.metadata.*;
+import com.notify.agent.client.models.metadata.*;
 
 import org.reflections.Reflections;
 import org.reflections.scanners.Scanners;
@@ -52,7 +52,7 @@ public class AnnotationProcessor {
         Set<Method> methods = reflections.getMethodsAnnotatedWith(Event.class);
         for (Method m : methods) {
             com.notify.agent.annotations.Event a = m.getAnnotation(com.notify.agent.annotations.Event.class);
-            com.notify.agent.models.Event event = new com.notify.agent.models.Event();
+            com.notify.agent.client.models.Event event = new com.notify.agent.client.models.Event();
             event.setName(a.key());
             event.setDescription(a.description());
             event.setEventType(a.eventType());
