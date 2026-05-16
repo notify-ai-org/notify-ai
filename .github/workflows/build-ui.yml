@@ -1,0 +1,74 @@
+name: Build UI Portals
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Triggers:
+#   push to master when notify-ui/** changes  →  CI validation
+#   pull_request on notify-ui/**              →  PR check
+#   workflow_call                             →  called by deploy.yml
+# ──────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'notify-ui/**'
+      - '.github/workflows/build-ui.yml'
+  pull_request:
+    paths:
+      - 'notify-ui/**'
+      - '.github/workflows/build-ui.yml'
+  workflow_call: {}   # no inputs — deploy.yml calls this to get portal-assets artifact
+
+jobs:
+  build-ui:
+    name: Build shared library + all portals
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Checkout ─────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Node setup ───────────────────────────────────────────────────────────
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          # Cache npm based on the shared library lock file.
+          # Individual portals add their own lock files here when they exist.
+          cache: 'npm'
+          cache-dependency-path: notify-ui/shared/package-lock.json
+
+      # ── Cache shared node_modules ─────────────────────────────────────────
+      # Keyed on OS + lock file so a lock-file change always triggers reinstall.
+      - name: Cache shared node_modules
+        id: cache-shared
+        uses: actions/cache@v4
+        with:
+          path: notify-ui/shared/node_modules
+          key: shared-nm-${{ runner.os }}-${{ hashFiles('notify-ui/shared/package-lock.json') }}
+          restore-keys: |
+            shared-nm-${{ runner.os }}-
+
+      # ── Build ────────────────────────────────────────────────────────────────
+      - name: Make build script executable
+        run: chmod +x notify-ui/build-all.sh
+
+      - name: Build shared library + all portals
+        run: ./notify-ui/build-all.sh
+
+      # ── Create output directory if no portals exist yet ───────────────────
+      - name: Ensure portal assets directory exists
+        run: mkdir -p access/src/main/resources/static/portals
+
+      # ── Upload artifact for the deploy job ───────────────────────────────
+      - name: Upload portal assets artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: portal-assets
+          # The build script copies portal builds here
+          path: access/src/main/resources/static/portals/
+          # 1 day is enough — the deploy job runs in the same workflow
+          retention-days: 1
+          # If no portals are built yet (all directories missing), upload an
+          # empty placeholder so the deploy job artifact download doesn't fail.
+          if-no-files-found: warn

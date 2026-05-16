@@ -16,3 +16,20 @@
 # Access Module target and Test Controller
 /access/target
 /access/src/main/java/com/example/agent/controllers/TestNotificationController.java
+
+# ── notify-ui — Node.js build artifacts ──────────────────────────────────────
+
+# Built output for the shared library and every portal
+notify-ui/**/dist/
+
+# Installed dependencies — each developer / CI run calls npm ci
+notify-ui/**/node_modules/
+
+# Lock files are generated per-machine; commit only if you want
+# reproducible installs across all contributors (recommended).
+# Uncomment the line below to ignore them instead:
+# notify-ui/**/package-lock.json
+
+# Portal assets copied into the Spring Boot classpath by build-all.sh.
+# These are generated artefacts — do not commit them.
+/access/src/main/resources/static/portals/

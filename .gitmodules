@@ -1,0 +1,27 @@
+[submodule "access"]
+	path = access
+	url = https://github.com/rohan-naik07/access.git
+[submodule "api"]
+	path = api
+	url = https://github.com/rohan-naik07/api.git
+[submodule "acp-server"]
+	path = acp-server
+	url = https://github.com/rohan-naik07/acp-server.git
+[submodule "annotations"]
+	path = annotations
+	url = https://github.com/rohan-naik07/annotations.git
+[submodule "client"]
+	path = client
+	url = https://github.com/rohan-naik07/client.git
+[submodule "common"]
+	path = common
+	url = https://github.com/rohan-naik07/common.git
+[submodule "engine"]
+	path = engine
+	url = https://github.com/rohan-naik07/engine.git
+[submodule "examples"]
+	path = examples
+	url = https://github.com/rohan-naik07/examples.git
+[submodule "notify-ui"]
+	path = notify-ui
+	url = https://github.com/rohan-naik07/notify-ui.git

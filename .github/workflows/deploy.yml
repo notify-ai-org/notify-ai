@@ -13,13 +13,29 @@ env:
   REGISTRY: gcr.io
 
 jobs:
+  # ── Step 1: build the React microfrontend portals ─────────────────────────
+  build-ui:
+    name: Build UI portals
+    uses: ./.github/workflows/build-ui.yml
+
+  # ── Step 2: build the Docker image and deploy ─────────────────────────────
   build-and-deploy:
     name: Build, Push, and Deploy
     runs-on: ubuntu-latest
+    needs: build-ui   # wait for portal assets before building the Docker image
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # Download the portal builds produced by the build-ui job.
+      # They land in the Spring Boot classpath so the JAR includes them.
+      - name: Download portal assets
+        uses: actions/download-artifact@v4
+        with:
+          name: portal-assets
+          path: access/src/main/resources/static/portals/
+        continue-on-error: true   # no portals exist yet during early development
 
       # Authenticate to Google Cloud using a Service Account key
       - name: Authenticate to Google Cloud

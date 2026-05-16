@@ -11,6 +11,7 @@ COPY acp-server/pom.xml acp-server/
 COPY client/pom.xml client/
 COPY engine/pom.xml engine/
 COPY access/pom.xml access/
+COPY common/pom.xml common/
 COPY examples/ecommerce-app/pom.xml examples/ecommerce-app/
 COPY examples/banking-app/pom.xml examples/banking-app/
 
