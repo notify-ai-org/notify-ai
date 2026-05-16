@@ -1,27 +1,27 @@
 [submodule "access"]
 	path = access
-	url = https://github.com/rohan-naik07/access.git
+	url = https://github.com/notify-ai-org/access.git
 [submodule "api"]
 	path = api
-	url = https://github.com/rohan-naik07/api.git
+	url = https://github.com/notify-ai-org/api.git
 [submodule "acp-server"]
 	path = acp-server
-	url = https://github.com/rohan-naik07/acp-server.git
+	url = https://github.com/notify-ai-org/acp-server.git
 [submodule "annotations"]
 	path = annotations
-	url = https://github.com/rohan-naik07/annotations.git
+	url = https://github.com/notify-ai-org/annotations.git
 [submodule "client"]
 	path = client
-	url = https://github.com/rohan-naik07/client.git
+	url = https://github.com/notify-ai-org/client.git
 [submodule "common"]
 	path = common
-	url = https://github.com/rohan-naik07/common.git
+	url = https://github.com/notify-ai-org/common.git
 [submodule "engine"]
 	path = engine
-	url = https://github.com/rohan-naik07/engine.git
+	url = https://github.com/notify-ai-org/engine.git
 [submodule "examples"]
 	path = examples
-	url = https://github.com/rohan-naik07/examples.git
+	url = https://github.com/notify-ai-org/examples.git
 [submodule "notify-ui"]
 	path = notify-ui
-	url = https://github.com/rohan-naik07/notify-ui.git
+	url = https://github.com/notify-ai-org/notify-ui.git
