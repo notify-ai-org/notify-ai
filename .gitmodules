@@ -25,3 +25,6 @@
 [submodule "notify-ui"]
 	path = notify-ui
 	url = https://github.com/notify-ai-org/notify-ui.git
+[submodule "adk-java"]
+	path = adk-java
+	url = https://github.com/notify-ai-org/adk-java.git
