@@ -21,6 +21,7 @@
         <module>access</module>
         <module>client</module>
         <module>engine</module>
+        <module>adk-java</module>
         <module>examples/ecommerce-app</module>
         <module>examples/banking-app</module>
     </modules>
@@ -30,7 +31,7 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.boot.version>3.2.0</spring.boot.version>
-        <google.adk.version>0.2.0</google.adk.version>
+        <google.adk.version>1.3.1-SNAPSHOT</google.adk.version>
         <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
     </properties>
     
@@ -117,13 +118,8 @@
                 <scope>test</scope>
             </dependency>
             <dependency>
-                <groupId>com.google.adk</groupId>
+                <groupId>com.notify</groupId>
                 <artifactId>google-adk</artifactId>
-                <version>${google.adk.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>com.google.adk</groupId>
-                <artifactId>google-adk-dev</artifactId>
                 <version>${google.adk.version}</version>
             </dependency>
             <dependency>
