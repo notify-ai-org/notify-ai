@@ -15,6 +15,7 @@ jobs:
   build-ui:
     name: Build UI portals
     uses: ./.github/workflows/build-ui.yml
+    secrets: inherit
 
   # ── Step 2: build the Docker image and deploy to EC2 ──────────────────────
   build-and-deploy:
@@ -27,6 +28,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+          token: ${{ secrets.GHCR_PAT }}
 
       # Download the portal builds produced by the build-ui job.
       # They land in the Spring Boot classpath so the JAR includes them.
