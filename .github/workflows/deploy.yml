@@ -25,6 +25,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
       # Download the portal builds produced by the build-ui job.
       # They land in the Spring Boot classpath so the JAR includes them.
