@@ -10,6 +10,8 @@ COPY api/pom.xml api/
 COPY acp-server/pom.xml acp-server/
 COPY client/pom.xml client/
 COPY adk-java/pom.xml adk-java/
+COPY adk-java/core/pom.xml adk-java/core/
+COPY adk-java/a2a/pom.xml adk-java/a2a/
 COPY engine/pom.xml engine/
 COPY access/pom.xml access/
 COPY common/pom.xml common/
