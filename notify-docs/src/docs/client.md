@@ -1,0 +1,68 @@
+The **Notify.ai Client SDK** is a lightweight Java library that integrates into Spring Boot applications. Using Aspect-Oriented Programming (AOP) and custom annotations, it intercepts methods, packages parameters as semantic event payloads, and transmits them to the control plane (`acp-server`).
+
+## 🚀 Integration Guide
+
+### 1. Add Dependencies
+Add the client SDK and annotations dependencies to your application's `pom.xml`:
+
+```xml
+<dependency>
+  <groupId>com.notify</groupId>
+  <artifactId>vocabulary-agent-client</artifactId>
+  <version>1.0.0</version>
+</dependency>
+<dependency>
+  <groupId>com.notify</groupId>
+  <artifactId>vocabulary-agent-annotations</artifactId>
+  <version>1.0.0</version>
+</dependency>
+```
+
+### 2. Enable the SDK
+Annotate a configuration class with `@EnableNotify` and specify the packages to scan:
+
+```java
+@Configuration
+@EnableNotify(basePackage = "com.myapp")
+public class NotifyConfig {}
+```
+
+### 3. Application Properties
+Configure connection parameters in your `application.yml` or `application.properties`:
+
+```yaml
+notify:
+  base-package: com.myapp
+  acp-server-url: http://localhost:8080
+  application-name: my-service
+  buffer-batch-size: 100
+  buffer-flush-timeout-ms: 5000
+  # Optional: Kafka integration for scheduled events
+  kafka-enabled: false
+  kafka-topic: notify-scheduled-events
+  kafka-group: notify-client-group
+```
+
+## 🛠️ Key Annotations
+
+| Annotation | Level | Purpose |
+|------------|-------|---------|
+| `@EnableNotify` | Class | Enables the SDK; specifies packages to scan. |
+| `@Event` | Method | Intercepts execution and forwards payloads to the control plane. |
+| `@Rule` | Method | Executes vocabulary rules before/after events. |
+| `@Callback` | Method | BEFORE/AFTER hooks running custom logic surrounding event capture. |
+| `@Vocabulary` | Field | Declares a field as a vocabulary attribute on model classes. |
+| `@Model` | Class | Exposes all fields of the class as vocabulary attributes. |
+| `@VocabularySupplier`| Method | Supplies additional context/payload mappings. |
+| `@SubjectSupplier` | Method | Maps recipients/subjects for notifications. |
+
+## 🚀 Local Compilation
+
+As a client SDK library, this module cannot be run on its own. It is compiled and installed locally, then imported by your applications.
+
+To compile and package the client SDK locally:
+```bash
+mvn clean install -pl client
+```
+
+For examples of how this SDK is utilized in active projects, refer to the [examples/ecommerce-app](file:///Users/rohannaik/Desktop/notify/examples/ecommerce-app/README.md) and [examples/banking-app](file:///Users/rohannaik/Desktop/notify/examples/banking-app/README.md) directories.
