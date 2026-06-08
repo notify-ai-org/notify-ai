@@ -1,6 +1,3 @@
-<p align="center">
-  <span style="font-size: 60px;">⚡</span>
-</p>
 <h1 align="center" style="border-bottom: none;">
   <span style="font-weight: 800;">Notify<span style="background: linear-gradient(135deg, #f59e0b 0%, #eab308 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">.ai</span></span>
 </h1>
@@ -8,7 +5,7 @@
 
 ---
 
-**Notify.ai** is an enterprise-grade, multi-module intelligent notification orchestration platform built with **Spring Boot**, **RxJava**, and **Google ADK (GenAI)**. 
+**Notify.ai** is an enterprise-grade, multi-module intelligent notification orchestration platform built on top of **Google ADK**. 
 
 Unlike traditional notification services that simply dispatch static text, Notify.ai **understands your user's context**. Designed for seamless integration into existing businesses (e-commerce, banking, healthcare), it securely intercepts domain events from your upstream applications. Utilizing advanced LLM orchestration, it intelligently extracts underlying facts over time, builds a comprehensive memory graph of user behavior, dynamically generates highly contextual message templates, and reliably dispatches them across multiple out-bound channels (Email, SMS, Push, Webhooks) when the user is most receptive.
 
