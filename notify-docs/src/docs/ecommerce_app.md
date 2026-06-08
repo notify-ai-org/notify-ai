@@ -1,14 +1,14 @@
-## 📖 Overview
+##  Overview
 
 The `ecommerce-app` module is a fully functional sample Spring Boot application demonstrating how to integrate the **Notify.ai** client SDK into an e-commerce ecosystem. It defines typical domain structures (Carts, Customers, Orders, Shipments) and illustrates how `@Event`, `@Rule`, `@Callback`, and `@Model` annotations work together to enable agentic notifications.
 
-## ⚙️ How it is annotated
+##  How it is annotated
 
 - **Vocabulary Models**: `Customer` and `OrderPayload` classes are marked with `@Model` or `@Vocabulary` annotations, exposing their properties to the semantic analysis engine.
 - **Events**: Methods in `OrderService` (like `createOrder`, `processShipment`) are decorated with `@Event` to capture transactional events automatically when triggered by controllers.
 - **Subject Suppliers**: Resolves the target recipient email/phone number for events.
 
-## 🚀 Running Locally
+##  Running Locally
 
 You can run the e-commerce sample locally to test the event capture and dispatch flow.
 

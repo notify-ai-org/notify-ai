@@ -22,14 +22,17 @@ interface LandingPageProps {
   searchQuery: string;
   setSearchQuery: (q: string) => void;
   filteredRegistry: any[];
+  theme: 'dark' | 'light';
 }
 
 function LandingPage({
   selectDoc,
   searchQuery,
   setSearchQuery,
-  filteredRegistry
+  filteredRegistry,
+  theme
 }: LandingPageProps) {
+  const isDark = theme === 'dark';
   const [pricingOpen, setPricingOpen] = useState(false);
   if (searchQuery.trim() !== '') {
     const results = filteredRegistry.flatMap(category => category.items);
@@ -78,30 +81,31 @@ function LandingPage({
             zIndex: 10,
             width: '100%',
             maxWidth: '840px',
+            padding: 15,
             borderRadius: '1.5rem',
             border: '1px solid hsl(var(--border-color))',
-            backgroundColor: 'hsla(var(--bg-card) / 0.15)',
+            backgroundColor: isDark ? 'hsla(var(--bg-card) / 0.15)' : 'hsla(var(--bg-card) / 0.7)',
             backdropFilter: 'blur(12px)',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.4)',
+            boxShadow: isDark ? '0 20px 50px rgba(0, 0, 0, 0.4)' : '0 20px 50px rgba(0, 0, 0, 0.1)',
             overflow: 'hidden',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             textAlign: 'center'
           }}>
-            {/* Enlarged Background Image */}
-
-            {/* Dark gradient overlay for text contrast */}
+            {/* Gradient overlay — dark tint in dark mode, subtle light tint in light mode */}
             <div style={{
               position: 'absolute',
               inset: 0,
-              background: 'linear-gradient(135deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.75) 100%)',
+              background: isDark
+                ? 'linear-gradient(135deg, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.55) 60%, rgba(0,0,0,0.75) 100%)'
+                : 'linear-gradient(135deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.35) 60%, rgba(255,255,255,0.55) 100%)',
               zIndex: -1,
               pointerEvents: 'none'
             }} />
 
             <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.9rem', borderRadius: '999px', border: '1px solid rgba(234,179,8,0.25)', backgroundColor: 'rgba(234,179,8,0.08)', color: '#facc15', fontSize: '0.8rem', fontWeight: 600, marginBottom: '1.75rem', letterSpacing: '0.04em' }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.35rem 0.9rem', borderRadius: '999px', border: '1px solid rgba(234,179,8,0.35)', backgroundColor: 'rgba(234,179,8,0.12)', color: isDark ? '#facc15' : '#92680a', fontSize: '0.8rem', fontWeight: 600, marginBottom: '1.75rem', letterSpacing: '0.04em' }}>
               ✦ AI-Powered Notification Engine
             </motion.div>
             <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.5 }}
@@ -109,26 +113,26 @@ function LandingPage({
               Notifications<br /><span className="gradient-text">Enhanced by AI</span>
             </motion.h1>
             <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
-              style={{ fontSize: '1.1rem', color: '#94a3b8', lineHeight: 1.75, marginBottom: '1.25rem', maxWidth: '560px', margin: '0 auto 1.25rem' }}>
+              style={{ fontSize: '1.1rem', color: isDark ? '#94a3b8' : '#475569', lineHeight: 1.75, marginBottom: '1.25rem', maxWidth: '560px', margin: '0 auto 1.25rem' }}>
               Notify.ai is a notification generation and dispatch engine powered by orchestrated AI agents.
             </motion.p>
             <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}
-              style={{ fontSize: '1rem', color: '#64748b', lineHeight: 1.75, marginBottom: '2.5rem', maxWidth: '540px', margin: '0 auto 2.5rem' }}>
+              style={{ fontSize: '1rem', color: isDark ? '#64748b' : '#64748b', lineHeight: 1.75, marginBottom: '2.5rem', maxWidth: '540px', margin: '0 auto 2.5rem' }}>
               An event-based architecture based on event generation by a client SDK embedded in your backend service. A generated event is consumed and processed asynchronously by a team of AI agents.
             </motion.p>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', justifyContent: 'center' }}>
               <button id="hero-get-started"
                 onClick={() => selectDoc('intro')}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 16px 40px rgba(234,179,8,0.35)'; }}
-                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 24px rgba(234,179,8,0.2)'; }}
-                style={{ padding: '0.875rem 2rem', borderRadius: '0.75rem', backgroundColor: '#eab308', color: '#000', fontWeight: 700, fontSize: '0.95rem', transition: 'all 300ms', cursor: 'pointer', boxShadow: '0 8px 24px rgba(234,179,8,0.2)', border: 'none' }}>
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 16px 40px rgba(234,179,8,0.45)'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'; (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 24px rgba(234,179,8,0.25)'; }}
+                style={{ padding: '0.875rem 2rem', borderRadius: '0.75rem', backgroundColor: '#eab308', color: '#000', fontWeight: 700, fontSize: '0.95rem', transition: 'all 300ms', cursor: 'pointer', boxShadow: '0 8px 24px rgba(234,179,8,0.25)', border: 'none' }}>
                 Read the Docs
               </button>
               <button id="hero-hosted-access"
                 onClick={() => setPricingOpen(true)}
-                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; }}
+                onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)'; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)'; }}
-                style={{ padding: '0.875rem 2rem', borderRadius: '0.75rem', border: '1px solid rgba(255,255,255,0.12)', color: '#e2e8f0', fontWeight: 600, fontSize: '0.95rem', transition: 'all 300ms', cursor: 'pointer' }}>
+                style={{ padding: '0.875rem 2rem', borderRadius: '0.75rem', border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.15)', color: isDark ? '#e2e8f0' : '#1e293b', fontWeight: 600, fontSize: '0.95rem', transition: 'all 300ms', cursor: 'pointer' }}>
                 Hosted Access →
               </button>
             </motion.div>
@@ -165,31 +169,21 @@ function LandingPage({
         <h2 className="landing-section-title">Getting Started Guides</h2>
         <div className="landing-grid">
           <div className="landing-card" onClick={() => selectDoc('intro')}>
-            <div className="landing-card-icon rocket">🚀</div>
             <h3>Quick Start Guide</h3>
             <p>Stand up the complete Notify.ai engine, MySQL, Redis, and administration portals locally in under 5 minutes.</p>
             <span className="landing-card-link">Start Building &rarr;</span>
           </div>
 
           <div className="landing-card" onClick={() => selectDoc('client')}>
-            <div className="landing-card-icon code-icon">💻</div>
             <h3>Java Client SDK</h3>
             <p>Configure aspect-oriented event capturing inside your spring boot projects to intercept method executions.</p>
             <span className="landing-card-link">View Integration &rarr;</span>
           </div>
 
           <div className="landing-card" onClick={() => selectDoc('acp-server')}>
-            <div className="landing-card-icon brain">🧠</div>
             <h3>Agent Control Plane</h3>
             <p>Explore the LLM orchestrator that processes incoming events, extracts facts, and structures behavioral profiles.</p>
             <span className="landing-card-link">Explore Agents &rarr;</span>
-          </div>
-
-          <div className="landing-card" onClick={() => selectDoc('testing')}>
-            <div className="landing-card-icon test-icon">🧪</div>
-            <h3>Testing & Edge Cases</h3>
-            <p>Read the comprehensive test plan covering payload ingestion, upsert concurrency locks, and sealed memory pages.</p>
-            <span className="landing-card-link">Read Scenarios &rarr;</span>
           </div>
         </div>
       </section>
@@ -199,15 +193,15 @@ function LandingPage({
         <h2 className="landing-section-title">Platform Capabilities</h2>
         <div className="architecture-grid">
           <div className="architecture-card">
-            <h4>⚡ Aspect-Oriented Interception</h4>
+            <h4>Aspect-Oriented Interception</h4>
             <p>Zero-boilerplate event capturing using semantic annotations like <code>@Event</code> and <code>@Vocabulary</code> inside spring boot clients.</p>
           </div>
           <div className="architecture-card">
-            <h4>🧠 Memory Assembler & Vector Search</h4>
+            <h4>Memory Assembler & Vector Search</h4>
             <p>Combines incoming domain events into raw context vectors, executes PGVector semantic search, and extracts user profiles dynamically.</p>
           </div>
           <div className="architecture-card">
-            <h4>🎯 Multi-Channel Delivery Pipes</h4>
+            <h4>Multi-Channel Delivery Pipes</h4>
             <p>Reactive RX delivery engines distributing notifications across email, SMS, push, and webhooks with built-in dead letter queues.</p>
           </div>
         </div>
@@ -226,12 +220,13 @@ function LandingPage({
               <div className="pricing-plans-grid">
                 <div className="pricing-plan-card">
                   <h3>Developer Plan</h3>
-                  <div className="pricing-price">$99<span>/mo</span></div>
+                  <div className="pricing-price"> Free </div>
                   <ul>
-                    <li>1,000,000 events/month</li>
+                    <li>Limited scalability and security</li>
                     <li>Shared agent execution queue</li>
-                    <li>Standard vector memory database</li>
-                    <li>Community email support</li>
+                    <li>Standard vector memory database and in memory cache</li>
+                    <li>OpenAI Llm provider</li>
+                    <li>REST API based event ingestion and scheduled notification trigger API</li>
                   </ul>
                 </div>
                 <div className="pricing-plan-card popular">
@@ -239,9 +234,10 @@ function LandingPage({
                   <h3>Enterprise Plan</h3>
                   <div className="pricing-price">Custom</div>
                   <ul>
-                    <li>Infinite event throughput</li>
+                    <li>Dedicated Kafka Topics for event ingestion</li>
                     <li>Dedicated agent instances & keys</li>
-                    <li>Dedicated PGVector database</li>
+                    <li>Dedicated PGVector database and Redis based cache</li>
+                    <li>OpenAI or locally hosted Ollama based LLM Provider, faster throughput</li>
                     <li>24/7 SLA developer support</li>
                   </ul>
                 </div>
@@ -474,7 +470,7 @@ export default function App() {
       {/* Left Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="logo-section" style={{ cursor: 'pointer' }} onClick={() => selectDoc('home')}>
-          <div className="logo-text">Notify.ai</div>
+          <div className="logo-text"><span className="logo-text-notify">Notify</span><span className="logo-text-ai">.ai</span></div>
         </div>
 
         <div className="search-container">
@@ -566,6 +562,7 @@ export default function App() {
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
               filteredRegistry={filteredRegistry}
+              theme={theme}
             />
           ) : (
             <article className="markdown-container">

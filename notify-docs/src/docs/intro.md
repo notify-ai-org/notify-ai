@@ -1,6 +1,6 @@
 Unlike traditional notification services that simply dispatch static text, Notify.ai **understands your user's context**. Designed for seamless integration into existing businesses (e-commerce, banking, healthcare), it securely intercepts domain events from your upstream applications. Utilizing advanced LLM orchestration, it intelligently extracts underlying facts over time, builds a comprehensive memory graph of user behavior, dynamically generates highly contextual message templates, and reliably dispatches them across multiple out-bound channels (Email, SMS, Push, Webhooks) when the user is most receptive.
 
-## 🏗️ Architecture & Project Structure
+##  Architecture & Project Structure
 
 This repository is built as a multi-module Maven project to enforce clear separation of concerns:
 
@@ -14,7 +14,7 @@ This repository is built as a multi-module Maven project to enforce clear separa
 - **[notify-ui](file:///Users/rohannaik/Desktop/notify/notify-ui/README.md)**: The administration portals built as React microfrontends under Vite.
 - **[examples](file:///Users/rohannaik/Desktop/notify/examples)**: Fully functional sample applications ([ecommerce-app](file:///Users/rohannaik/Desktop/notify/examples/ecommerce-app/README.md), [banking-app](file:///Users/rohannaik/Desktop/notify/examples/banking-app/README.md)) demonstrating how to integrate the client SDK.
 
-## 🚀 Running Locally
+##  Running Locally
 
 To stand up the complete development environment locally:
 
@@ -58,7 +58,7 @@ mvn spring-boot:run -pl examples/banking-app
 
 ---
 
-## 👥 Developer Contact & Contributing
+##  Developer Contact & Contributing
 
 For questions, issues, or support:
 - **Lead Developer**: Rohan Naik ([rohan.naik07@github](https://github.com/rohan-naik07))

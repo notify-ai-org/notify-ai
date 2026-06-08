@@ -1,6 +1,6 @@
 The `banking-app` module is a sample Spring Boot application demonstrating how to integrate the **Notify.ai** client SDK into a financial/banking services architecture. It defines banking operations (Logins, OTP verification, Transactions, Balance summaries) and showcases event interception using annotations.
 
-## 🚀 Running Locally
+##  Running Locally
 
 You can run the banking sample application locally to test the event logging flow.
 

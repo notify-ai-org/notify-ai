@@ -1,6 +1,8 @@
-The **Notify.ai Client SDK** is a lightweight Java library that integrates into Spring Boot applications. Using Aspect-Oriented Programming (AOP) and custom annotations, it intercepts methods, packages parameters as semantic event payloads, and transmits them to the control plane (`acp-server`).
+The **Notify.ai Client SDK** is a lightweight Java library that integrates into Spring Boot applications. It intercepts methods, packages parameters as semantic event payloads, and transmits them to the control plane (`acp-server`). It also listens to the scheduled notification event triggers.
 
-## 🚀 Integration Guide
+> **Note**: Currently only Spring Boot implementations are supported, but soon we are coming up with support for Java, Python, Go and Node.js.
+
+##  Integration Guide
 
 ### 1. Add Dependencies
 Add the client SDK and annotations dependencies to your application's `pom.xml`:
@@ -9,11 +11,6 @@ Add the client SDK and annotations dependencies to your application's `pom.xml`:
 <dependency>
   <groupId>com.notify</groupId>
   <artifactId>vocabulary-agent-client</artifactId>
-  <version>1.0.0</version>
-</dependency>
-<dependency>
-  <groupId>com.notify</groupId>
-  <artifactId>vocabulary-agent-annotations</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
@@ -33,30 +30,246 @@ Configure connection parameters in your `application.yml` or `application.proper
 ```yaml
 notify:
   base-package: com.myapp
-  acp-server-url: http://localhost:8080
   application-name: my-service
-  buffer-batch-size: 100
-  buffer-flush-timeout-ms: 5000
-  # Optional: Kafka integration for scheduled events
-  kafka-enabled: false
-  kafka-topic: notify-scheduled-events
-  kafka-group: notify-client-group
+  client-token : "*************"*************
+
 ```
 
-## 🛠️ Key Annotations
+---
 
-| Annotation | Level | Purpose |
-|------------|-------|---------|
-| `@EnableNotify` | Class | Enables the SDK; specifies packages to scan. |
-| `@Event` | Method | Intercepts execution and forwards payloads to the control plane. |
-| `@Rule` | Method | Executes vocabulary rules before/after events. |
-| `@Callback` | Method | BEFORE/AFTER hooks running custom logic surrounding event capture. |
-| `@Vocabulary` | Field | Declares a field as a vocabulary attribute on model classes. |
-| `@Model` | Class | Exposes all fields of the class as vocabulary attributes. |
-| `@VocabularySupplier`| Method | Supplies additional context/payload mappings. |
-| `@SubjectSupplier` | Method | Maps recipients/subjects for notifications. |
+# Steps for integrating the SDK
 
-## 🚀 Local Compilation
+- Add dependencies to your `pom.xml`
+- Login to [https://notify.ai](https://notify.ai) and get your client token
+- Enable the SDK by annotating a configuration class with `@EnableNotify` and specify the packages to scan
+- Configure connection parameters in your `application.yml` or `application.properties`
+- Add relevant annotations to your business logic
+
+##  Annotation Reference
+
+### `@EnableNotify`
+**Target:** Class (on a `@Configuration` class)
+
+Bootstraps the Notify.ai SDK in your application. The SDK scans the specified `basePackage` (or the value of `notify.base-package` in your properties) for all other Notify annotations and registers the necessary AOP interceptors and beans.
+
+**Attributes**
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `basePackage` | String | `""` | Root package to scan for Notify annotations. Falls back to `notify.base-package` property if empty. |
+
+**Example**
+```java
+@Configuration
+@EnableNotify(basePackage = "com.myapp.orders")
+public class NotifyConfig {}
+```
+
+---
+
+### `@Event`
+**Target:** Method
+
+The primary annotation. Wrap any service method with `@Event` to have the SDK intercept its execution, capture the method arguments and return value as a structured payload, and forward an `EventCapture` to the ACP server for agent processing.
+
+**Attributes**
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `key` | String | ✅ | Unique event key/name (e.g. `"order.placed"`). Used to identify and route the event. |
+| `eventType` | String | ✅ | Broad category of the event (e.g. `"TRANSACTIONAL"`, `"ENGAGEMENT"`, `"SYSTEM"`). |
+| `description` | String | ❌ | Human-readable description of what this event represents. Helps agents generate better templates and schedules. |
+| `scheduleIntent` | String | ❌ | Natural-language hint for the scheduler agent (e.g. `"immediately"`, `"next business day morning"`). |
+| `preferredTimeWindow` | String | ❌ | Preferred delivery window (e.g. `"morning"`, `"09:00-12:00"`). |
+| `priority` | int | ❌ | Numeric priority for processing order. Lower values are processed first. |
+| `version` | String | ❌ | Schema version for the event payload (default `"v1"`). |
+| `payload` | Class<?> | ❌ | Explicit payload type override. Defaults to `Void.class` (auto-inferred from method parameters). |
+
+**Example**
+```java
+@Event(
+    key = "order.placed",
+    description = "Fired when a customer completes checkout",
+    eventType = "TRANSACTIONAL",
+    scheduleIntent = "immediately after order confirmation",
+    preferredTimeWindow = "anytime",
+    priority = 1
+)
+public Order placeOrder(Cart cart, User user) {
+    // your business logic
+}
+```
+
+---
+
+### `@Rule`
+**Target:** Method
+
+Associates a method with a named rule that gates or modifies event behaviour. The method is invoked by the SDK's rule evaluation engine in relation to a specific event. It can return a boolean (gate/suppress) or mutate context before the event is emitted.
+
+**Attributes**
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | String |  | Unique rule name. Matched against rules persisted by the ACP's `RuleProcessorAgent`. |
+| `description` | String |  | Human-readable description of what this rule enforces. |
+| `event` | String |  | Event key this rule applies to. If empty, the rule is considered global. |
+
+**Example**
+```java
+@Rule(
+    name = "high-value-order",
+    description = "Only notify for orders above $500",
+    event = "order.placed"
+)
+public boolean isHighValueOrder(Order order) {
+    return order.getTotal() > 500.0;
+}
+```
+
+---
+
+### `@Callback`
+**Target:** Method
+
+Defines a lifecycle hook that runs **before** or **after** the AOP intercept for a given event. Use callbacks to inject pre-processing logic (e.g. enriching the payload with additional context) or post-processing logic (e.g. logging, cleanup) without modifying the event-producing method itself.
+
+**Attributes**
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `event` | String |  | Event key this callback is bound to. |
+| `when` | `When` enum |  | `When.BEFORE` runs before the intercepted method executes; `When.AFTER` runs after it returns. |
+
+**Example**
+```java
+@Callback(event = "order.placed", when = Callback.When.BEFORE)
+public void enrichOrderContext(Cart cart, User user) {
+    // e.g. attach geo-location or session metadata
+}
+
+@Callback(event = "order.placed", when = Callback.When.AFTER)
+public void auditOrderEvent(Order result) {
+    log.info("Order event captured: {}", result.getId());
+}
+```
+
+---
+
+### `@Vocabulary`
+**Target:** Field (on fields of a `@Model`-annotated class)
+
+Marks a field as a named vocabulary attribute. The SDK registers this field's name, type, and description with the ACP's vocabulary graph, enabling agents to reason semantically about the data.
+
+**Attributes**
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `name` | String | `""` | Override the attribute name sent to the vocabulary graph. Defaults to the Java field name. |
+| `description` | String | `""` | Human-readable description of what this field represents. Used by agents to understand data semantics. |
+
+**Example**
+```java
+@Model(description = "Represents a customer order")
+public class Order {
+
+    @Vocabulary(name = "order_id", description = "Unique identifier for the order")
+    private String id;
+
+    @Vocabulary(name = "total_amount", description = "Total monetary value of the order in USD")
+    private double total;
+
+    @Vocabulary(description = "Current fulfilment status of the order")
+    private String status;
+}
+```
+
+---
+
+### `@Model`
+**Target:** Class
+
+Marks a class as a vocabulary model. All fields annotated with `@Vocabulary` within the class are registered with the ACP vocabulary graph as attributes of this model. This powers the agent's understanding of your domain entities.
+
+**Attributes**
+
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `description` | String | `""` | Description of the model's purpose, helping agents understand the domain entity it represents. |
+
+**Example**
+```java
+@Model(description = "Represents a product in the e-commerce catalogue")
+public class Product {
+
+    @Vocabulary(description = "The product's display name")
+    private String name;
+
+    @Vocabulary(description = "Price in USD")
+    private double price;
+
+    @Vocabulary(description = "Current stock quantity")
+    private int stockLevel;
+}
+```
+
+---
+
+### `@VocabularySupplier`
+**Target:** Method
+
+Marks a method that dynamically supplies additional payload context for a specific event. The method is called by the SDK at interception time and its return value (a `Map<String, Object>`) is merged into the event's payload before it is sent to the ACP server. Use this to enrich events with computed or session-derived data that isn't available as method parameters.
+
+**Attributes**
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `event` | String |  | The event key this supplier provides additional payload for. |
+| `description` | String |  | Description of what additional context this method supplies. |
+
+**Example**
+```java
+@VocabularySupplier(
+    event = "order.placed",
+    description = "Enriches the order event with customer loyalty tier and session metadata"
+)
+public Map<String, Object> supplyOrderContext() {
+    return Map.of(
+        "loyaltyTier", loyaltyService.getCurrentTier(),
+        "sessionId", sessionContext.getId(),
+        "region", geoService.getRegion()
+    );
+}
+```
+
+---
+
+### `@SubjectSupplier`
+**Target:** Method
+
+Marks a method that returns the list of **notification recipients** (subjects) for a specific event. The method must return a `List<?>` — typically a list of email addresses, phone numbers, or user identifiers. This list is attached to the `EventCapture` and forwarded as the `subjects` field on the resulting `NotificationJob`.
+
+**Attributes**
+
+| Attribute | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `event` | String |  | The event key this supplier provides subjects for. |
+| `description` | String |  | Description of the recipient resolution logic. |
+
+**Example**
+```java
+@SubjectSupplier(
+    event = "order.placed",
+    description = "Returns the email address of the customer who placed the order"
+)
+public List<String> getOrderSubjects(Order order) {
+    return List.of(order.getCustomer().getEmail());
+}
+```
+
+---
+
+##  Local Compilation
 
 As a client SDK library, this module cannot be run on its own. It is compiled and installed locally, then imported by your applications.
 
@@ -66,3 +279,5 @@ mvn clean install -pl client
 ```
 
 For examples of how this SDK is utilized in active projects, refer to the [examples/ecommerce-app](file:///Users/rohannaik/Desktop/notify/examples/ecommerce-app/README.md) and [examples/banking-app](file:///Users/rohannaik/Desktop/notify/examples/banking-app/README.md) directories.
+
+**APIs to directly emit events and dispatch notifications coming soon**

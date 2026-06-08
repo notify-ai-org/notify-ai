@@ -9,11 +9,11 @@
   --text-muted: 215 20% 65%;
   --border-color: 217 30% 12%;
   --border-glass: rgba(255, 255, 255, 0.05);
-  --accent-color: 24 96% 53%;
-  /* Brand Orange */
-  --accent-secondary: 45 93% 47%;
+  --accent-color: 45 93% 47%;
   /* Brand Yellow */
-  --accent-glow: rgba(249, 115, 22, 0.15);
+  --accent-secondary: 38 92% 50%;
+  /* Brand Amber */
+  --accent-glow: rgba(234, 179, 8, 0.15);
 
   --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', 'Courier New', monospace;
@@ -33,9 +33,9 @@
   --text-muted: 215 16% 47%;
   --border-color: 214 32% 91%;
   --border-glass: rgba(0, 0, 0, 0.05);
-  --accent-color: 24 96% 53%;
-  --accent-secondary: 45 93% 47%;
-  --accent-glow: rgba(249, 115, 22, 0.08);
+  --accent-color: 45 93% 47%;
+  --accent-secondary: 38 92% 50%;
+  --accent-glow: rgba(234, 179, 8, 0.08);
 }
 
 /* Reset and Core Styles */
@@ -122,6 +122,17 @@ body {
   font-size: 1.25rem;
   font-weight: 800;
   letter-spacing: -0.025em;
+}
+
+.logo-text-notify {
+  color: #ffffff;
+}
+
+:root.light .logo-text-notify {
+  color: hsl(var(--text-main));
+}
+
+.logo-text-ai {
   background: linear-gradient(135deg, hsl(var(--accent-secondary)) 0%, hsl(var(--accent-color)) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

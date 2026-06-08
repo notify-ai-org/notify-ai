@@ -3,8 +3,6 @@ import accessRaw from './access.md?raw';
 import acpServerRaw from './acp_server.md?raw';
 import engineRaw from './engine.md?raw';
 import clientRaw from './client.md?raw';
-import annotationsRaw from './annotations.md?raw';
-import apiRaw from './api.md?raw';
 import ecommerceRaw from './ecommerce_app.md?raw';
 import bankingRaw from './banking_app.md?raw';
 
@@ -64,18 +62,6 @@ export const docsRegistry: DocCategory[] = [
         category: 'Developer SDK',
         content: clientRaw,
       },
-      {
-        id: 'annotations',
-        title: 'Custom Annotations',
-        category: 'Developer SDK',
-        content: annotationsRaw,
-      },
-      {
-        id: 'api',
-        title: 'Shared API Module',
-        category: 'Developer SDK',
-        content: apiRaw,
-      }
     ],
   },
   {
