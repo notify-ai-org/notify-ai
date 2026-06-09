@@ -80,6 +80,7 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
             # Log in to GHCR on the EC2 instance
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
@@ -90,6 +91,14 @@ jobs:
             docker stop ${{ env.IMAGE }} 2>/dev/null || true
             docker rm ${{ env.IMAGE }} 2>/dev/null || true
 
+            # Ensure the env-file exists to prevent docker run from failing
+            if [ ! -f /opt/vocab-agent/.env ]; then
+              echo "WARNING: /opt/vocab-agent/.env not found, creating an empty one."
+              sudo mkdir -p /opt/vocab-agent
+              sudo touch /opt/vocab-agent/.env
+              sudo chmod 600 /opt/vocab-agent/.env
+            fi
+
             # Run the new container
             docker run -d \
               --name ${{ env.IMAGE }} \
@@ -97,6 +106,14 @@ jobs:
               -p 8080:8080 \
               --env-file /opt/vocab-agent/.env \
               ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+            # Wait a moment to check if it crashed immediately
+            sleep 3
+            if ! docker ps --filter name=${{ env.IMAGE }} --format "{{.Names}}" | grep -q "^${{ env.IMAGE }}$"; then
+              echo "ERROR: Container failed to start or crashed on startup!"
+              docker logs ${{ env.IMAGE }}
+              exit 1
+            fi
 
             # Prune old images to free disk space
             docker image prune -af --filter "until=24h"
@@ -109,8 +126,9 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            set -e
             echo "── Container status ──"
-            docker ps --filter name=${{ env.IMAGE }} --format "table {{.ID}}\t{{.Status}}\t{{.Ports}}"
+            docker ps -a --filter name=${{ env.IMAGE }} --format "table {{.ID}}\t{{.Status}}\t{{.Ports}}"
 
             echo ""
             echo "── Health check ──"

@@ -83,25 +83,6 @@ The `LogToMemoryAgentWorker` is a scheduled background service that runs indepen
 
 ---
 
-##  Key Components
-
-| Component | Package | Role |
-|---|---|---|
-| `AgentOrchestrator` | `util` | Manages the agent pool, task dispatch, idle eviction, and snapshot restoration. |
-| `EventConsumer` | `consumers` | REST controller + reactive pipeline for ingesting and processing `EventCapture` batches. |
-| `VocabularyConsumer` | `consumers` | REST controller for ingesting vocabulary class models and dispatching rule processing. |
-| `LogToMemoryAgentWorker` | `service` | Scheduled worker that consolidates event logs into long-term semantic memory. |
-| `RetrievalPlanner` | `planner` | Fetches historical context (facts, memory, vocabulary) to assemble agent prompts. |
-| `PromptAssembler` | `assembler` | Combines retrieved context and raw event data into structured LLM prompts. |
-| `AgentRegistry` | `config` | Registers and resolves named agent instances and their token limits. |
-| `ManagedConfigService` | `service` | Applies runtime configuration updates to `@ManagedConfiguration`-annotated fields. |
-| `IdempotencyService` | `service` | Redis-backed deduplication service for event captures. |
-| `SessionService` | `service` | Manages ADK agent session lifecycles across invocations. |
-| `DefaultFactStore` | `store` | Persists and retrieves semantic facts from the database. |
-| `AgentAuthenticationFilter` | `auth` | Spring Security filter that validates JWT tokens on all `/api/` requests. |
-
----
-
 ##  Local Compilation
 
 Since `acp-server` is packaged as a library module, it cannot be run as an independent application. It is bundled and executed within the **`access`** module web application.
