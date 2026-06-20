@@ -18,7 +18,7 @@ spec:
         - name: vocab-agent
           # Replace with your actual image name and registry, e.g., your-dockerhub-user/vocab-agent:1.0.0
           image: gcr.io/newagent-rnun/vocab-agent:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
           resources:

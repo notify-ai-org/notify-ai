@@ -34,7 +34,7 @@ WORKDIR /app
 
 # Copy the built jar from the builder stage
 # The spring-boot-maven-plugin repackages the jar to be executable
-COPY --from=builder /app/access/target/vocabulary-agent-access-*.jar app.jar
+COPY --from=builder /app/access/target/vocabulary-agent-access-1.0.0.jar app.jar
 
 # Expose the port the application runs on
 EXPOSE 8080
