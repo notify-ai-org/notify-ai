@@ -91,19 +91,19 @@ jobs:
             docker stop ${{ env.IMAGE }} 2>/dev/null || true
             docker rm ${{ env.IMAGE }} 2>/dev/null || true
 
-            # Ensure the env-file exists to prevent docker run from failing
-            if [ ! -f /opt/vocab-agent/.env ]; then
-              echo "WARNING: /opt/vocab-agent/.env not found, creating an empty one."
-              sudo mkdir -p /opt/vocab-agent
-              sudo touch /opt/vocab-agent/.env
-              sudo chmod 600 /opt/vocab-agent/.env
+            # Database configuration is required. An empty file silently falls
+            # back to the local MySQL defaults baked into development profiles.
+            if [ ! -s /opt/vocab-agent/.env ]; then
+              echo "ERROR: /opt/vocab-agent/.env is missing or empty."
+              echo "Create it with the PostgreSQL production variables before deploying."
+              exit 1
             fi
 
             # Run the new container
             docker run -d \
               --name ${{ env.IMAGE }} \
               --restart unless-stopped \
-              -p 8080:8080 \
+              --network host \
               --env-file /opt/vocab-agent/.env \
               ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
