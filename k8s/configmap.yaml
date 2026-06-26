@@ -20,8 +20,8 @@ data:
 
   # ─── OpenAI ────────────────────────────────────────────────────────────────
   OPENAI_API_BASE_URL: "https://api.openai.com/v1"
-  OPENAI_API_TIMEOUT: "30s"
-  OPENAI_API_CONNECTION_TIMEOUT: "10s"
+  OPENAI_API_TIMEOUT: "90s"
+  OPENAI_API_CONNECTION_TIMEOUT: "15s"
   OPENAI_MODEL: "gpt-4o-mini"
 
   # ─── Vocab ─────────────────────────────────────────────────────────────────
@@ -54,4 +54,3 @@ data:
 # Sensitive values should be stored in a Kubernetes Secret, not ConfigMap.
 # Create this Secret manually (do NOT commit to Git):
 #
-
