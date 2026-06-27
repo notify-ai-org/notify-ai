@@ -6,8 +6,7 @@ import {
   Moon,
   Menu,
   ChevronRight,
-  Home,
-  LogIn
+  Home
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { docsRegistry, allDocs } from './docs/docsRegistry';
