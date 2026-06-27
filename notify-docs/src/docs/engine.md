@@ -46,32 +46,6 @@ connector.channel.WEBHOOK.maxAttempts=4
 connector.channel.WEBHOOK.backOffMultiplier=3
 ```
 
-| Property | Type | Description |
-|---|---|---|
-| `clazz` | String | Fully-qualified class name of the `NotificationConnector` implementation. |
-| `instances` | int | Number of connector instances to run in parallel per channel. |
-| `delay` | long (ms) | Initial wait before the first retry attempt. |
-| `maxAttempts` | int | Maximum delivery attempts before the job is sent to the DLQ. |
-| `backOffMultiplier` | int | Exponential backoff factor applied to `delay` on each successive retry. |
-
-### ConnectorRegistry — Lazy Init & Load Balancing
-
-The `ConnectorRegistry` is the central lookup for the engine. When `NotificationDispatcher` needs to deliver a job, it calls `registry.get(channel)`, which:
-
-1. **Lazy-initializes** a `ChannelHolder` for the channel on the first call, reading `connector.channel.<channel>.*` from the Spring `Environment` and instantiating the configured number of connector beans via `AutowireCapableBeanFactory` (so each instance is a fully Spring-wired bean with all its dependencies injected).
-2. **Round-robin load balances** across the instance pool using an `AtomicInteger` counter — distributing delivery load evenly with no locking.
-3. **Validates** that `clazz` is non-null and `instances > 0` before accepting the configuration, throwing a descriptive `IllegalStateException` if either is missing.
-
-### Hot-Reload Mechanism
-
-A background reloader polls the properties source every `connector.reload.pollMs` milliseconds (default `2000 ms`; set `connector.reload.enabled=false` to disable). On each tick, for any channel where `clazz` or `instances` has changed:
-
-1. A fresh set of Spring-wired connector instances is built.
-2. The `ChannelHolder`'s `activeInstances` and `activeCfg` are **atomically swapped** via `AtomicReference.set()` — the new pool becomes live instantly, with no restart required.
-3. The round-robin counter resets to `0`.
-
-Channels removed from the config are retained (not destroyed) and a warning is logged, preventing accidental delivery outages from configuration drift.
-
 ### Built-in Connector Implementations
 
 | Connector | Channel key | Provider |
@@ -79,24 +53,6 @@ Channels removed from the config are retained (not destroyed) and a warning is l
 | `SmtpEmailConnector` | `EMAIL` | Jakarta Mail (SMTP / SMTPS) |
 | `TwilioSmsConnector` | `SMS` | Twilio REST API |
 | `WebhookConnector` | `WEBHOOK` | Generic HTTP POST |
-
-### Adding a Custom Connector
-
-To plug in a new channel provider (e.g., Firebase FCM for push notifications):
-
-1. Create a class that extends `AbstractNotificationConnector` and implements the `send(NotificationJob)` method.
-2. Annotate it with `@Component` so Spring can inject its dependencies.
-3. Add the channel block to your properties:
-
-```properties
-connector.channel.PUSH.clazz=com.myapp.FcmPushConnector
-connector.channel.PUSH.instances=2
-connector.channel.PUSH.delay=500
-connector.channel.PUSH.maxAttempts=3
-connector.channel.PUSH.backOffMultiplier=2
-```
-
-The `ConnectorRegistry` will lazily initialize the new channel on the first job dispatch with no further changes required.
 
 ##  Local Compilation
 

@@ -30,24 +30,11 @@ In future, we will configure per channel consumer groups to scale each channel t
 
 Each consumer thread runs a tight `poll → process → commitSync` loop at a 100 ms polling interval. If a thread encounters a fatal error it is automatically **respawned** — the crashed consumer is removed from the pool, closed, and a fresh consumer is subscribed to the topic, maintaining thread pool capacity without operator intervention.
 
-**Idempotency Layer**
-
-Before each `EventCapture` batch is forwarded to the processing pipeline, the consumer checks each capture's `correlationId` against a Redis-backed `IdempotencyService`. Captures in one of the following states are filtered out:
-
-| State | Action |
-|---|---|
-| `ACQUIRED` | Lock taken — capture proceeds to processing. |
-| `ALREADY_COMPLETED` | Duplicate detected — capture silently skipped. |
-| `STILL_PROCESSING` | Concurrent in-flight duplicate — capture skipped with a warning. |
-| `INTERRUPTED` | Lock check interrupted — capture processed anyway as a safety fallback. |
-
-Once the `enqueueEventProcessing` Flowable completes successfully, all acquired idempotency keys are marked `COMPLETED`. On pipeline failure, locks are released so the message can be retried.
-
 **Offset Management**
 
 Offsets are committed **synchronously** after each successfully processed batch (`commitSync`). During a consumer group rebalance (`onPartitionsRevoked`), a synchronous commit is also performed to avoid re-processing records already handled before the rebalance. If Kafka reports an `OffsetOutOfRangeException`, the consumer seeks to the latest available offset and commits, preventing an infinite error loop.
 
-### 2. Agent Orchestration
+### 3. Agent Orchestration
 The `AgentOrchestrator` manages a **pool of GenAI agents** grouped by functional type (e.g., `EventProcessor`, `MessageTemplateAgent`, `EventSchedulerAgent`, `RuleProcessor`). Key behaviours:
 
 - **Core pool** (`agent.orchestrator.core-pool-size`, default `10`): A protected floor of always-available agents that are never evicted.
@@ -57,18 +44,6 @@ The `AgentOrchestrator` manages a **pool of GenAI agents** grouped by functional
 - **Snapshot restoration**: On startup, the orchestrator queries persisted `AgentSnapshot` records to restore agents that were mid-task during the last shutdown, preventing data loss.
 - **Dynamic configuration**: Pool size, idle timeouts, and cleanup intervals are all governed by `@ManagedConfiguration`-annotated fields, which can be updated at runtime via `POST /api/admin/config/apply` without a restart.
 
-### 3. Event Processing Pipeline
-When an `EventCapture` arrives, the following sequential pipeline executes:
-
-1. **Idempotency check** — Duplicate captures (same correlation ID) are filtered via `IdempotencyService` backed by Redis.
-2. **Context retrieval** — `RetrievalPlanner` fetches relevant historical facts, memory pages, and vocabulary graph entries to build a `ContextBundle`.
-3. **Prompt assembly** — `PromptAssembler` combines system context, retrieved memory, and the raw event JSON into a structured `Content` prompt for the LLM.
-4. **EventProcessor agent** — The agent decides: should a notification be sent (`emit`) or is this event noise (`suppressed`)? It also extracts facts observed from the payload and assigns notification channels.
-5. **Fact persistence** — Observations extracted by the agent are saved as `FactEntity` records, contributing to the long-term user memory graph.
-6. **Downstream tasks (parallel)**:
-   - **MessageTemplateAgent** — If no template exists for this event type and channel, an agent generates contextually appropriate message copy and persists it as a `MessageTemplate`.
-   - **EventSchedulerAgent** — If no schedule exists for this event, an agent determines the optimal delivery timing (cron expression or trigger type) and persists it as an `EventSchedule`.
-7. **Notification dispatch** — A `NotificationJob` is created and pushed to the `NotificationDispatcher` queue, which the `engine` module consumes for actual delivery.
 
 ### 4. Fact Extraction & Memory
 The `LogToMemoryAgentWorker` is a scheduled background service that runs independently of the real-time event pipeline:

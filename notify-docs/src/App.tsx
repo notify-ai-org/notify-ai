@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { marked } from 'marked';
 import {
   Search,
@@ -6,7 +6,8 @@ import {
   Moon,
   Menu,
   ChevronRight,
-  Home
+  Home,
+  LogIn
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { docsRegistry, allDocs } from './docs/docsRegistry';
@@ -23,6 +24,79 @@ interface LandingPageProps {
   setSearchQuery: (q: string) => void;
   filteredRegistry: any[];
   theme: 'dark' | 'light';
+}
+
+const ADMIN_DEMO_EMAIL = 'rohan.notify.admin1203@gmail.com';
+
+
+function DemoRequestModal({ onClose }: { onClose: () => void }) {
+  const [clientEmail, setClientEmail] = useState('');
+  const [note, setNote] = useState('');
+
+  const submitRequest = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const subject = 'Notify.ai demo request';
+    const body = [
+      'A client requested a Notify.ai demo.',
+      '',
+      `Client email: ${clientEmail}`,
+      '',
+      'Note:',
+      note || 'No note provided.'
+    ].join('\n');
+
+    window.location.href = `mailto:${ADMIN_DEMO_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    onClose();
+  };
+
+  return (
+    <div className="pricing-modal-overlay" onClick={onClose}>
+      <div className="demo-modal-card animate-fade-in" onClick={event => event.stopPropagation()}>
+        <div className="pricing-modal-header">
+          <div>
+            <h2>Request demo</h2>
+            <p className="demo-modal-kicker">Tell us where to reach you.</p>
+          </div>
+          <button className="pricing-modal-close" onClick={onClose} aria-label="Close request demo modal">
+            &times;
+          </button>
+        </div>
+
+        <form className="demo-form" onSubmit={submitRequest}>
+          <label className="demo-form-field">
+            <span>Client email</span>
+            <input
+              required
+              type="email"
+              value={clientEmail}
+              onChange={event => setClientEmail(event.target.value)}
+              placeholder="client@company.com"
+            />
+          </label>
+
+          <label className="demo-form-field">
+            <span>Note</span>
+            <textarea
+              rows={5}
+              value={note}
+              onChange={event => setNote(event.target.value)}
+              placeholder="What should we cover in the demo?"
+            />
+          </label>
+
+          <div className="demo-modal-actions">
+            <button type="button" className="docs-secondary-btn" onClick={onClose}>
+              Cancel
+            </button>
+            <button type="submit" className="docs-primary-btn">
+              Send request
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
 }
 
 function LandingPage({
@@ -255,6 +329,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [demoModalOpen, setDemoModalOpen] = useState<boolean>(false);
   const [toc, setToc] = useState<TOCItem[]>([]);
   const [activeTocId, setActiveTocId] = useState<string>('');
 
@@ -533,6 +608,9 @@ export default function App() {
           </div>
 
           <div className="header-actions">
+            <button className="docs-primary-btn" onClick={() => setDemoModalOpen(true)}>
+              Request demo
+            </button>
             <button
               className="theme-toggle-btn"
               onClick={toggleTheme}
@@ -594,6 +672,10 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {demoModalOpen && (
+        <DemoRequestModal onClose={() => setDemoModalOpen(false)} />
+      )}
     </div>
   );
 }

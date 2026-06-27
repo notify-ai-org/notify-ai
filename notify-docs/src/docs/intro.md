@@ -4,15 +4,10 @@ Unlike traditional notification services that simply dispatch static text, Notif
 
 This repository is built as a multi-module Maven project to enforce clear separation of concerns:
 
-- **[access](file:///Users/rohannaik/Desktop/notify/access/README.md)**: Main web API entrypoint, exposing REST controllers and serving static administration portal files.
 - **[acp-server (Agent Control Plane)](file:///Users/rohannaik/Desktop/notify/acp-server/README.md)**: The "brain" of the operation. Orchestrates GenAI agents (using Google ADK) to process incoming events, extract actionable facts, generate targeted schedules, and formulate intelligent notification templates.
 - **[engine](file:///Users/rohannaik/Desktop/notify/engine/README.md)**: The robust delivery mechanism. Handles the reliable execution of notification jobs, interacts with external channel providers, and manages failures via an advanced Dead Letter Queue (DLQ) mechanism.
 - **[client](file:///Users/rohannaik/Desktop/notify/client/README.md)**: A lightweight Java SDK meant to be embedded directly into your source applications. It uses Aspect-Oriented Programming (AOP) to intercept method executions, securely packaging them as semantic events, and pushes them to the `acp-server`.
-- **[annotations](file:///Users/rohannaik/Desktop/notify/annotations/README.md)**: Custom diagnostic annotations (`@Event`, `@Vocabulary`, `@Rule`, etc.) used seamlessly by the client SDK to strictly define event schemas and vocabulary rules with minimal boilerplate.
-- **[api](file:///Users/rohannaik/Desktop/notify/api/README.md)**: A shared module containing core data models (Entities, DTOs), JPA repositories, and common event interfaces used across both the Engine and ACP Server.
-- **[common](file:///Users/rohannaik/Desktop/notify/common/README.md)**: Infrastructure configuration classes (Kafka, security, JWT helpers) shared across Maven modules.
 - **[notify-ui](file:///Users/rohannaik/Desktop/notify/notify-ui/README.md)**: The administration portals built as React microfrontends under Vite.
-- **[examples](file:///Users/rohannaik/Desktop/notify/examples)**: Fully functional sample applications ([ecommerce-app](file:///Users/rohannaik/Desktop/notify/examples/ecommerce-app/README.md), [banking-app](file:///Users/rohannaik/Desktop/notify/examples/banking-app/README.md)) demonstrating how to integrate the client SDK.
 
 ##  Running Locally
 
