@@ -1,17 +1,17 @@
-Unlike traditional notification services that simply dispatch static text, Notify.ai **understands your user's context**. Designed for seamless integration into existing businesses (e-commerce, banking, healthcare), it securely intercepts domain events from your upstream applications. Utilizing advanced LLM orchestration, it intelligently extracts underlying facts over time, builds a comprehensive memory graph of user behavior, dynamically generates highly contextual message templates, and reliably dispatches them across multiple out-bound channels (Email, SMS, Push, Webhooks) when the user is most receptive.
+Unlike traditional notification services that simply dispatch static text, Notify.ai understands user and event context. It captures annotated domain events from upstream applications, extracts useful facts over time, builds memory around user behavior, generates contextual message templates, and dispatches notifications across channels such as email, SMS, push, and webhooks.
 
 ##  Architecture & Project Structure
 
-This repository is built as a multi-module Maven project to enforce clear separation of concerns:
+Notify.ai is organized around clear product boundaries:
 
-- **[acp-server (Agent Control Plane)](file:///Users/rohannaik/Desktop/notify/acp-server/README.md)**: The "brain" of the operation. Orchestrates GenAI agents (using Google ADK) to process incoming events, extract actionable facts, generate targeted schedules, and formulate intelligent notification templates.
-- **[engine](file:///Users/rohannaik/Desktop/notify/engine/README.md)**: The robust delivery mechanism. Handles the reliable execution of notification jobs, interacts with external channel providers, and manages failures via an advanced Dead Letter Queue (DLQ) mechanism.
-- **[client](file:///Users/rohannaik/Desktop/notify/client/README.md)**: A lightweight Java SDK meant to be embedded directly into your source applications. It uses Aspect-Oriented Programming (AOP) to intercept method executions, securely packaging them as semantic events, and pushes them to the `acp-server`.
-- **[notify-ui](file:///Users/rohannaik/Desktop/notify/notify-ui/README.md)**: The administration portals built as React microfrontends under Vite.
+- **Agent Control Plane**: Coordinates AI agents that process events, extract facts, plan schedules, and generate intelligent notification templates.
+- **Notification Engine**: Executes delivery through outbound channels and records delivery attempts, retries, and failures.
+- **Client SDK**: Embeds into source applications and captures annotated domain events.
+- **Admin Portals**: Provide tenant, event, schedule, template, memory, rule, and delivery-observability workflows.
 
 ##  Running Locally
 
-To stand up the complete development environment locally:
+To stand up the development environment locally:
 
 ### 1. Build All Modules
 From the root directory, compile and install all submodules:
@@ -20,14 +20,14 @@ mvn clean install
 ```
 
 ### 2. Stand up Backend Services
-Ensure **MySQL** (port `3306`) and **Redis** (port `6379`) are running on localhost. Create a MySQL database named `notify`.
+Ensure the required database and cache services are running locally. Keep credentials in local environment variables or ignored configuration files.
 
 ### 3. Run the Backend Server
 Launch the Spring Boot backend (`access` module):
 ```bash
 mvn spring-boot:run -pl access
 ```
-The server will boot on `http://localhost:8080`.
+The server starts on the configured application port.
 
 ### 4. Build and Run the UI Portals
 To compile the UI assets and copy them to the Spring Boot resources directory:
@@ -44,10 +44,8 @@ npm run dev
 ### 5. Run Example Applications
 Test the end-to-end integration by running one of the sample apps:
 ```bash
-# Start the E-Commerce sample (runs on port 8090)
 mvn spring-boot:run -pl examples/ecommerce-app
 
-# Start the Banking sample (runs on port 8091)
 mvn spring-boot:run -pl examples/banking-app
 ```
 
@@ -56,7 +54,7 @@ mvn spring-boot:run -pl examples/banking-app
 ##  Developer Contact & Contributing
 
 For questions, issues, or support:
-- **Lead Developer**: Rohan Naik ([rohan.naik07@github](https://github.com/rohan-naik07))
+- **GitHub**: [notify-ai-org/notify-ai](https://github.com/notify-ai-org/notify-ai)
 - **Email**: dev-support@notify.ai
 
 ### Contributing

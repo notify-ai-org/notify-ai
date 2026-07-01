@@ -1,67 +1,83 @@
-The **Notification Engine** acts as the reliable delivery layer for the **Notify.ai** architecture. Once the agent control plane has formulated what to send and scheduled it, the engine executes the resulting `NotificationJob` and dispatches it over the requested outbound channels.
+The **Notification Engine** is the delivery layer of Notify.ai. After the control plane decides what should be sent and when, the engine handles channel execution, provider integration, retry behavior, and delivery observability.
 
-##  Key Responsibilities
+It is designed to separate notification intelligence from delivery mechanics. The control plane can focus on decisions, templates, schedules, and personalization while the engine focuses on reliable outbound communication.
 
-1. **Job Dispatch**: Continuously polls or listens for active `NotificationJob` entities.
-2. **Multi-Channel Delivery**: Resolves target channels (Email, SMS, Push, Webhooks) and invokes specific provider integrations (SMTP, Twilio, Webhook) to send messages.
-3. **Resilience & Retry**: Logs attempts in `NotificationAttemptLog` and handles transient network errors.
-4. **Dead Letter Queue (DLQ)**: Captures failed deliveries inside `DeadLetterRecord` database entries. Provides automated and manual retry endpoints.
+---
 
-## Configurable Channel Connectors
+## Key Responsibilities
 
-The engine uses a **plugin-style connector model**: each outbound channel (Email, SMS, Webhook, etc.) is backed by an implementation of the `NotificationConnector` interface, and every aspect of that connector — which class to use, how many instances to run, and how aggressively to retry — is driven entirely by Spring properties. No code changes are needed to swap providers.
+### 1. Delivery Execution
 
-### Connector Interface & Base Class
+The engine receives scheduled or ready-to-send notification work from the backend runtime and dispatches it through the requested channel.
 
-All connectors implement `NotificationConnector` and extend `AbstractNotificationConnector`, which provides:
+Supported channel patterns include:
 
-- **`bind(ChannelConfig)`** — Attaches the channel's configuration (retry delays, max attempts, backoff multiplier) to the connector instance at initialization time.
-- **`init(AtomicReference<ConnectorMetrics>)`** — Wires up a shared metrics reference so each instance can record sent/retried/failed counters.
-- **`retryWithBackoff(NotificationJob, Runnable)`** — A built-in retry loop that executes the delivery action up to `maxAttempts` times, sleeping `delay * backOffMultiplier^attempt` milliseconds between attempts. On final failure, it hands the job off to `DeadLetterManagerImpl` and re-throws the exception.
+- Email
+- SMS
+- Push notifications
+- Webhooks
+- Custom provider integrations
 
-### Configuration Schema
+Each channel can be connected to a provider-specific implementation without changing the upstream application that emitted the original event.
 
-Connectors are declared under the `connector.channel.<channelName>` prefix in `application.properties` or `application.yml`:
+### 2. Provider Connectors
 
-```properties
-# Email channel — SMTP connector, 3 parallel instances
-connector.channel.EMAIL.clazz=com.notify.agent.connectors.SmtpEmailConnector
-connector.channel.EMAIL.instances=3
-connector.channel.EMAIL.delay=1000
-connector.channel.EMAIL.maxAttempts=3
-connector.channel.EMAIL.backOffMultiplier=2
+Notify.ai uses a connector model for outbound delivery. A connector adapts Notify.ai's internal notification request into the provider-specific API or protocol required by a delivery service.
 
-# SMS channel — Twilio, 2 parallel instances
-connector.channel.SMS.clazz=com.notify.agent.connectors.TwilioSmsConnector
-connector.channel.SMS.instances=2
-connector.channel.SMS.delay=500
-connector.channel.SMS.maxAttempts=2
-connector.channel.SMS.backOffMultiplier=2
+Examples include:
 
-# Webhook channel
-connector.channel.WEBHOOK.clazz=com.notify.agent.connectors.WebhookConnector
-connector.channel.WEBHOOK.instances=1
-connector.channel.WEBHOOK.delay=2000
-connector.channel.WEBHOOK.maxAttempts=4
-connector.channel.WEBHOOK.backOffMultiplier=3
-```
+- SMTP or transactional email providers for email
+- SMS providers for text messages
+- Push providers for mobile or web notifications
+- HTTP endpoints for webhook delivery
 
-### Built-in Connector Implementations
+This keeps provider-specific concerns isolated from event processing and agent orchestration.
 
-| Connector | Channel key | Provider |
-|---|---|---|
-| `SmtpEmailConnector` | `EMAIL` | Jakarta Mail (SMTP / SMTPS) |
-| `TwilioSmsConnector` | `SMS` | Twilio REST API |
-| `WebhookConnector` | `WEBHOOK` | Generic HTTP POST |
+### 3. Retry And Resilience
 
-##  Local Compilation
+Delivery can fail for temporary reasons such as network errors, provider throttling, transient service outages, invalid recipient state, or downstream timeouts.
 
+The engine records delivery attempts and applies retry behavior where appropriate. Permanent failures are separated from transient failures so operators can inspect, retry, or resolve them without losing visibility into what happened.
 
-Since `engine` is built as a library module, it cannot be run independently. It is imported and runs inside the main executable **`access`** module.
+### 4. Dead-Letter Handling
 
-To compile and package the engine module locally:
-```bash
-mvn clean install -pl engine
-```
+When a notification cannot be delivered after the configured retry policy, it is moved into a failure-handling path instead of being silently dropped.
 
-To run the application containing the Notification Engine, see the [access/README.md](file:///Users/rohannaik/Desktop/notify/access/README.md) execution instructions.
+This gives operators a place to inspect failed deliveries, understand why they failed, and decide whether they should be retried, ignored, or corrected through configuration or data changes.
+
+### 5. Delivery Observability
+
+The engine tracks the lifecycle of outbound notification attempts. This supports operational dashboards, audit views, and future delivery analytics.
+
+Typical lifecycle signals include:
+
+- queued
+- sent to provider
+- delivered when the provider supports delivery receipts
+- failed
+- retried
+- dead-lettered
+- opened or clicked when the channel supports engagement tracking
+
+Delivery and read confirmation vary by channel. Email opens and SMS engagement are best treated as signals, while push and in-app events can provide stronger client-reported interaction data when the application reports those events back to Notify.ai.
+
+### 6. Channel Extensibility
+
+The engine is built so additional channels and providers can be added without redesigning the notification pipeline.
+
+A new connector can be introduced for a provider while keeping the same upstream flow:
+
+1. The application emits a domain event.
+2. The control plane decides whether and how to notify.
+3. The engine delivers through the selected channel.
+4. Delivery status is recorded for operators and analytics.
+
+---
+
+## Deployment Model
+
+The Notification Engine runs as part of the Notify.ai backend runtime. It is not typically operated as a standalone public service.
+
+For production deployments, keep provider credentials and delivery configuration outside source control, restrict administrative access, and expose only the intended public application routes through a reverse proxy or load balancer.
+
+Use the local development guide for startup and operational setup.

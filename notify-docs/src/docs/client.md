@@ -1,16 +1,16 @@
-The **Notify.ai Client SDK** is a lightweight Java library that integrates into Spring Boot applications. It intercepts methods, packages parameters as semantic event payloads, and transmits them to the control plane (`acp-server`). It also listens to the scheduled notification event triggers.
+The **Notify.ai Client SDK** is a lightweight Java library that integrates into Spring Boot applications. It captures annotated domain events, packages method context as semantic event payloads, and sends those events to the Notify.ai control plane.
 
-> **Note**: Currently only Spring Boot implementations are supported, but soon we are coming up with support for Java, Python, Go and Node.js.
+> **Note**: Spring Boot is the first supported runtime. Additional language and framework SDKs are planned.
 
 ##  Integration Guide
 
 ### 1. Add Dependencies
-Add the client SDK and annotations dependencies to your application's `pom.xml`:
+Add the client SDK dependency to your application's `pom.xml`:
 
 ```xml
 <dependency>
-  <groupId>com.notify</groupId>
-  <artifactId>vocabulary-agent-client</artifactId>
+  <groupId>dev.notifyai</groupId>
+  <artifactId>notify-ai-agent-client</artifactId>
   <version>1.0.0</version>
 </dependency>
 ```
@@ -31,8 +31,7 @@ Configure connection parameters in your `application.yml` or `application.proper
 notify:
   base-package: com.myapp
   application-name: my-service
-  client-token : "*************"*************
-
+  client-token: ${NOTIFY_CLIENT_TOKEN}
 ```
 
 ---
@@ -40,7 +39,7 @@ notify:
 # Steps for integrating the SDK
 
 - Add dependencies to your `pom.xml`
-- Login to [https://notify.ai](https://notify.ai) and get your client token
+- Sign in to the Notify.ai portal and generate a client token
 - Enable the SDK by annotating a configuration class with `@EnableNotify` and specify the packages to scan
 - Configure connection parameters in your `application.yml` or `application.properties`
 - Add relevant annotations to your business logic
@@ -70,7 +69,7 @@ public class NotifyConfig {}
 ### `@Event`
 **Target:** Method
 
-The primary annotation. Wrap any service method with `@Event` to have the SDK intercept its execution, capture the method arguments and return value as a structured payload, and forward an `EventCapture` to the ACP server for agent processing.
+The primary annotation. Wrap any service method with `@Event` to have the SDK capture the method arguments and return value as a structured payload, then forward the event to the Notify.ai control plane for processing.
 
 **Attributes**
 
@@ -111,7 +110,7 @@ Associates a method with a named rule that gates or modifies event behaviour. Th
 
 | Attribute | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `name` | String |  | Unique rule name. Matched against rules persisted by the ACP's `RuleProcessorAgent`. |
+| `name` | String |  | Unique rule name. Matched against rules configured in the Notify.ai control plane. |
 | `description` | String |  | Human-readable description of what this rule enforces. |
 | `event` | String |  | Event key this rule applies to. If empty, the rule is considered global. |
 
@@ -159,7 +158,7 @@ public void auditOrderEvent(Order result) {
 ### `@Vocabulary`
 **Target:** Field (on fields of a `@Model`-annotated class)
 
-Marks a field as a named vocabulary attribute. The SDK registers this field's name, type, and description with the ACP's vocabulary graph, enabling agents to reason semantically about the data.
+Marks a field as a named vocabulary attribute. The SDK registers this field's name, type, and description with Notify.ai, enabling agents to reason semantically about the data.
 
 **Attributes**
 
@@ -189,7 +188,7 @@ public class Order {
 ### `@Model`
 **Target:** Class
 
-Marks a class as a vocabulary model. All fields annotated with `@Vocabulary` within the class are registered with the ACP vocabulary graph as attributes of this model. This powers the agent's understanding of your domain entities.
+Marks a class as a vocabulary model. All fields annotated with `@Vocabulary` within the class are registered as attributes of this model. This powers the agent's understanding of your domain entities.
 
 **Attributes**
 
@@ -218,7 +217,7 @@ public class Product {
 ### `@VocabularySupplier`
 **Target:** Method
 
-Marks a method that dynamically supplies additional payload context for a specific event. The method is called by the SDK at interception time and its return value (a `Map<String, Object>`) is merged into the event's payload before it is sent to the ACP server. Use this to enrich events with computed or session-derived data that isn't available as method parameters.
+Marks a method that dynamically supplies additional payload context for a specific event. The method is called by the SDK at capture time and its return value is merged into the event payload before it is sent to Notify.ai. Use this to enrich events with computed or session-derived data that is not available as method parameters.
 
 **Attributes**
 
@@ -247,7 +246,7 @@ public Map<String, Object> supplyOrderContext() {
 ### `@SubjectSupplier`
 **Target:** Method
 
-Marks a method that returns the list of **notification recipients** (subjects) for a specific event. The method must return a `List<?>` — typically a list of email addresses, phone numbers, or user identifiers. This list is attached to the `EventCapture` and forwarded as the `subjects` field on the resulting `NotificationJob`.
+Marks a method that returns the list of **notification recipients** or subject identifiers for a specific event. The method typically returns email addresses, phone numbers, user IDs, account IDs, or other identifiers used by Notify.ai to resolve the notification audience.
 
 **Attributes**
 
@@ -278,6 +277,6 @@ To compile and package the client SDK locally:
 mvn clean install -pl client
 ```
 
-For examples of how this SDK is utilized in active projects, refer to the [examples/ecommerce-app](file:///Users/rohannaik/Desktop/notify/examples/ecommerce-app/README.md) and [examples/banking-app](file:///Users/rohannaik/Desktop/notify/examples/banking-app/README.md) directories.
+For examples of how this SDK is used, see the e-commerce and banking example guides in these docs.
 
 **APIs to directly emit events and dispatch notifications coming soon**

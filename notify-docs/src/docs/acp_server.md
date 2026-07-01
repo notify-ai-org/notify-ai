@@ -1,70 +1,75 @@
-The **ACP Server** (Agent Control Plane) is the intelligent core of the Notify.ai ecosystem. It receives incoming events from registered client SDKs, leverages Large Language Models (LLMs) via the **Google Agent Development Kit (ADK)**, extracts semantic user facts, and dynamically compiles notification schedules and message templates — all without manual configuration.
+The **ACP Server** (Agent Control Plane) is the decision-making layer of Notify.ai. It receives application events from the client SDK, enriches them with domain context, coordinates AI agents, and produces notification decisions, templates, schedules, and memory updates.
+
+The control plane is designed to sit behind authenticated access and process events asynchronously, so upstream applications can emit business events without owning notification intelligence, personalization logic, or delivery planning.
 
 ---
 
-##  Key Responsibilities
+## Key Responsibilities
 
-### 1. Event Ingestion using REST
-The ACP Server exposes two primary REST endpoints for event ingestion.
+### 1. Event Intake
 
-- **`POST /api/event`** — Receives a batch of `EventCapture` objects from the client SDK. Each capture contains the intercepted method's parameters, metadata, and contextual payload. Captures are immediately persisted and enqueued for asynchronous agent processing.
-- **`POST /api/event/sync`** — Same as above but blocks until the entire processing pipeline completes. Useful for testing or lower-throughput integrations.
-- **`POST /api/vocabulary`** — Accepts `ClassModel` descriptors that define the domain vocabulary (entity classes and their attributes). The server upserts these into the vocabulary graph, which agents later use to reason about user data semantics.
-- **`POST /api/vocabulary/rules/process`** — Accepts a natural-language rule description and dispatches it to the `RuleProcessorAgent`, which converts it into an executable condition expression using vocabulary and persists it.
+The ACP Server accepts structured events emitted by registered client SDKs. Each event carries metadata about the source application, the event type, and the contextual payload needed for notification decisions.
 
-### 2. Event Ingestion using Kafka
+Events can be ingested through low-latency APIs or through streaming infrastructure for higher-throughput deployments. Both paths feed the same processing pipeline, so teams can start with simple integration and move to streaming as scale increases.
 
-For high-throughput production deployments, events are delivered to the ACP Server over Kafka rather than HTTP.Kafka delivery is wired into the same reactive processing pipeline used by the REST path.
+### 2. Domain Understanding
 
-**Topic & Partition Model**
+Notify.ai uses vocabulary metadata from the client SDK to understand the meaning of application-specific payloads. This lets the control plane reason about domain objects such as orders, accounts, carts, customers, transactions, appointments, or any other model exposed by the application.
 
-All client SDK events are published to a single topic for free tier: `notify-v1-events`. On startup, the consumer probes Kafka for the number of active partitions and spawns **one consumer thread per partition**, ensuring full topic parallelism without manual configuration. But cross tenant data security isn't guaranteed.
+This domain context helps agents decide:
 
-For paid cloud hosted tiers, we have sharded acp-servers, each managing a section of topics which are configured per tenant. This ensures cross tenant data security and allows us to scale the ACP servers independently.
-
-We have 12 partitions for each topic and a consumer group with 12 corresponding consumer threads. Each subject's event will be emitted in a fixed partition using a hash function, so that all events of a subject are processed in order, as Kafka guarantees ordering only per partition.
-
-In future, we will configure per channel consumer groups to scale each channel traffic independently.
-
-**Consumer Lifecycle**
-
-Each consumer thread runs a tight `poll → process → commitSync` loop at a 100 ms polling interval. If a thread encounters a fatal error it is automatically **respawned** — the crashed consumer is removed from the pool, closed, and a fresh consumer is subscribed to the topic, maintaining thread pool capacity without operator intervention.
-
-**Offset Management**
-
-Offsets are committed **synchronously** after each successfully processed batch (`commitSync`). During a consumer group rebalance (`onPartitionsRevoked`), a synchronous commit is also performed to avoid re-processing records already handled before the rebalance. If Kafka reports an `OffsetOutOfRangeException`, the consumer seeks to the latest available offset and commits, preventing an infinite error loop.
+- whether an event is notification-worthy
+- which user or subject the event relates to
+- what facts should be remembered
+- which message tone and content are appropriate
+- when a notification is most useful
 
 ### 3. Agent Orchestration
-The `AgentOrchestrator` manages a **pool of GenAI agents** grouped by functional type (e.g., `EventProcessor`, `MessageTemplateAgent`, `EventSchedulerAgent`, `RuleProcessor`). Key behaviours:
 
-- **Core pool** (`agent.orchestrator.core-pool-size`, default `10`): A protected floor of always-available agents that are never evicted.
-- **Max pool** (`agent.orchestrator.max-pool-size`, default `20`): The burst ceiling. Overflow agents (those registered beyond the core pool) are eligible for idle eviction.
-- **Idle eviction**: A scheduled cleanup task (interval: `agent.orchestrator.cleanup-interval-seconds`, default `60s`) evicts overflow agents that have been idle longer than `agent.orchestrator.idle-timeout-seconds` (default `300s`).
-- **Task dispatch**: Tasks are built as RxJava `Flowable` streams. Sequential pipelines (e.g., generate template → then schedule) use `Flowable.concat`; parallel channel processing uses `Flowable.merge`.
-- **Snapshot restoration**: On startup, the orchestrator queries persisted `AgentSnapshot` records to restore agents that were mid-task during the last shutdown, preventing data loss.
-- **Dynamic configuration**: Pool size, idle timeouts, and cleanup intervals are all governed by `@ManagedConfiguration`-annotated fields, which can be updated at runtime via `POST /api/admin/config/apply` without a restart.
+The ACP Server coordinates specialized AI agents for event analysis, rule interpretation, memory extraction, template generation, and schedule planning.
 
+Instead of treating notifications as static text, the control plane evaluates each event in context. It can combine the current payload with domain vocabulary, historical facts, configured rules, and channel-specific delivery constraints.
 
-### 4. Fact Extraction & Memory
-The `LogToMemoryAgentWorker` is a scheduled background service that runs independently of the real-time event pipeline:
+Agent work is handled asynchronously so event intake remains responsive while deeper reasoning happens in the background.
 
-- It periodically reads buffered agent logs from the `AgentLogRepository`.
-- It feeds these logs to a memory-consolidation agent that extracts higher-order semantic facts (e.g., behavioural patterns, preference signals) and stores them in the `FactStore`.
-- These consolidated facts are later retrieved by the `RetrievalPlanner` to enrich future event prompts, creating a **growing long-term memory** for each user/subject.
+### 4. Rules And Policies
 
-### 5. Vocabulary & Rule Processing
-- **Vocabulary graph**: A hierarchical structure of `Vocabulary` entities. Class-level nodes represent domain entities (e.g., `Order`, `User`); attribute-level nodes represent their fields. This graph is consulted by agents when reasoning about what data is meaningful.
-- **Rule processing**: Natural-language rule definitions submitted via `/api/vocabulary/rules/process` are transformed by the `RuleProcessorAgent` into structured condition expressions (e.g., `order.total > 500`) and stored in the `RuleRepository`. These are evaluated during the event processing pipeline to influence notification decisions.
+Business rules can guide notification decisions without hardcoding every case in the upstream application. Rules are interpreted against the domain vocabulary and applied during event processing.
+
+This allows teams to express notification behavior in business terms, such as priority, eligibility, timing preference, escalation behavior, or suppression conditions.
+
+### 5. Memory And Personalization
+
+The control plane builds long-term context from event history. It extracts durable facts and behavioral patterns that can improve future notification decisions.
+
+Examples include:
+
+- user preferences
+- repeated behavior patterns
+- risk or severity signals
+- engagement context
+- recent activity summaries
+
+This memory layer helps Notify.ai avoid treating every event as isolated. Notifications can become more relevant over time as the system learns from prior interactions.
+
+### 6. Template And Schedule Planning
+
+Once an event qualifies for notification, the ACP Server can generate or select a message template and determine the most appropriate schedule.
+
+Template generation considers the event, recipient context, configured channel, and available domain content. Schedule planning can support immediate, delayed, or rule-driven delivery depending on the event intent.
+
+### 7. Multi-Tenant Operation
+
+Hosted deployments are designed for tenant-aware operation. Higher-scale tiers can isolate workloads and scale processing capacity independently based on tenant needs and traffic volume.
+
+This keeps event processing, agent capacity, and delivery planning aligned with the operational requirements of each customer environment.
 
 ---
 
-##  Local Compilation
+## Deployment Model
 
-Since `acp-server` is packaged as a library module, it cannot be run as an independent application. It is bundled and executed within the **`access`** module web application.
+The ACP Server is packaged as part of the Notify.ai backend runtime. The backend application provides the web application, administrative APIs, authentication boundary, and operational endpoints around the control plane.
 
-To compile and package this module locally:
-```bash
-mvn clean install -pl acp-server
-```
+For local development, run the full backend application. For production, place the backend behind a reverse proxy or load balancer and expose only the intended public routes.
 
-To run the full application (including the ACP server), refer to the [Access module](file:///Users/rohannaik/Desktop/notify/access/README.md) running instructions.
+Use the local development guide for startup and operational setup.

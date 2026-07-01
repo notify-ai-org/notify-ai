@@ -1,5 +1,4 @@
 import introRaw from './intro.md?raw';
-import accessRaw from './access.md?raw';
 import acpServerRaw from './acp_server.md?raw';
 import engineRaw from './engine.md?raw';
 import clientRaw from './client.md?raw';
@@ -33,12 +32,6 @@ export const docsRegistry: DocCategory[] = [
   {
     name: 'Core Modules',
     items: [
-      {
-        id: 'access',
-        title: 'Access API (REST Entrypoint)',
-        category: 'Core Modules',
-        content: accessRaw,
-      },
       {
         id: 'acp-server',
         title: 'Agent Control Plane (ACP)',

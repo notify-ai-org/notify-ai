@@ -5,25 +5,25 @@ The `ecommerce-app` module is a fully functional sample Spring Boot application 
 ##  How it is annotated
 
 - **Vocabulary Models**: `Customer` and `OrderPayload` classes are marked with `@Model` or `@Vocabulary` annotations, exposing their properties to the semantic analysis engine.
-- **Events**: Methods in `OrderService` (like `createOrder`, `processShipment`) are decorated with `@Event` to capture transactional events automatically when triggered by controllers.
+- **Events**: Order, cart, and shipment operations are decorated with `@Event` to capture transactional activity automatically when the application handles those workflows.
 - **Subject Suppliers**: Resolves the target recipient email/phone number for events.
 
-##  Running Locally
+## Running The Example
 
-You can run the e-commerce sample locally to test the event capture and dispatch flow.
+You can run the e-commerce sample locally to see how annotated business operations become Notify.ai events.
 
 ### Prerequisites
-- **Notify.ai Control Plane**: Ensure the backend application (`access` module) is running on `http://localhost:8080`.
+- **Notify.ai backend**: Ensure the Access application is running locally.
 
 ### Execution
 From the root directory of the project, run:
 ```bash
 mvn spring-boot:run -pl examples/ecommerce-app
 ```
-By default, the application runs on port **8090**.
+The application starts on its configured local port.
 
 ### Testing the Integration
-Once the application is running, trigger order/cart events by making HTTP requests:
+Once the application is running, trigger order and cart operations with sample HTTP requests:
 ```bash
 # Add an item to the shopping cart
 curl -X POST http://localhost:8090/order/cart \
@@ -35,4 +35,4 @@ curl -X POST http://localhost:8090/order/checkout \
   -H "Content-Type: application/json" \
   -d '{"customerId":"cust-99","items":["Mechanical Keyboard"],"total":120.0}'
 ```
-These calls will be intercepted by the Notify SDK and pushed as event payloads to the main control plane (`access` module) on port `8080`.
+These calls are captured by the Notify.ai SDK and sent to the local backend for processing.

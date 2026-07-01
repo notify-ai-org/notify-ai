@@ -1,18 +1,18 @@
 The `banking-app` module is a sample Spring Boot application demonstrating how to integrate the **Notify.ai** client SDK into a financial/banking services architecture. It defines banking operations (Logins, OTP verification, Transactions, Balance summaries) and showcases event interception using annotations.
 
-##  Running Locally
+## Running The Example
 
-You can run the banking sample application locally to test the event logging flow.
+You can run the banking sample application locally to see how financial domain actions become Notify.ai events.
 
 ### Prerequisites
-- **Notify.ai Control Plane**: Ensure the backend application (`access` module) is running on `http://localhost:8080`.
+- **Notify.ai backend**: Ensure the Access application is running locally.
 
 ### Execution
 From the root directory of the project, run:
 ```bash
 mvn spring-boot:run -pl examples/banking-app
 ```
-By default, the application runs on port **8091**.
+The application starts on its configured local port.
 
 ### Testing the Integration
 Once the application is running, trigger transactional events via HTTP requests:
@@ -28,4 +28,4 @@ curl -X POST http://localhost:8091/banking/transaction \
   -H "Content-Type: application/json" \
   -d '{"accountId":"act-10123","amount":750.0,"targetAccount":"act-99220","description":"Monthly Rent Payment"}'
 ```
-These events are intercepted by the client SDK and batched/pushed to the central control plane (`access` module) at port `8080` for processing.
+These events are captured by the client SDK and sent to the local backend for processing.
