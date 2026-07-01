@@ -4,14 +4,36 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     
-    <groupId>com.notify</groupId>
+    <groupId>dev.notify-ai</groupId>
     <artifactId>vocabulary-agent-parent</artifactId>
     <version>1.0.0</version>
     <packaging>pom</packaging>
     
     <name>Vocabulary Agent Parent</name>
     <description>Parent project for vocabulary agent multi-module setup</description>
+    <url>https://github.com/rohan-naik07/notify-ai</url>
 
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/licenses/MIT</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>rohan-naik07</id>
+            <name>Rohan Naik</name>
+            <email>rohan.nn1203@gmail.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/rohan-naik07/notify-ai.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/rohan-naik07/notify-ai.git</developerConnection>
+        <url>https://github.com/rohan-naik07/notify-ai</url>
+    </scm>
     
     <modules>
         <module>annotations</module>
@@ -31,7 +53,7 @@
         <maven.compiler.release>17</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring.boot.version>3.2.0</spring.boot.version>
-        <google.adk.version>1.3.1-SNAPSHOT</google.adk.version>
+        <google.adk.version>1.3.1</google.adk.version>
         <maven.compiler.plugin.version>3.14.0</maven.compiler.plugin.version>
     </properties>
     
@@ -101,6 +123,7 @@
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
+                <version>1.18.30</version>
                 <optional>true</optional>
             </dependency>
             <dependency>
@@ -122,10 +145,11 @@
             <dependency>
                 <groupId>org.mockito</groupId>
                 <artifactId>mockito-core</artifactId>
+                <version>5.7.0</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
-                <groupId>com.notify</groupId>
+                <groupId>dev.notify-ai</groupId>
                 <artifactId>google-adk</artifactId>
                 <version>${google.adk.version}</version>
             </dependency>
