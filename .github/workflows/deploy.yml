@@ -96,33 +96,30 @@ jobs:
             # Pull the latest image
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-            # Load instance-level environment variables when they are managed
-            # through /etc/environment. The deploy no longer depends on an
-            # application .env file.
-            if [ -f /etc/environment ]; then
-              set -a
-              . /etc/environment
-              set +a
+            cd /opt/vocab-agent
+            ENV_FILE=/opt/vocab-agent/deploy/ec2.env
+
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "ERROR: $ENV_FILE does not exist. Copy deploy/ec2.env.example to deploy/ec2.env and set production secrets."
+              exit 1
             fi
 
-            # Required production secrets must come from the EC2 instance
-            # environment.
+            # Required production secrets must come from the Compose env file.
             for required_var in DB_PASSWORD REDIS_PASSWORD OPENAI_API_KEY; do
-              if [ -z "$(printenv "$required_var")" ]; then
-                echo "ERROR: $required_var is not set on the EC2 instance."
+              if ! grep -Eq "^${required_var}=.+" "$ENV_FILE"; then
+                echo "ERROR: $required_var is not set in $ENV_FILE."
                 exit 1
               fi
             done
 
-            cd /opt/vocab-agent
             cat > docker-compose.deploy.yml <<'COMPOSE'
             services:
               vocab-agent:
                 image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
             COMPOSE
 
-            docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull vocab-agent
-            docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d
+            docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml pull vocab-agent
+            docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml up -d
 
             # Wait a moment to check if it crashed immediately
             sleep 3
@@ -149,12 +146,11 @@ jobs:
 
             echo ""
             echo "── Health check ──"
-            if [ -f /etc/environment ]; then
-              set -a
-              . /etc/environment
-              set +a
+            ENV_FILE=/opt/vocab-agent/deploy/ec2.env
+            if [ -f "$ENV_FILE" ]; then
+              SERVER_PORT="$(grep -E '^SERVER_PORT=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
             fi
-            MANAGEMENT_PORT=${MANAGEMENT_PORT:-8081}
+            MANAGEMENT_PORT=${SERVER_PORT:-8080}
             # Wait up to 60s for the app to start responding
             for i in $(seq 1 12); do
               if curl -sf http://localhost:${MANAGEMENT_PORT}/actuator/health > /dev/null 2>&1; then
