@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
-          token: ${{ secrets.GHCR_PAT }}
+          token: ${{ secrets.CHECKOUT_PAT || github.token }}
 
       # Download the portal builds produced by the build-ui job.
       # They land in the Spring Boot classpath so the JAR includes them.
