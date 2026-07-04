@@ -15,6 +15,10 @@
 # Minikube / Kubernetes secrets
 /k8s/minikube-secrets-template.yaml
 
+# EC2 / Docker Compose secrets
+/deploy/ec2.env
+/.env
+
 # Access Module target and Test Controller
 /access/target
 /access/src/main/java/com/example/agent/controllers/TestNotificationController.java

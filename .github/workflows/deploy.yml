@@ -87,25 +87,33 @@ jobs:
             # Pull the latest image
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-            # Stop and remove existing container (if running)
-            docker stop ${{ env.IMAGE }} 2>/dev/null || true
-            docker rm ${{ env.IMAGE }} 2>/dev/null || true
-
-            # Database configuration is required. An empty file silently falls
-            # back to the local MySQL defaults baked into development profiles.
-            if [ ! -s /opt/vocab-agent/.env ]; then
-              echo "ERROR: /opt/vocab-agent/.env is missing or empty."
-              echo "Create it with the PostgreSQL production variables before deploying."
-              exit 1
+            # Load instance-level environment variables when they are managed
+            # through /etc/environment. The deploy no longer depends on an
+            # application .env file.
+            if [ -f /etc/environment ]; then
+              set -a
+              . /etc/environment
+              set +a
             fi
 
-            # Run the new container
-            docker run -d \
-              --name ${{ env.IMAGE }} \
-              --restart unless-stopped \
-              --network host \
-              --env-file /opt/vocab-agent/.env \
-              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            # Required production secrets must come from the EC2 instance
+            # environment.
+            for required_var in DB_PASSWORD REDIS_PASSWORD OPENAI_API_KEY; do
+              if [ -z "$(printenv "$required_var")" ]; then
+                echo "ERROR: $required_var is not set on the EC2 instance."
+                exit 1
+              fi
+            done
+
+            cd /opt/vocab-agent
+            cat > docker-compose.deploy.yml <<'COMPOSE'
+            services:
+              vocab-agent:
+                image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            COMPOSE
+
+            docker compose -f docker-compose.yml -f docker-compose.deploy.yml pull vocab-agent
+            docker compose -f docker-compose.yml -f docker-compose.deploy.yml up -d
 
             # Wait a moment to check if it crashed immediately
             sleep 3
@@ -132,9 +140,15 @@ jobs:
 
             echo ""
             echo "── Health check ──"
+            if [ -f /etc/environment ]; then
+              set -a
+              . /etc/environment
+              set +a
+            fi
+            MANAGEMENT_PORT=${MANAGEMENT_PORT:-8081}
             # Wait up to 60s for the app to start responding
             for i in $(seq 1 12); do
-              if curl -sf http://localhost:8080/actuator/health > /dev/null 2>&1; then
+              if curl -sf http://localhost:${MANAGEMENT_PORT}/actuator/health > /dev/null 2>&1; then
                 echo "✓ Application is healthy"
                 exit 0
               fi

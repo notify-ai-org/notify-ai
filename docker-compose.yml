@@ -1,0 +1,90 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: notify-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: notify_db
+      POSTGRES_USER: notification_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U notification_user -d notify_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: notify-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+
+  vocab-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: notify/vocab-agent:latest
+    container_name: vocab-agent
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: default
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: notify_db
+      DB_USER: notification_user
+      DB_PASSWORD: ${DB_PASSWORD}
+      DDL_AUTO: update
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_USERNAME: default
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      SERVER_PORT: 8080
+      SERVER_ADDRESS: 0.0.0.0
+      MANAGEMENT_PORT: 8081
+      MANAGEMENT_ADDRESS: 0.0.0.0
+      ACP_CORS_ALLOWED_ORIGINS: https://app.notify-ai.dev
+      SPRING_WEBFLUX_CORS_ALLOWED_ORIGINS: https://app.notify-ai.dev
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+    expose:
+      - "8080"
+    ports:
+      - "127.0.0.1:8081:8081"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: notify-nginx
+    restart: unless-stopped
+    depends_on:
+      - vocab-agent
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - nginx-cache:/var/cache/nginx
+
+volumes:
+  postgres-data:
+  redis-data:
+  nginx-cache:
