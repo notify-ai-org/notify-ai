@@ -72,6 +72,15 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Validate deploy secrets
+        env:
+          CHECKOUT_PAT: ${{ secrets.CHECKOUT_PAT }}
+        run: |
+          if [ -z "$CHECKOUT_PAT" ]; then
+            echo "ERROR: CHECKOUT_PAT is not set. Add a GitHub token with repo and read:packages so checkout and EC2 image pulls can authenticate."
+            exit 1
+          fi
+
       # Deploy to EC2 via SSH
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1
@@ -82,7 +91,7 @@ jobs:
           script: |
             set -e
             # Log in to GHCR on the EC2 instance
-            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            printf '%s' '${{ secrets.CHECKOUT_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
 
             # Pull the latest image
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
