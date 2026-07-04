@@ -81,6 +81,26 @@ jobs:
             exit 1
           fi
 
+      - name: Prepare EC2 deploy directory
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            sudo mkdir -p /opt/vocab-agent
+            sudo chown -R "${USER}:${USER}" /opt/vocab-agent
+
+      - name: Copy Compose deployment files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,deploy"
+          target: "/opt/vocab-agent"
+
       # Deploy to EC2 via SSH
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1
