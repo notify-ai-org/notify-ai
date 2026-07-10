@@ -2,7 +2,7 @@
   <img src="../assets/notify-ai-logo.svg" alt="Notify.ai" width="96" />
 </p>
 
-<h1 align="center">EC2 Docker Compose Deployment</h1>
+<h1 align="center">Notify.ai Deployment</h1>
 
 This deployment runs the application, nginx, PostgreSQL, and Redis as one
 Compose stack.
