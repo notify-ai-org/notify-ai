@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { marked } from 'marked';
 import {
   Search,
@@ -11,6 +12,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { docsRegistry, allDocs } from './docs/docsRegistry';
+import notifyLogoUrl from './assets/notify-ai-logo.svg';
 
 interface TOCItem {
   id: string;
@@ -29,6 +31,10 @@ interface LandingPageProps {
 const ADMIN_DEMO_EMAIL = 'rohan.notify.admin1203@gmail.com';
 const PRODUCTION_LOGIN_URL = 'https://app.notify-ai.dev/portals/login/';
 
+function ModalPortal({ children }: { children: ReactNode }) {
+  if (typeof document === 'undefined') return null;
+  return createPortal(children, document.body);
+}
 
 function DemoRequestModal({ onClose }: { onClose: () => void }) {
   const [clientEmail, setClientEmail] = useState('');
@@ -282,6 +288,7 @@ function LandingPage({
         </div>
       </section>
       {pricingOpen && (
+        <ModalPortal>
         <div className="pricing-modal-overlay" onClick={() => setPricingOpen(false)}>
           <div className="pricing-modal-card animate-fade-in" onClick={e => e.stopPropagation()}>
             <div className="pricing-modal-header">
@@ -320,6 +327,7 @@ function LandingPage({
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );
@@ -546,6 +554,7 @@ export default function App() {
       {/* Left Sidebar */}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="logo-section" style={{ cursor: 'pointer' }} onClick={() => selectDoc('home')}>
+          <img className="logo-mark" src={notifyLogoUrl} alt="Notify.ai" />
           <div className="logo-text"><span className="logo-text-notify">Notify</span><span className="logo-text-ai">.ai</span></div>
         </div>
 

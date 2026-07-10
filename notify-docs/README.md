@@ -1,6 +1,10 @@
-# React + TypeScript + Vite
+<p align="center">
+  <img src="src/assets/notify-ai-logo.svg" alt="Notify.ai" width="96" />
+</p>
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<h1 align="center">Notify.ai Docs</h1>
+
+This package contains the public Notify.ai documentation site, built with React, TypeScript, and Vite.
 
 Currently, two official plugins are available:
 

@@ -1,4 +1,8 @@
-# EC2 Docker Compose Deployment
+<p align="center">
+  <img src="../assets/notify-ai-logo.svg" alt="Notify.ai" width="96" />
+</p>
+
+<h1 align="center">EC2 Docker Compose Deployment</h1>
 
 This deployment runs the application, nginx, PostgreSQL, and Redis as one
 Compose stack.
@@ -52,4 +56,3 @@ Docker starts. If needed, run:
 cd /opt/notify
 docker compose --env-file deploy/ec2.env up -d
 ```
-
