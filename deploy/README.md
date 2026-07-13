@@ -38,6 +38,15 @@ The nginx container expects Let's Encrypt certificates at:
 docker compose --env-file deploy/ec2.env up -d --build
 ```
 
+## Apply database migrations
+
+Run the bundled SQL migration after schema changes or when an existing EC2
+database reports missing columns/wrong column types:
+
+```bash
+docker compose --env-file deploy/ec2.env exec -T postgres psql -U notification_user -d notify_db -f - < deploy/migrations/001_notify_postgresql.sql
+```
+
 ## Check status
 
 ```bash
