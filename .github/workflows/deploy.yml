@@ -139,6 +139,17 @@ jobs:
             COMPOSE
 
             docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml pull vocab-agent
+            docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml up -d postgres redis ollama
+
+            OLLAMA_CHAT_MODEL="$(grep -E '^OLLAMA_CHAT_MODEL=' "$ENV_FILE" | tail -1 | cut -d= -f2- || true)"
+            OLLAMA_EMBEDDING_MODEL="$(grep -E '^OLLAMA_EMBEDDING_MODEL=' "$ENV_FILE" | tail -1 | cut -d= -f2- || true)"
+            OLLAMA_CHAT_MODEL="${OLLAMA_CHAT_MODEL:-qwen3:1.7b}"
+            OLLAMA_EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}"
+
+            echo "Ensuring Ollama models are available: ${OLLAMA_CHAT_MODEL}, ${OLLAMA_EMBEDDING_MODEL}"
+            docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml exec -T ollama ollama pull "$OLLAMA_CHAT_MODEL"
+            docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml exec -T ollama ollama pull "$OLLAMA_EMBEDDING_MODEL"
+
             docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml up -d
 
             # Wait a moment to check if it crashed immediately
@@ -168,9 +179,9 @@ jobs:
             echo "── Health check ──"
             ENV_FILE=/opt/vocab-agent/deploy/ec2.env
             if [ -f "$ENV_FILE" ]; then
-              SERVER_PORT="$(grep -E '^SERVER_PORT=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
+              MANAGEMENT_PORT="$(grep -E '^MANAGEMENT_PORT=' "$ENV_FILE" | tail -1 | cut -d= -f2-)"
             fi
-            MANAGEMENT_PORT=${SERVER_PORT:-8080}
+            MANAGEMENT_PORT=${MANAGEMENT_PORT:-8081}
             # Wait up to 60s for the app to start responding
             for i in $(seq 1 12); do
               if curl -sf http://localhost:${MANAGEMENT_PORT}/actuator/health > /dev/null 2>&1; then
