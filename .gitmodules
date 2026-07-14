@@ -28,6 +28,3 @@
 [submodule "adk-java"]
 	path = adk-java
 	url = https://github.com/notify-ai-org/adk-java.git
-[submodule "ollama4j"]
-	path = ollama4j
-	url = https://github.com/notify-ai-org/ollama4j.git
