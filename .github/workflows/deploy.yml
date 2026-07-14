@@ -139,16 +139,7 @@ jobs:
             COMPOSE
 
             docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml pull vocab-agent
-            docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml up -d postgres redis ollama
-
-            OLLAMA_CHAT_MODEL="$(grep -E '^OLLAMA_CHAT_MODEL=' "$ENV_FILE" | tail -1 | cut -d= -f2- || true)"
-            OLLAMA_EMBEDDING_MODEL="$(grep -E '^OLLAMA_EMBEDDING_MODEL=' "$ENV_FILE" | tail -1 | cut -d= -f2- || true)"
-            OLLAMA_CHAT_MODEL="${OLLAMA_CHAT_MODEL:-qwen3:1.7b}"
-            OLLAMA_EMBEDDING_MODEL="${OLLAMA_EMBEDDING_MODEL:-nomic-embed-text}"
-
-            echo "Ensuring Ollama models are available: ${OLLAMA_CHAT_MODEL}, ${OLLAMA_EMBEDDING_MODEL}"
-            docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml exec -T ollama ollama pull "$OLLAMA_CHAT_MODEL"
-            docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml exec -T ollama ollama pull "$OLLAMA_EMBEDDING_MODEL"
+            docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml up -d postgres redis
 
             docker compose --env-file "$ENV_FILE" -f docker-compose.yml -f docker-compose.deploy.yml up -d
 

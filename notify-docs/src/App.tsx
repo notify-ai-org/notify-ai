@@ -319,7 +319,7 @@ function LandingPage({
                     <li>Dedicated Kafka Topics for event ingestion</li>
                     <li>Dedicated agent instances & keys</li>
                     <li>Dedicated PGVector database and Redis based cache</li>
-                    <li>OpenAI or locally hosted Ollama based LLM Provider, faster throughput</li>
+                    <li>OpenAI or Groq based LLM provider, faster throughput</li>
                     <li>24/7 SLA developer support</li>
                   </ul>
                 </div>

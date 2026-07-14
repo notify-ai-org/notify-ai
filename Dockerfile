@@ -11,7 +11,6 @@ COPY annotations/pom.xml annotations/
 COPY api/pom.xml api/
 COPY acp-server/pom.xml acp-server/
 COPY client/pom.xml client/
-COPY ollama4j/pom.xml ollama4j/
 COPY adk-java/pom.xml adk-java/
 COPY adk-java/core/pom.xml adk-java/core/
 COPY adk-java/a2a/pom.xml adk-java/a2a/
