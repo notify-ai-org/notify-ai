@@ -80,9 +80,37 @@ DO $$
 BEGIN
     IF to_regclass('public.eventschedule') IS NOT NULL THEN
         ALTER TABLE eventschedule ADD COLUMN IF NOT EXISTS channel VARCHAR(255);
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'eventschedule' AND column_name = 'eventname'
+        ) THEN
+            CREATE INDEX IF NOT EXISTS idx_eventschedule_eventname_channel
+                ON eventschedule (eventname, channel);
+        END IF;
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'eventschedule' AND column_name = 'event_name'
+        ) THEN
+            CREATE INDEX IF NOT EXISTS idx_eventschedule_event_name_channel
+                ON eventschedule (event_name, channel);
+        END IF;
     END IF;
 
     IF to_regclass('public.event_schedule') IS NOT NULL THEN
         ALTER TABLE event_schedule ADD COLUMN IF NOT EXISTS channel VARCHAR(255);
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'event_schedule' AND column_name = 'event_name'
+        ) THEN
+            CREATE INDEX IF NOT EXISTS idx_event_schedule_event_name_channel
+                ON event_schedule (event_name, channel);
+        END IF;
+        IF EXISTS (
+            SELECT 1 FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = 'event_schedule' AND column_name = 'eventname'
+        ) THEN
+            CREATE INDEX IF NOT EXISTS idx_event_schedule_eventname_channel
+                ON event_schedule (eventname, channel);
+        END IF;
     END IF;
 END $$;
