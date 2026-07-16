@@ -30,6 +30,7 @@ interface LandingPageProps {
 
 const ADMIN_DEMO_EMAIL = 'rohan.notify.admin1203@gmail.com';
 const PRODUCTION_LOGIN_URL = 'https://app.notify-ai.dev/portals/login/';
+const GITHUB_REPO_URL = 'https://github.com/notify-ai-org/notify-ai';
 
 function ModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === 'undefined') return null;
@@ -103,6 +104,46 @@ function DemoRequestModal({ onClose }: { onClose: () => void }) {
         </form>
       </div>
     </div>
+  );
+}
+
+function DocsFooter({ selectDoc, onRequestDemo }: { selectDoc: (id: string) => void; onRequestDemo: () => void }) {
+  const year = new Date().getFullYear();
+
+  return (
+    <footer className="docs-footer">
+      <div className="docs-footer-inner">
+        <div className="docs-footer-brand">
+          <div className="docs-footer-logo">
+            <img src={notifyLogoUrl} alt="Notify.ai" />
+            <span><span className="logo-text-notify">Notify</span><span className="logo-text-ai">.ai</span></span>
+          </div>
+          <p>
+            AI-assisted notification infrastructure for event-driven teams building smarter messaging workflows.
+          </p>
+        </div>
+
+        <nav className="docs-footer-links" aria-label="Footer navigation">
+          <div>
+            <h2>Docs</h2>
+            <button type="button" onClick={() => selectDoc('intro')}>Quick start</button>
+            <button type="button" onClick={() => selectDoc('client')}>Java SDK</button>
+            <button type="button" onClick={() => selectDoc('engine')}>Engine</button>
+          </div>
+          <div>
+            <h2>Project</h2>
+            <a href={GITHUB_REPO_URL} target="_blank" rel="noreferrer">GitHub</a>
+            <button type="button" onClick={onRequestDemo}>Request demo</button>
+            <a href={PRODUCTION_LOGIN_URL}>Hosted login</a>
+          </div>
+        </nav>
+      </div>
+
+      <div className="docs-footer-bottom">
+        <span>&copy; {year} Notify.ai</span>
+        <span>Early MVP. Built in public.</span>
+      </div>
+    </footer>
   );
 }
 
@@ -629,7 +670,7 @@ export default function App() {
               {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
             </button>
             <a
-              href="https://github.com/notify-ai-org/notify-ai"
+              href={GITHUB_REPO_URL}
               target="_blank"
               rel="noreferrer"
               className="github-btn"
@@ -685,6 +726,8 @@ export default function App() {
             </aside>
           )}
         </div>
+
+        <DocsFooter selectDoc={selectDoc} onRequestDemo={() => setDemoModalOpen(true)} />
       </div>
 
       {demoModalOpen && (

@@ -416,6 +416,98 @@ body {
   padding-left: calc(1.25rem - 2px);
 }
 
+/* Footer */
+.docs-footer {
+  width: 100%;
+  border-top: 1px solid hsl(var(--border-color));
+  background:
+    radial-gradient(circle at 12% 0%, hsla(var(--accent-color) / 0.08), transparent 34%),
+    hsla(var(--bg-sidebar) / 0.62);
+  padding: 2rem;
+}
+
+.docs-footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+  gap: 2rem;
+}
+
+.docs-footer-brand {
+  max-width: 440px;
+}
+
+.docs-footer-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.docs-footer-logo img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+
+.docs-footer-brand p {
+  color: hsl(var(--text-muted));
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.docs-footer-links {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.5rem;
+}
+
+.docs-footer-links h2 {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: hsl(var(--text-muted));
+  margin-bottom: 0.85rem;
+}
+
+.docs-footer-links a,
+.docs-footer-links button {
+  display: block;
+  width: fit-content;
+  border: 0;
+  background: transparent;
+  color: hsla(var(--text-main) / 0.82);
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  text-decoration: none;
+  cursor: pointer;
+  padding: 0.22rem 0;
+  transition: var(--transition-smooth);
+}
+
+.docs-footer-links a:hover,
+.docs-footer-links button:hover {
+  color: hsl(var(--accent-color));
+  transform: translateX(2px);
+}
+
+.docs-footer-bottom {
+  max-width: 1200px;
+  margin: 1.75rem auto 0;
+  padding-top: 1rem;
+  border-top: 1px solid hsl(var(--border-color));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: hsl(var(--text-muted));
+  font-size: 0.82rem;
+}
+
 /* Markdown Rendering Styles */
 .markdown-body h1 {
   font-size: 2.25rem;
@@ -665,6 +757,23 @@ body {
     background-color: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(4px);
     z-index: 95;
+  }
+
+  .docs-footer {
+    padding: 1.5rem 1rem;
+  }
+
+  .docs-footer-inner {
+    grid-template-columns: 1fr;
+  }
+
+  .docs-footer-links {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .docs-footer-bottom {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 
