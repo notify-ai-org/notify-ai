@@ -74,6 +74,22 @@ BEGIN
     END IF;
 END $$;
 
+-- Agent ids are logical runtime ids that can repeat across tenants and app
+-- restarts. Keep one latest snapshot per tenant + agent id instead of a global
+-- unique agent id constraint.
+DO $$
+BEGIN
+    IF to_regclass('public.agent_snapshots') IS NOT NULL THEN
+        ALTER TABLE agent_snapshots
+            DROP CONSTRAINT IF EXISTS agent_snapshots_agentid_key;
+
+        DROP INDEX IF EXISTS agent_snapshots_agentid_key;
+
+        CREATE UNIQUE INDEX IF NOT EXISTS agent_snapshots_tenant_agentid_key
+            ON agent_snapshots (tenant_id, agentid);
+    END IF;
+END $$;
+
 -- Adds the channel selected for a generated event schedule. Existing
 -- deployments may have compact or snake_case table names.
 DO $$

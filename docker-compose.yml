@@ -53,7 +53,7 @@ services:
       DB_NAME: notify_db
       DB_USER: notification_user
       DB_PASSWORD: ${DB_PASSWORD}
-      DDL_AUTO: create
+      DDL_AUTO: update
       REDIS_HOST: redis
       REDIS_ENABLED: true
       REDIS_PORT: 6379
