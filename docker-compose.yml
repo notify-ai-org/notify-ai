@@ -55,6 +55,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DDL_AUTO: create
       REDIS_HOST: redis
+      REDIS_ENABLED: true
       REDIS_PORT: 6379
       REDIS_USERNAME: default
       REDIS_PASSWORD: ${REDIS_PASSWORD}
