@@ -82,15 +82,55 @@ BEGIN
     IF to_regclass('public.agent_sessions') IS NOT NULL THEN
         ALTER TABLE agent_sessions
             DROP CONSTRAINT IF EXISTS agent_sessions_sessionid_key;
+        ALTER TABLE agent_sessions
+            DROP CONSTRAINT IF EXISTS idx_agent_sessions_session_id;
+        ALTER TABLE agent_sessions
+            DROP CONSTRAINT IF EXISTS agent_sessions_tenant_sessionid_key;
 
         DROP INDEX IF EXISTS agent_sessions_sessionid_key;
         DROP INDEX IF EXISTS idx_agent_sessions_session_id;
+        DROP INDEX IF EXISTS agent_sessions_tenant_sessionid_key;
+
+        IF to_regclass('public.session_events') IS NOT NULL THEN
+            WITH ranked_sessions AS (
+                SELECT
+                    id,
+                    first_value(id) OVER (
+                        PARTITION BY COALESCE(tenant_id, ''), sessionid
+                        ORDER BY updatedat DESC NULLS LAST, createdat DESC NULLS LAST, id DESC
+                    ) AS keep_id,
+                    row_number() OVER (
+                        PARTITION BY COALESCE(tenant_id, ''), sessionid
+                        ORDER BY updatedat DESC NULLS LAST, createdat DESC NULLS LAST, id DESC
+                    ) AS rn
+                FROM agent_sessions
+            )
+            UPDATE session_events event
+            SET session_id = ranked.keep_id
+            FROM ranked_sessions ranked
+            WHERE event.session_id = ranked.id
+              AND ranked.rn > 1;
+        END IF;
+
+        WITH ranked_sessions AS (
+            SELECT
+                id,
+                row_number() OVER (
+                    PARTITION BY COALESCE(tenant_id, ''), sessionid
+                    ORDER BY updatedat DESC NULLS LAST, createdat DESC NULLS LAST, id DESC
+                ) AS rn
+            FROM agent_sessions
+        )
+        DELETE FROM agent_sessions session
+        USING ranked_sessions ranked
+        WHERE session.id = ranked.id
+          AND ranked.rn > 1;
 
         CREATE INDEX IF NOT EXISTS idx_agent_sessions_session_id
             ON agent_sessions (sessionid);
 
         CREATE UNIQUE INDEX IF NOT EXISTS agent_sessions_tenant_sessionid_key
-            ON agent_sessions (tenant_id, sessionid);
+            ON agent_sessions (COALESCE(tenant_id, ''), sessionid);
     END IF;
 END $$;
 
