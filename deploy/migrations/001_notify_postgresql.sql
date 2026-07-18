@@ -138,15 +138,63 @@ END $$;
 -- restarts. Keep one latest snapshot per tenant + agent id instead of a global
 -- unique agent id constraint.
 DO $$
+DECLARE
+    constraint_name TEXT;
+    index_name TEXT;
 BEGIN
     IF to_regclass('public.agent_snapshots') IS NOT NULL THEN
+        ALTER TABLE agent_snapshots ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(255);
+
         ALTER TABLE agent_snapshots
             DROP CONSTRAINT IF EXISTS agent_snapshots_agentid_key;
 
+        FOR constraint_name IN
+            SELECT con.conname
+            FROM pg_constraint con
+            JOIN pg_class rel ON rel.oid = con.conrelid
+            JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+            WHERE nsp.nspname = 'public'
+              AND rel.relname = 'agent_snapshots'
+              AND con.contype = 'u'
+              AND (
+                    SELECT array_agg(att.attname ORDER BY ord.ordinality)
+                    FROM unnest(con.conkey) WITH ORDINALITY AS ord(attnum, ordinality)
+                    JOIN pg_attribute att
+                      ON att.attrelid = rel.oid
+                     AND att.attnum = ord.attnum
+                  ) = ARRAY['agentid']
+        LOOP
+            EXECUTE format('ALTER TABLE public.agent_snapshots DROP CONSTRAINT IF EXISTS %I', constraint_name);
+        END LOOP;
+
+        FOR index_name IN
+            SELECT idx.relname
+            FROM pg_index i
+            JOIN pg_class tbl ON tbl.oid = i.indrelid
+            JOIN pg_namespace nsp ON nsp.oid = tbl.relnamespace
+            JOIN pg_class idx ON idx.oid = i.indexrelid
+            JOIN pg_attribute att ON att.attrelid = tbl.oid AND att.attnum = i.indkey[0]
+            WHERE nsp.nspname = 'public'
+              AND tbl.relname = 'agent_snapshots'
+              AND i.indisunique
+              AND NOT i.indisprimary
+              AND i.indnatts = 1
+              AND att.attname = 'agentid'
+        LOOP
+            EXECUTE format('DROP INDEX IF EXISTS public.%I', index_name);
+        END LOOP;
+
         DROP INDEX IF EXISTS agent_snapshots_agentid_key;
+        DROP INDEX IF EXISTS agent_snapshots_tenant_agentid_key;
+
+        DELETE FROM agent_snapshots older
+        USING agent_snapshots newer
+        WHERE COALESCE(older.tenant_id, '') = COALESCE(newer.tenant_id, '')
+          AND older.agentid = newer.agentid
+          AND older.ctid < newer.ctid;
 
         CREATE UNIQUE INDEX IF NOT EXISTS agent_snapshots_tenant_agentid_key
-            ON agent_snapshots (tenant_id, agentid);
+            ON agent_snapshots (COALESCE(tenant_id, ''), agentid);
     END IF;
 END $$;
 
