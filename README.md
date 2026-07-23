@@ -12,19 +12,6 @@
 
 Unlike traditional notification services that simply dispatch static text, Notify.ai **understands your user's context**. Designed for seamless integration into existing businesses (e-commerce, banking, healthcare), it securely intercepts domain events from your upstream applications. Utilizing advanced LLM orchestration, it intelligently extracts underlying facts over time, builds a comprehensive memory graph of user behavior, dynamically generates highly contextual message templates, and reliably dispatches them across multiple out-bound channels (Email, SMS, Push, Webhooks) when the user is most receptive.
 
-## 🏗️ Architecture & Project Structure
-
-This repository is built as a multi-module Maven project to enforce clear separation of concerns:
-
-- **[access](file:///Users/rohannaik/Desktop/notify/access/README.md)**: Main web API entrypoint, exposing REST controllers and serving static administration portal files.
-- **[acp-server (Agent Control Plane)](file:///Users/rohannaik/Desktop/notify/acp-server/README.md)**: The "brain" of the operation. Orchestrates GenAI agents (using Google ADK) to process incoming events, extract actionable facts, generate targeted schedules, and formulate intelligent notification templates.
-- **[engine](file:///Users/rohannaik/Desktop/notify/engine/README.md)**: The robust delivery mechanism. Handles the reliable execution of notification jobs, interacts with external channel providers, and manages failures via an advanced Dead Letter Queue (DLQ) mechanism.
-- **[client](file:///Users/rohannaik/Desktop/notify/client/README.md)**: A lightweight Java SDK meant to be embedded directly into your source applications. It uses Aspect-Oriented Programming (AOP) to intercept method executions, securely packaging them as semantic events, and pushes them to the `acp-server`.
-- **[annotations](file:///Users/rohannaik/Desktop/notify/annotations/README.md)**: Custom diagnostic annotations (`@Event`, `@Vocabulary`, `@Rule`, etc.) used seamlessly by the client SDK to strictly define event schemas and vocabulary rules with minimal boilerplate.
-- **[api](file:///Users/rohannaik/Desktop/notify/api/README.md)**: A shared module containing core data models (Entities, DTOs), JPA repositories, and common event interfaces used across both the Engine and ACP Server.
-- **[common](file:///Users/rohannaik/Desktop/notify/common/README.md)**: Infrastructure configuration classes (Kafka, security, JWT helpers) shared across Maven modules.
-- **[notify-ui](file:///Users/rohannaik/Desktop/notify/notify-ui/README.md)**: The administration portals built as React microfrontends under Vite.
-- **[examples](file:///Users/rohannaik/Desktop/notify/examples)**: Fully functional sample applications ([ecommerce-app](file:///Users/rohannaik/Desktop/notify/examples/ecommerce-app/README.md), [banking-app](file:///Users/rohannaik/Desktop/notify/examples/banking-app/README.md)) demonstrating how to integrate the client SDK.
 
 ## 🚀 Running Locally
 
@@ -37,7 +24,20 @@ mvn clean install
 ```
 
 ### 2. Stand up Backend Services
-Ensure **MySQL** (port `3306`) and **Redis** (port `6379`) are running on localhost. Create a MySQL database named `notify`.
+Ensure **PostgreSQL** and **Redis** are running locally. The bundled Compose
+file can start both dependencies with the same service names and credentials
+used by the application:
+
+```bash
+export DB_PASSWORD=change-me
+export REDIS_PASSWORD=change-me
+docker compose up -d postgres redis
+docker compose ps
+```
+
+PostgreSQL is exposed on `127.0.0.1:5432` with database `notify_db` and user
+`notification_user`. Redis is exposed on `127.0.0.1:6379` and requires the
+password from `REDIS_PASSWORD`.
 
 ### 3. Run the Backend Server
 Launch the Spring Boot backend (`access` module):
@@ -68,13 +68,81 @@ mvn spring-boot:run -pl examples/ecommerce-app
 mvn spring-boot:run -pl examples/banking-app
 ```
 
+## 🐳 Running Locally With Docker Compose
+
+The root `docker-compose.yml` can be used to run the app locally with its
+PostgreSQL and Redis dependencies.
+
+- `postgres` - PostgreSQL 16 database.
+- `redis` - Redis 7 with password authentication.
+- `vocab-agent` - the Notify.ai application image built from this repository.
+
+### Environment Variables
+
+Compose reads variables from your shell or from a local `.env` file in the repo
+root. At minimum, provide:
+
+```bash
+DB_PASSWORD=change-me
+REDIS_PASSWORD=change-me
+OPENAI_API_KEY=sk-change-me
+```
+
+Optional values include `GROQ_API_KEY`, `SERVER_PORT`, `MANAGEMENT_PORT`,
+`ACP_CORS_ALLOWED_ORIGINS`, and embedding model settings.
+
+Keep local env files out of git and do not commit secrets.
+
+### Start Dependencies Only
+
+```bash
+export DB_PASSWORD=change-me
+export REDIS_PASSWORD=change-me
+docker compose up -d postgres redis
+mvn spring-boot:run -pl access
+```
+
+### Start the App With Compose
+
+```bash
+export DB_PASSWORD=change-me
+export REDIS_PASSWORD=change-me
+export OPENAI_API_KEY=sk-change-me
+docker compose up -d --build postgres redis vocab-agent
+```
+
+The application is configured inside Compose to listen on the container network.
+Use the Maven workflow above if you want the backend directly on
+`http://localhost:8080` while still using Docker for Postgres and Redis.
+
+### Useful Compose Commands
+
+```bash
+# Show container status
+docker compose ps
+
+# Follow application logs
+docker compose logs -f vocab-agent
+
+# Open psql in the Compose Postgres container
+docker compose exec postgres psql -U notification_user -d notify_db
+
+# Run a one-off SQL statement
+docker compose exec postgres \
+  psql -U notification_user -d notify_db \
+  -c "ALTER TABLE message_templates ALTER COLUMN template TYPE TEXT;"
+
+# Stop containers but keep volumes
+docker compose down
+```
+
 ---
 
 ## 👥 Developer Contact & Contributing
 
 For questions, issues, or support:
 - **Lead Developer**: Rohan Naik ([rohan.naik07@github](https://github.com/rohan-naik07))
-- **Email**: dev-support@notify.ai
+- **Email**: rohan.notify.admin1203@gmail.com
 
 ### Contributing
 

@@ -25,23 +25,32 @@ public class NotifyConfig {}
 ```
 
 ### 3. Application Properties
-Configure connection parameters in your `application.yml` or `application.properties`:
+Sign in to the Notify.ai portal, open **Clients**, generate a client, and copy
+the generated **Client ID**. Add it to your Spring Boot application's
+`application.properties`:
 
-```yaml
-notify:
-  base-package: com.myapp
-  application-name: my-service
-  client-token: ${NOTIFY_CLIENT_TOKEN}
+```properties
+notify.ai.properties.base-package=com.myapp
+notify.ai.properties.application-name=my-service
+notify.ai.properties.acp-server-url=http://localhost:8080
+notify.ai.properties.client-token=client-your-generated-id
 ```
+
+Use `notify.ai.properties.acp-server-url=http://localhost:8080` only when the
+Notify.ai backend is running locally for testing. For any hosted or shared
+environment, point this property to that environment's Notify.ai backend URL.
+
+The current SDK property name is `client-token`; paste the generated Client ID
+as its value.
 
 ---
 
 # Steps for integrating the SDK
 
 - Add dependencies to your `pom.xml`
-- Sign in to the Notify.ai portal and generate a client token
+- Sign in to the Notify.ai portal and generate a client ID
 - Enable the SDK by annotating a configuration class with `@EnableNotify` and specify the packages to scan
-- Configure connection parameters in your `application.yml` or `application.properties`
+- Configure connection parameters in your `application.properties`
 - Add relevant annotations to your business logic
 
 ##  Annotation Reference
