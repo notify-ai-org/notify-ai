@@ -19,6 +19,82 @@ CREATE INDEX IF NOT EXISTS idx_memory_page_namespace
 CREATE INDEX IF NOT EXISTS idx_memory_page_correlation_id
     ON memory_page (correlation_id);
 
+-- Agent configuration is seeded from agents.json on startup, then managed in DB.
+CREATE TABLE IF NOT EXISTS agent_configs (
+    id VARCHAR(128) NOT NULL,
+    name VARCHAR(255),
+    description TEXT,
+    resourcePath VARCHAR(255),
+    inputSchemaTitle VARCHAR(255),
+    inputSchemaDescription TEXT,
+    inputClass VARCHAR(255),
+    outputSchemaTitle VARCHAR(255),
+    outputSchemaDescription TEXT,
+    outputClass VARCHAR(255),
+    outputType VARCHAR(255),
+    outputKey VARCHAR(255),
+    model VARCHAR(255),
+    instances INTEGER NOT NULL DEFAULT 1,
+    maxLlmCalls INTEGER NOT NULL DEFAULT 0,
+    bypassStateInjection BOOLEAN NOT NULL DEFAULT FALSE,
+    createdAt TIMESTAMP WITH TIME ZONE,
+    updatedAt TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (id)
+);
+
+CREATE TABLE IF NOT EXISTS agent_config_tools (
+    agent_id VARCHAR(128) NOT NULL,
+    position INTEGER,
+    tool VARCHAR(255)
+);
+
+ALTER TABLE agent_config_tools
+    ADD COLUMN IF NOT EXISTS position INTEGER;
+
+CREATE INDEX IF NOT EXISTS idx_agent_config_tools_agent_id
+    ON agent_config_tools (agent_id);
+
+CREATE TABLE IF NOT EXISTS agent_config_feedback_instructions (
+    agent_id VARCHAR(128) NOT NULL,
+    position INTEGER,
+    instruction TEXT
+);
+
+ALTER TABLE agent_config_feedback_instructions
+    ADD COLUMN IF NOT EXISTS position INTEGER;
+
+CREATE INDEX IF NOT EXISTS idx_agent_config_feedback_agent_id
+    ON agent_config_feedback_instructions (agent_id);
+
+-- Session events now participate in the RawLog -> fact extraction pipeline.
+DO $$
+BEGIN
+    IF to_regclass('public.session_events') IS NOT NULL THEN
+        ALTER TABLE session_events ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP WITH TIME ZONE;
+        ALTER TABLE session_events ADD COLUMN IF NOT EXISTS processingStatus VARCHAR(16) DEFAULT 'PENDING';
+        ALTER TABLE session_events ADD COLUMN IF NOT EXISTS processed boolean DEFAULT false;
+        ALTER TABLE session_events ADD COLUMN IF NOT EXISTS processedAt TIMESTAMP WITH TIME ZONE;
+
+        UPDATE session_events
+        SET timestamp = occurredAt
+        WHERE timestamp IS NULL AND occurredAt IS NOT NULL;
+    END IF;
+END $$;
+
+-- Fact-level memory dedup stores sentence embeddings and keeps audit history
+-- by superseding older facts instead of deleting them.
+DO $$
+BEGIN
+    IF to_regclass('public.facts') IS NOT NULL THEN
+        ALTER TABLE facts ADD COLUMN IF NOT EXISTS embedding BYTEA;
+        ALTER TABLE facts ADD COLUMN IF NOT EXISTS supersededAt TIMESTAMP WITH TIME ZONE;
+        ALTER TABLE facts ADD COLUMN IF NOT EXISTS supersededByFactId VARCHAR(128);
+        CREATE INDEX IF NOT EXISTS idx_facts_client_active_observed
+            ON facts (clientId, observedAt)
+            WHERE supersededAt IS NULL;
+    END IF;
+END $$;
+
 -- Existing databases may have created message_templates.template as
 -- VARCHAR(2048), but generated EMAIL templates are full HTML documents.
 DO $$
