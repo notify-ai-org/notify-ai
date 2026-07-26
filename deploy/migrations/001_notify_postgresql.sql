@@ -66,6 +66,41 @@ ALTER TABLE agent_config_feedback_instructions
 CREATE INDEX IF NOT EXISTS idx_agent_config_feedback_agent_id
     ON agent_config_feedback_instructions (agent_id);
 
+-- Captures each LogToMemoryAgentWorker run, including empty/skipped runs.
+CREATE TABLE IF NOT EXISTS worker_run_log (
+    id VARCHAR(128) NOT NULL,
+    createdAt TIMESTAMP WITH TIME ZONE NOT NULL,
+    updatedAt TIMESTAMP WITH TIME ZONE NOT NULL,
+    tenant_id VARCHAR(255),
+    validated BOOLEAN NOT NULL DEFAULT FALSE,
+    validatedAt TIMESTAMP WITH TIME ZONE,
+    validatedBy VARCHAR(255),
+    correlationId VARCHAR(255),
+    workerName VARCHAR(255),
+    status VARCHAR(255),
+    startedAt TIMESTAMP WITH TIME ZONE,
+    finishedAt TIMESTAMP WITH TIME ZONE,
+    durationMillis BIGINT NOT NULL DEFAULT 0,
+    batchSize INTEGER NOT NULL DEFAULT 0,
+    processedCount INTEGER NOT NULL DEFAULT 0,
+    failedCount INTEGER NOT NULL DEFAULT 0,
+    factsExtracted INTEGER NOT NULL DEFAULT 0,
+    pagesUpdated INTEGER NOT NULL DEFAULT 0,
+    sourceType VARCHAR(255),
+    detailsJson TEXT,
+    error TEXT,
+    PRIMARY KEY (id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_worker_run_log_worker_name
+    ON worker_run_log (workerName);
+
+CREATE INDEX IF NOT EXISTS idx_worker_run_log_status
+    ON worker_run_log (status);
+
+CREATE INDEX IF NOT EXISTS idx_worker_run_log_started_at
+    ON worker_run_log (startedAt);
+
 -- Session events now participate in the RawLog -> fact extraction pipeline.
 DO $$
 BEGIN
