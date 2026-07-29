@@ -19,6 +19,12 @@ CREATE INDEX IF NOT EXISTS idx_memory_page_namespace
 CREATE INDEX IF NOT EXISTS idx_memory_page_correlation_id
     ON memory_page (correlation_id);
 
+ALTER TABLE memory_page
+    ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(255);
+
+CREATE INDEX IF NOT EXISTS idx_memory_page_tenant_id
+    ON memory_page (tenant_id);
+
 -- Agent configuration is seeded from agents.json on startup, then managed in DB.
 CREATE TABLE IF NOT EXISTS agent_configs (
     id VARCHAR(128) NOT NULL,
