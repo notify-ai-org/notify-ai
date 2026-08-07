@@ -1,0 +1,19 @@
+[
+  {
+    "timestamp": "2026-08-07T03:00:00Z",
+    "correlationId": "idempotency-concurrency-test",
+    "payload": {
+      "orderId": "idem-order-001",
+      "customerId": "idem-customer-001",
+      "amount": 100
+    },
+    "event": {
+      "name": "IDEMPOTENCY_TEST_EVENT",
+      "description": "Concurrent idempotency integration test",
+      "priority": 1,
+      "eventType": "TEST"
+    },
+    "durationMillis": 1,
+    "serviceName": "idempotency-test"
+  }
+]
