@@ -3,6 +3,7 @@
 /api/target
 /acp-server/target
 /engine/target
+/artifact-engine/target
 /client/target
 /examples/ecommerce-app/target
 /examples/banking-app/target
