@@ -28,3 +28,6 @@
 [submodule "adk-java"]
 	path = adk-java
 	url = https://github.com/notify-ai-org/adk-java.git
+[submodule "artifact-engine"]
+	path = artifact-engine
+	url = https://github.com/notify-ai-org/artifact-engine.git
