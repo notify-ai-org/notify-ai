@@ -7,9 +7,6 @@
 [submodule "acp-server"]
 	path = acp-server
 	url = https://github.com/notify-ai-org/acp-server.git
-[submodule "annotations"]
-	path = annotations
-	url = https://github.com/notify-ai-org/annotations.git
 [submodule "client"]
 	path = client
 	url = https://github.com/notify-ai-org/client.git
