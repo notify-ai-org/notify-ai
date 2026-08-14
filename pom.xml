@@ -36,7 +36,6 @@
     </scm>
     
     <modules>
-        <module>annotations</module>
         <module>api</module>
         <module>common</module>
         <module>acp-server</module>
