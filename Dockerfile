@@ -14,6 +14,7 @@ COPY adk-java/pom.xml adk-java/
 COPY adk-java/core/pom.xml adk-java/core/
 COPY adk-java/a2a/pom.xml adk-java/a2a/
 COPY engine/pom.xml engine/
+COPY artifact-engine/pom.xml artifact-engine/
 COPY access/pom.xml access/
 COPY common/pom.xml common/
 COPY examples/ecommerce-app/pom.xml examples/ecommerce-app/
