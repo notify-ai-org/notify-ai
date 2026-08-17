@@ -42,6 +42,7 @@
         <module>access</module>
         <module>client</module>
         <module>engine</module>
+        <module>artifact-engine</module>
         <module>adk-java</module>
         <module>examples/ecommerce-app</module>
         <module>examples/banking-app</module>
