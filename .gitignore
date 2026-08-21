@@ -10,6 +10,10 @@
 /adk-java/core/target
 /adk-java/a2a/target
 
+# Local documentation and asset workspaces
+/docs/
+/assets/
+
 # Local overrides — never commit sensitive config
 /acp-server/src/main/resources/application-local.properties
 
