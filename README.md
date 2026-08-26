@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/notify-ai-logo.svg" alt="Notify.ai" width="96" />
+  <img src="notify-docs/src/assets/notify-ai-logo.svg" alt="Notify.ai" width="96" />
 </p>
 
 <h1 align="center">Notify.ai</h1>
