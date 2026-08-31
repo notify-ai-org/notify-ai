@@ -309,6 +309,16 @@ body {
   transform: translateY(-1px);
 }
 
+.product-hunt-btn {
+  border-color: #da552f;
+}
+
+.product-hunt-btn:hover {
+  border-color: #da552f;
+  color: #f26b45;
+  background: rgba(218, 85, 47, 0.1);
+}
+
 .theme-toggle-btn,
 .github-btn {
   background: transparent;

@@ -1,6 +1,7 @@
 import introRaw from './intro.md?raw';
 import acpServerRaw from './acp_server.md?raw';
 import engineRaw from './engine.md?raw';
+import artifactEngineRaw from './artifact_engine.md?raw';
 import clientRaw from './client.md?raw';
 import ecommerceRaw from './ecommerce_app.md?raw';
 import bankingRaw from './banking_app.md?raw';
@@ -43,6 +44,12 @@ export const docsRegistry: DocCategory[] = [
         title: 'Execution & Delivery Engine',
         category: 'Core Modules',
         content: engineRaw,
+      },
+      {
+        id: 'artifact-engine',
+        title: 'Artifact Storage and Retrieval Engine',
+        category: 'Core Modules',
+        content: artifactEngineRaw,
       },
     ],
   },

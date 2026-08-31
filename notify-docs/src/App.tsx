@@ -31,6 +31,7 @@ interface LandingPageProps {
 const ADMIN_DEMO_EMAIL = 'rohan.notify.admin1203@gmail.com';
 const PRODUCTION_LOGIN_URL = 'https://app.notify-ai.dev/portals/login/';
 const GITHUB_REPO_URL = 'https://github.com/notify-ai-org/notify-ai';
+const PRODUCT_HUNT_URL = 'https://www.producthunt.com/products/notify-ai?utm_source=other&utm_medium=social';
 
 function ModalPortal({ children }: { children: ReactNode }) {
   if (typeof document === 'undefined') return null;
@@ -659,6 +660,14 @@ export default function App() {
           </div>
 
           <div className="header-actions">
+            <a
+              className="docs-secondary-btn product-hunt-btn"
+              href={PRODUCT_HUNT_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Product Hunt
+            </a>
             <button className="docs-primary-btn" onClick={() => setDemoModalOpen(true)}>
               Request demo
             </button>

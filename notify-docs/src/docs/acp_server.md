@@ -12,9 +12,28 @@ The ACP Server accepts structured events emitted by registered client SDKs. Each
 
 Events can be ingested through low-latency APIs or through streaming infrastructure for higher-throughput deployments. Both paths feed the same processing pipeline, so teams can start with simple integration and move to streaming as scale increases.
 
-### 2. Domain Understanding
+### 2. Domain Context Understanding
 
 Notify.ai uses vocabulary metadata from the client SDK to understand the meaning of application-specific payloads. This lets the control plane reason about domain objects such as orders, accounts, carts, customers, transactions, appointments, or any other model exposed by the application.
+
+The control plane can also learn stable business context from the organization's website. Playwright
+opens and renders the site as a browser would, allowing client-rendered content and the visible
+design to be evaluated. The **Domain Content Agent** uses that rendered view to generate reusable
+domain values such as the business name, website and logo references, brand colors, typography,
+visual style, tone, support details, important links, taglines, and other approved business content.
+These values help generated notifications follow the organization's website theme and brand
+language instead of using generic styling.
+
+Website-derived values are reviewed as domain content and kept separate from event-specific or
+user-specific data. They can then be referenced consistently during message-template generation
+and delivery rendering.
+
+For deeper domain knowledge, applications can add policies, product guides, help content, and other
+reference documents to a tenant-scoped knowledge base backed by the **Artifact Storage and
+Retrieval Engine**. The Artifact Engine securely stores the source material and makes its extracted
+content searchable. Authorized control-plane agents can retrieve relevant knowledge when reasoning
+about an event, grounding their output in the organization's own content alongside the structured
+vocabulary and website-derived domain values.
 
 This domain context helps agents decide:
 

@@ -1,13 +1,39 @@
-Unlike traditional notification services that simply dispatch static text, Notify.ai understands user and event context. It captures annotated domain events from upstream applications, extracts useful facts over time, builds memory around user behavior, generates contextual message templates, and dispatches notifications across channels such as email, SMS, push, and webhooks.
+**Notify.ai** is an enterprise-grade, multi-module intelligent notification orchestration platform built on top of **Google ADK**. Unlike traditional notification services that simply dispatch static text, Notify.ai understands user and event context. It captures annotated domain events from upstream applications, extracts useful facts over time, builds memory around user behavior, generates contextual message templates, and dispatches notifications across channels such as email, SMS, push, and webhooks.
 
-##  Architecture & Project Structure
+## Sign In and Generate a Client ID
 
-Notify.ai is organized around clear product boundaries:
+After login, open the **Clients** portal and generate a client. Copy the
+generated **Client ID**. Your Spring Boot application uses this ID when the
+Notify.ai SDK registers its scanned events, vocabulary, rules, and callbacks.
 
-- **Agent Control Plane**: Coordinates AI agents that process events, extract facts, plan schedules, and generate intelligent notification templates.
-- **Notification Engine**: Executes delivery through outbound channels and records delivery attempts, retries, and failures.
-- **Client SDK**: Embeds into source applications and captures annotated domain events.
-- **Admin Portals**: Provide tenant, event, schedule, template, memory, rule, and delivery-observability workflows.
+## Add the client SDK dependency to your application's `pom.xml`:
+
+```xml
+<dependency>
+  <groupId>dev.notify-ai</groupId>
+  <artifactId>notify-ai-agent-client</artifactId>
+  <version>1.0.1</version>
+</dependency>
+```
+
+##  Add the Client ID to Your Spring Boot App
+In the upstream Spring Boot application that embeds the Notify.ai client SDK,
+add the generated Client ID to `src/main/resources/application.properties`:
+
+```properties
+notify.ai.properties.base-package=com.myapp
+notify.ai.properties.application-name=my-service
+notify.ai.properties.client-token=client-your-generated-id
+```
+
+Use `notify.ai.properties.acp-server-url=http://localhost:8080` only when the
+Notify.ai backend is running locally for testing. For any hosted or shared
+environment, set this value to that environment's Notify.ai backend URL.
+
+The current SDK property name is `client-token`, but the value to paste here is
+the **Client ID** generated in the portal.
+
+Define your business events, subjects, and rules using client SDK as shown in the Developer SDK section.
 
 ##  Running Locally
 
@@ -41,36 +67,7 @@ npm install
 npm run dev
 ```
 
-### 5. Sign In and Generate a Client ID
-Open the admin portal and sign in:
-
-```text
-http://localhost:8080/portals/login/
-```
-
-After login, open the **Clients** portal and generate a client. Copy the
-generated **Client ID**. Your Spring Boot application uses this ID when the
-Notify.ai SDK registers its scanned events, vocabulary, rules, and callbacks.
-
-### 6. Add the Client ID to Your Spring Boot App
-In the upstream Spring Boot application that embeds the Notify.ai client SDK,
-add the generated Client ID to `src/main/resources/application.properties`:
-
-```properties
-notify.ai.properties.base-package=com.myapp
-notify.ai.properties.application-name=my-service
-notify.ai.properties.acp-server-url=http://localhost:8080
-notify.ai.properties.client-token=client-your-generated-id
-```
-
-Use `notify.ai.properties.acp-server-url=http://localhost:8080` only when the
-Notify.ai backend is running locally for testing. For any hosted or shared
-environment, set this value to that environment's Notify.ai backend URL.
-
-The current SDK property name is `client-token`, but the value to paste here is
-the **Client ID** generated in the portal.
-
-### 7. Run Example Applications
+### 5. Run Example Applications
 Test the end-to-end integration by running one of the sample apps:
 ```bash
 mvn spring-boot:run -pl examples/ecommerce-app

@@ -32,13 +32,11 @@ the generated **Client ID**. Add it to your Spring Boot application's
 ```properties
 notify.ai.properties.base-package=com.myapp
 notify.ai.properties.application-name=my-service
-notify.ai.properties.acp-server-url=http://localhost:8080
 notify.ai.properties.client-token=client-your-generated-id
 ```
 
-Use `notify.ai.properties.acp-server-url=http://localhost:8080` only when the
-Notify.ai backend is running locally for testing. For any hosted or shared
-environment, point this property to that environment's Notify.ai backend URL.
+Use `notify.ai.properties.acp-server-url=http://localhost:8080` when the
+Notify.ai backend is running locally for testing.
 
 The current SDK property name is `client-token`; paste the generated Client ID
 as its value.
@@ -255,7 +253,9 @@ public Map<String, Object> supplyOrderContext() {
 ### `@SubjectSupplier`
 **Target:** Method
 
-Marks a method that returns the list of **notification recipients** or subject identifiers for a specific event. The method typically returns email addresses, phone numbers, user IDs, account IDs, or other identifiers used by Notify.ai to resolve the notification audience.
+Marks a method that supplies the typed **notification subjects** for a specific event. The method
+must return a `List<Subject>` rather than a list of strings. Each `Subject` identifies both the
+delivery channel and that channel's destination address.
 
 **Attributes**
 
@@ -264,16 +264,90 @@ Marks a method that returns the list of **notification recipients** or subject i
 | `event` | String |  | The event key this supplier provides subjects for. |
 | `description` | String |  | Description of the recipient resolution logic. |
 
-**Example**
+**Subject types**
+
+| Type | Channel | Destination | Additional values |
+|------|---------|-------------|-------------------|
+| `EmailSubject` | `EMAIL` | Email address | Optional CC and BCC addresses |
+| `SmsSubject` | `SMS` | Phone number | Common subject attributes |
+| `PushSubject` | `PUSH` | Device token | Common subject attributes |
+| `WebhookSubject` | `WEBHOOK` | Webhook URL | Common subject attributes |
+
+All subject types support a correlation ID and a `Map<String, String>` of application attributes.
+If the correlation ID is `null`, the SDK generates one. Attributes can carry non-sensitive routing
+or personalization context associated with the subject.
+
+**Email example**
+
 ```java
+import com.notify.agent.annotations.SubjectSupplier;
+import com.notify.agent.client.models.subject.EmailSubject;
+import com.notify.agent.client.models.subject.Subject;
+import java.util.List;
+import java.util.Map;
+
 @SubjectSupplier(
     event = "order.placed",
-    description = "Returns the email address of the customer who placed the order"
+    description = "Returns the customer who should receive the order confirmation"
 )
-public List<String> getOrderSubjects(Order order) {
-    return List.of(order.getCustomer().getEmail());
+public List<Subject> getOrderSubjects(Order order) {
+    Customer customer = order.getCustomer();
+
+    return List.of(new EmailSubject(
+        customer.getEmail(),
+        null,                              // CC
+        null,                              // BCC
+        String.valueOf(order.getId()),     // correlation ID
+        Map.of("customerId", String.valueOf(customer.getId()))
+    ));
 }
 ```
+
+**Multi-channel example**
+
+One supplier can return different subject types when the same event should reach multiple
+destinations:
+
+```java
+import com.notify.agent.annotations.SubjectSupplier;
+import com.notify.agent.client.models.subject.EmailSubject;
+import com.notify.agent.client.models.subject.PushSubject;
+import com.notify.agent.client.models.subject.SmsSubject;
+import com.notify.agent.client.models.subject.Subject;
+import com.notify.agent.client.models.subject.WebhookSubject;
+import java.util.List;
+import java.util.Map;
+
+@SubjectSupplier(
+    event = "payment.failed",
+    description = "Returns customer and operations destinations for a failed payment"
+)
+public List<Subject> getPaymentFailureSubjects(Payment payment) {
+    Customer customer = payment.getCustomer();
+    String correlationId = String.valueOf(payment.getId());
+    Map<String, String> attributes = Map.of(
+        "customerId", String.valueOf(customer.getId()),
+        "paymentId", String.valueOf(payment.getId())
+    );
+
+    return List.of(
+        new EmailSubject(
+            customer.getEmail(), null, null, correlationId, attributes),
+        new SmsSubject(
+            customer.getPhoneNumber(), correlationId, attributes),
+        new PushSubject(
+            customer.getDeviceToken(), correlationId, attributes),
+        new WebhookSubject(
+            "https://operations.example.com/hooks/payment-failed",
+            correlationId,
+            attributes)
+    );
+}
+```
+
+The SDK validates the supplier result before adding it to the captured event. A `null` list, a
+non-`Subject` item, or a subject with a blank destination is recorded as a supplier failure. Return
+an empty list when an event intentionally has no recipients.
 
 ---
 
