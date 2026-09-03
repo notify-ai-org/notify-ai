@@ -73,6 +73,9 @@ services:
       EMBEDDING_MODELS: ${EMBEDDING_MODELS:-text-embedding-3-small}
       EMBEDDING_QUERY_MODEL: ${EMBEDDING_QUERY_MODEL:-text-embedding-3-small}
       EMBEDDING_API_PATH: ${EMBEDDING_API_PATH:-/embeddings}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-} 
+      AWS_REGION: ap-south-1
     expose:
       - "${SERVER_PORT:-8080}"
     ports:
