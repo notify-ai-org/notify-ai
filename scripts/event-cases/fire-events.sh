@@ -19,16 +19,16 @@ request() {
   printf '\n'
 }
 
-request "ORDER_PLACED" "/api/orders/place" "$(cat <<JSON
-{
-  "orderId": "ORD-PLACED-${RUN_ID}",
-  "customerId": "${CUSTOMER_ID}",
-  "amount": 249.99,
-  "items": ["Mechanical Keyboard", "Wireless Mouse"],
-  "shippingAddress": "42 MG Road, Bengaluru, Karnataka 560001"
-}
-JSON
-)"
+# request "ORDER_PLACED" "/api/orders/place" "$(cat <<JSON
+# {
+#   "orderId": "ORD-PLACED-${RUN_ID}",
+#   "customerId": "${CUSTOMER_ID}",
+#   "amount": 249.99,
+#   "items": ["Mechanical Keyboard", "Wireless Mouse"],
+#   "shippingAddress": "42 MG Road, Bengaluru, Karnataka 560001"
+# }
+# JSON
+# )"
 
 # request "PAYMENT_FAILED" "/api/orders/payment-failed" "$(cat <<JSON
 # {
@@ -42,16 +42,16 @@ JSON
 # )"
 
 # # ORDER_SHIPPED resolves its recipient from an order already stored by ORDER_PLACED.
-# request "ORDER_PLACED (shipment prerequisite)" "/api/orders/place" "$(cat <<JSON
-# {
-#   "orderId": "ORD-SHIPPED-${RUN_ID}",
-#   "customerId": "${CUSTOMER_ID}",
-#   "amount": 129.99,
-#   "items": ["Smart Watch"],
-#   "shippingAddress": "42 MG Road, Bengaluru, Karnataka 560001"
-# }
-# JSON
-# )"
+request "ORDER_PLACED (shipment prerequisite)" "/api/orders/place" "$(cat <<JSON
+{
+  "orderId": "ORD-SHIPPED-${RUN_ID}",
+  "customerId": "${CUSTOMER_ID}",
+  "amount": 129.99,
+  "items": ["Smart Watch"],
+  "shippingAddress": "42 MG Road, Bengaluru, Karnataka 560001"
+}
+JSON
+)"
 
 # request "ORDER_SHIPPED" "/api/orders/ship" "$(cat <<JSON
 # {
