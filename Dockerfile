@@ -37,14 +37,26 @@ COPY . .
 RUN --mount=type=cache,target=/root/.m2 \
     mvn clean package -DskipTests -T 1C ${MAVEN_RETRY_OPTS}
 
-# Stage 2: Create the runtime image using GraalVM JDK
-FROM ghcr.io/graalvm/jdk-community:17
+# Stage 2: Ubuntu provides the system libraries supported by Playwright Chromium.
+FROM eclipse-temurin:17-jdk-jammy
 
 WORKDIR /app
 
 # Copy the built jar from the builder stage
 # The spring-boot-maven-plugin repackages the jar to be executable
 COPY --from=builder /app/access/target/vocabulary-agent-access-1.0.0.jar app.jar
+
+# Install the exact browser revision required by the Playwright dependency in app.jar.
+# The standalone CLI avoids starting Spring or connecting to application services.
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN java -Dloader.main=com.microsoft.playwright.CLI -cp app.jar \
+      org.springframework.boot.loader.launch.PropertiesLauncher install --with-deps chromium \
+    && java -Dloader.main=com.microsoft.playwright.CLI -cp app.jar \
+      org.springframework.boot.loader.launch.PropertiesLauncher screenshot \
+      --browser chromium about:blank /tmp/playwright-smoke.png \
+    && rm -f /tmp/playwright-smoke.png \
+    && rm -rf /var/lib/apt/lists/*
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 # Expose the port the application runs on
 EXPOSE 8080

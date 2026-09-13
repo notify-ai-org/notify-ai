@@ -77,6 +77,12 @@ PostgreSQL and Redis dependencies.
 - `redis` - Redis 7 with password authentication.
 - `vocab-agent` - the Notify.ai application image built from this repository.
 
+The runtime image installs Chromium and its system dependencies using the Playwright version
+packaged in the application. The image build checks driver startup and captures a blank page;
+website ingestion does not need to download browsers at runtime. The executable JAR unpacks
+Playwright's native driver bundle before use. See the
+[Playwright Docker documentation](https://playwright.dev/java/docs/docker) for browser requirements.
+
 ### Environment Variables
 
 Compose reads variables from your shell or from a local `.env` file in the repo
