@@ -113,6 +113,9 @@ jobs:
             # Log in to GHCR on the EC2 instance
             printf '%s' '${{ secrets.CHECKOUT_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
 
+            # Free space before downloading layers; a failed pull never reaches post-deploy cleanup.
+            docker image prune -af --filter "until=24h"
+
             # Pull the latest image
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
