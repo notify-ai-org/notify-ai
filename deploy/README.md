@@ -48,6 +48,10 @@ database reports missing columns/wrong column types:
 docker compose --env-file deploy/ec2.env exec -T postgres psql -U notification_user -d notify_db -f - < deploy/migrations/001_notify_postgresql.sql
 ```
 
+For tenant-managed connectors, apply migrations `002_channel_secrets.sql` and
+`003_unified_channel_config.sql` in order. See [tenant channel configuration](channel-configuration.md)
+for the settings and credential migration from environment properties.
+
 ## Check status
 
 ```bash
