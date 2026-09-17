@@ -1,0 +1,21 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Build Notify Access",
+            "type": "process",
+            "command": "mvn",
+            "args": [
+                "-pl", "access", "-am",
+                "-Dfmt.skip=true",
+                "-Dmaven.test.skip=true",
+                "compile"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "build",
+            "problemMatcher": []
+        }
+    ]
+}

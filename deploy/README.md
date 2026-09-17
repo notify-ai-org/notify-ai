@@ -48,8 +48,13 @@ database reports missing columns/wrong column types:
 docker compose --env-file deploy/ec2.env exec -T postgres psql -U notification_user -d notify_db -f - < deploy/migrations/001_notify_postgresql.sql
 ```
 
-For tenant-managed connectors, apply migrations `002_channel_secrets.sql` and
-`003_unified_channel_config.sql` in order. See [tenant channel configuration](channel-configuration.md)
+For tenant-managed connectors, apply migrations `002_channel_secrets.sql`,
+`003_unified_channel_config.sql`, `004_secret_metadata_version_id.sql`, and
+`005_unique_tenant_channel_type.sql` in order.
+Apply 004 before starting the updated application; it preserves credential version
+IDs while renaming their column and removing the stored secret ARN. Migration
+005 enforces one channel per tenant/type, including disabled channels; existing
+duplicates must be reviewed and resolved before it can succeed. See [tenant channel configuration](channel-configuration.md)
 for the settings and credential migration from environment properties.
 
 ## Check status

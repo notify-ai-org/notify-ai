@@ -23,6 +23,7 @@
 # EC2 / Docker Compose secrets
 /deploy/ec2.env
 /.env
+/.env.local
 
 # Access Module target and Test Controller
 /access/target

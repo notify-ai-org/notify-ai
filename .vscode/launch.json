@@ -1,0 +1,16 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Notify Access",
+            "request": "launch",
+            "mainClass": "com.notify.agent.VocabAgentApplication",
+            "projectName": "vocabulary-agent-access",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env.local",
+            "console": "integratedTerminal",
+            "preLaunchTask": "Build Notify Access"
+        }
+    ]
+}

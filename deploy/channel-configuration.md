@@ -5,6 +5,15 @@ before deploying against an existing database. The migration adds connector pool
 and retry fields to `tenant_channel_config` and selects the connector class from
 the existing provider. It does not copy environment values or credentials.
 
+Then apply `migrations/004_secret_metadata_version_id.sql` before starting the
+updated application. It preserves credential version IDs under `version_id` and
+removes the stored secret ARN. Secret names are derived from the configured
+environment, tenant ID, channel ID and secret reference.
+
+Apply `migrations/005_unique_tenant_channel_type.sql` to enforce one channel per
+tenant/type, including disabled or revoked channels. It stops if duplicates
+already exist and does not delete them automatically.
+
 `TenantChannelConfig` replaces both the old `ChannelConfig` interface and
 `ConnectorProperties.ChannelConfigImpl`. Connector pools are keyed by tenant and
 channel ID. Changes to the persisted version, settings, secret reference, or
