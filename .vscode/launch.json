@@ -3,6 +3,13 @@
     "configurations": [
         {
             "type": "java",
+            "name": "EcommerceApplication",
+            "request": "launch",
+            "mainClass": "com.notify.ecommerce.EcommerceApplication",
+            "projectName": "ecommerce-app"
+        },
+        {
+            "type": "java",
             "name": "Notify Access",
             "request": "launch",
             "mainClass": "com.notify.agent.VocabAgentApplication",

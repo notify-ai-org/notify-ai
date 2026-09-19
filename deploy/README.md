@@ -57,6 +57,11 @@ IDs while renaming their column and removing the stored secret ARN. Migration
 duplicates must be reviewed and resolved before it can succeed. See [tenant channel configuration](channel-configuration.md)
 for the settings and credential migration from environment properties.
 
+For tenant prompt versions, apply `006_tenant_prompt_store.sql` before deploying
+the updated application. It creates the version catalog and active selections;
+prompt content uses the existing artifact engine/S3 configuration. See
+[tenant prompts](tenant-prompts.md) for the API and activation workflow.
+
 ## Check status
 
 ```bash
