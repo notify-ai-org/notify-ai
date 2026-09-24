@@ -62,6 +62,16 @@ the updated application. It creates the version catalog and active selections;
 prompt content uses the existing artifact engine/S3 configuration. See
 [tenant prompts](tenant-prompts.md) for the API and activation workflow.
 
+For structured facts, apply `007_fact_references.sql` before deploying the updated
+application. It adds `event`, `entityRef`, and `subject` storage, copies legacy
+`fact_user` values into the subject field, and normalizes known fact types to
+`event`, `notification`, `subject`, or `entity`. Missing/unknown legacy types must
+be classified before the migration can succeed; the transaction rolls back on
+those rows. Entity references remain null when no explicit reference exists.
+Existing tenant overrides of the log-to-facts prompt should adopt the updated
+bundled output contract; known legacy outcome types and `user` remain accepted
+for compatibility.
+
 ## Check status
 
 ```bash
@@ -80,3 +90,5 @@ Docker starts. If needed, run:
 cd /opt/vocab-agent
 docker compose --env-file deploy/ec2.env up -d
 ```
+
+Adaptive event scheduling: apply `migrations/008_adaptive_event_scheduling.sql` before deploying the new processor/scheduler contracts. It adds subject history snapshots, schedule event/subject references, revisions, revocation and pending-mutation state. Existing shared schedules retain revision zero and continue running. Update tenant prompt overrides and restart agents; configure Redis for standby context. See `acp-server/README.md` for the output contracts and recovery behavior.
