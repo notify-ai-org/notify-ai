@@ -44,7 +44,6 @@
         <module>artifact-engine</module>
         <module>adk-java</module>
         <module>examples/ecommerce-app</module>
-        <module>examples/banking-app</module>
     </modules>
     
     <properties>
