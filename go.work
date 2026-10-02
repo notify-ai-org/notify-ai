@@ -1,0 +1,8 @@
+// Local development workspace: builds the Go example apps against the
+// client-go submodule checkout instead of the published module.
+go 1.22
+
+use (
+	./client-go
+	./examples/banking-app-go
+)

@@ -28,3 +28,15 @@
 [submodule "artifact-engine"]
 	path = artifact-engine
 	url = https://github.com/notify-ai-org/artifact-engine.git
+[submodule "client-go"]
+	path = client-go
+	url = https://github.com/notify-ai-org/client-go.git
+	branch = main
+[submodule "client-python"]
+	path = client-python
+	url = https://github.com/notify-ai-org/client-python.git
+	branch = main
+[submodule "client-ts"]
+	path = client-ts
+	url = https://github.com/notify-ai-org/client-ts.git
+	branch = main

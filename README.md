@@ -13,6 +13,28 @@
 Unlike traditional notification services that simply dispatch static text, Notify.ai **understands your user's context**. Designed for seamless integration into existing businesses (e-commerce, banking, healthcare), it securely intercepts domain events from your upstream applications. Utilizing advanced LLM orchestration, it intelligently extracts underlying facts over time, builds a comprehensive memory graph of user behavior, dynamically generates highly contextual message templates, and reliably dispatches them across multiple out-bound channels (Email, SMS, Push, Webhooks) when the user is most receptive.
 
 
+## 📦 Repository Layout
+
+Every module is its own repository, included here as a git submodule. Clone with:
+
+```bash
+git clone --recurse-submodules https://github.com/notify-ai-org/notify-ai.git
+# or, in an existing checkout:
+git submodule update --init --recursive
+```
+
+| Path | Repository | |
+|---|---|---|
+| `client` | [notify-ai-org/client](https://github.com/notify-ai-org/client) | Java client SDK |
+| `client-go` | [notify-ai-org/client-go](https://github.com/notify-ai-org/client-go) | Go client SDK |
+| `client-python` | [notify-ai-org/client-python](https://github.com/notify-ai-org/client-python) | Python client SDK |
+| `client-ts` | [notify-ai-org/client-ts](https://github.com/notify-ai-org/client-ts) | TypeScript client SDK |
+| `examples` | [notify-ai-org/examples](https://github.com/notify-ai-org/examples) | Example apps (Java `banking-app`, plus the submodules below) |
+| `examples/ecommerce-app` | [notify-ai-org/ecommerce-app](https://github.com/notify-ai-org/ecommerce-app) | E-commerce example (Spring Boot + React storefront) |
+| `examples/banking-app-go` | [notify-ai-org/banking-app-go](https://github.com/notify-ai-org/banking-app-go) | Banking example on the Go SDK |
+
+The root `go.work` builds the Go example apps against the local `client-go` checkout.
+
 ## 🚀 Running Locally
 
 To stand up the complete development environment locally:
@@ -66,6 +88,9 @@ mvn spring-boot:run -pl examples/ecommerce-app
 
 # Start the Banking sample (runs on port 8091)
 mvn spring-boot:run -pl examples/banking-app
+
+# Or the Go port of the Banking sample (also defaults to 8091; set PORT to run both)
+(cd examples/banking-app-go && NOTIFY_AI_CLIENT_TOKEN=client-... PORT=8094 go run .)
 ```
 
 ## 🐳 Running Locally With Docker Compose
