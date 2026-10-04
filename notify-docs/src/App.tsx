@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { docsRegistry, allDocs } from './docs/docsRegistry';
+import { EcommercePlayground } from './EcommercePlayground';
 import notifyLogoUrl from './assets/notify-ai-logo.svg';
 
 interface TOCItem {
@@ -708,6 +709,7 @@ export default function App() {
             />
           ) : (
             <article className="markdown-container">
+              {activeDoc.id === 'ecommerce' && <EcommercePlayground />}
               <div
                 ref={contentRef}
                 className="markdown-body"

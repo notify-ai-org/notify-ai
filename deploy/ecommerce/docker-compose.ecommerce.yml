@@ -1,0 +1,36 @@
+# E-commerce example app, deployed next to the main stack by
+# .github/workflows/deploy-ecommerce.yml. Use it together with the root file so
+# the app joins the same network as nginx and vocab-agent:
+#
+#   docker compose --env-file deploy/ec2.env \
+#     -f docker-compose.yml -f deploy/ecommerce/docker-compose.ecommerce.yml \
+#     up -d --no-deps ecommerce-app
+#
+# nginx forwards https://<host>/ecommerce/* to this container on port 8090.
+services:
+  ecommerce-app:
+    image: ${ECOMMERCE_IMAGE:-ghcr.io/notify-ai-org/ecommerce-app:latest}
+    container_name: ecommerce-app
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8090
+      # Must match the nginx location and the VITE_BASE_PATH the image was built with.
+      SERVER_SERVLET_CONTEXT_PATH: /ecommerce
+      SERVER_FORWARD_HEADERS_STRATEGY: native
+      # The docs site embeds the storefront in an iframe on another domain, so the
+      # session cookie must be allowed in a cross-site context.
+      SERVER_SERVLET_SESSION_COOKIE_SAME_SITE: ${ECOMMERCE_COOKIE_SAME_SITE:-none}
+      SERVER_SERVLET_SESSION_COOKIE_SECURE: "true"
+      # The H2 console has no real password; never expose it on a public host.
+      SPRING_H2_CONSOLE_ENABLED: "false"
+      NOTIFY_AI_PROPERTIES_ACPSERVERURL: ${ECOMMERCE_ACP_SERVER_URL:-http://vocab-agent:8080}
+      NOTIFY_AI_PROPERTIES_CLIENTTOKEN: ${ECOMMERCE_NOTIFY_CLIENT_TOKEN:-client-1618cc7d-26f2-48ab-ba7a-42e0a4debc3e}
+    expose:
+      - "8090"
+    ports:
+      - "127.0.0.1:8090:8090"
+    volumes:
+      - ecommerce-data:/app/data
+
+volumes:
+  ecommerce-data:

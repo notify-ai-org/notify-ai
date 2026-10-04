@@ -8,3 +8,6 @@
 target/
 */target/
 **/target/
+
+# Host-installed JS dependencies must not leak into images (wrong-platform binaries).
+**/node_modules

@@ -1,0 +1,93 @@
+name: Deploy Docs to Vercel
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Builds notify-docs and deploys it to Vercel.
+#   push to master (notify-docs/**)  →  production deployment
+#   pull_request   (notify-docs/**)  →  preview deployment
+#
+# Required repository secrets:
+#   VERCEL_TOKEN       – Vercel account token (Account Settings → Tokens)
+#   VERCEL_ORG_ID      – "orgId" from notify-docs/.vercel/project.json
+#   VERCEL_PROJECT_ID  – "projectId" from notify-docs/.vercel/project.json
+# Optional repository variable:
+#   ECOMMERCE_PLAYGROUND_URL – storefront URL embedded on the E-Commerce page
+# ──────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'notify-docs/**'
+      - '.github/workflows/deploy-docs.yml'
+  pull_request:
+    paths:
+      - 'notify-docs/**'
+      - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-docs-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  VITE_ECOMMERCE_PLAYGROUND_URL: ${{ vars.ECOMMERCE_PLAYGROUND_URL }}
+
+jobs:
+  deploy:
+    name: Build and deploy docs
+    runs-on: ubuntu-latest
+    # Pull requests from forks have no access to the Vercel secrets.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    defaults:
+      run:
+        working-directory: notify-docs
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: notify-docs/package-lock.json
+
+      - name: Validate Vercel secrets
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          for name in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!name}" ]; then
+              echo "ERROR: repository secret $name is not set."
+              exit 1
+            fi
+          done
+
+      - name: Select Vercel environment
+        id: target
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "environment=preview" >> "$GITHUB_OUTPUT"
+            echo "flag=" >> "$GITHUB_OUTPUT"
+          else
+            echo "environment=production" >> "$GITHUB_OUTPUT"
+            echo "flag=--prod" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=${{ steps.target.outputs.environment }} --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: vercel build ${{ steps.target.outputs.flag }} --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        id: deploy
+        run: |
+          url="$(vercel deploy --prebuilt ${{ steps.target.outputs.flag }} --token=${{ secrets.VERCEL_TOKEN }})"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployed to $url (${{ steps.target.outputs.environment }})" >> "$GITHUB_STEP_SUMMARY"

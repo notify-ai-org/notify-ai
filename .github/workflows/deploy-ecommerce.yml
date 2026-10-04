@@ -1,0 +1,170 @@
+name: Deploy E-commerce Example to EC2
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Builds the e-commerce example app (examples/ecommerce-app) and runs it on the
+# EC2 host on port 8090, next to the main stack. nginx forwards
+# https://<host>/ecommerce/* to it (deploy/nginx/conf.d/notify.conf).
+#
+# Uses the same secrets as deploy.yml: EC2_HOST, EC2_USERNAME, EC2_SSH_KEY,
+# CHECKOUT_PAT. Requires the main stack (deploy.yml) to be deployed already.
+# ──────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'examples'            # submodule pointer
+      - 'client'              # SDK the example is built against (submodule pointer)
+      - 'deploy/ecommerce/**'
+      - 'deploy/nginx/**'
+      - '.github/workflows/deploy-ecommerce.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-ecommerce
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/ecommerce-app
+  CONTAINER: ecommerce-app
+  PORT: 8090
+  BASE_PATH: /ecommerce
+
+jobs:
+  build-and-deploy:
+    name: Build, Push, and Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          token: ${{ secrets.CHECKOUT_PAT || github.token }}
+
+      - name: Validate deploy secrets
+        env:
+          CHECKOUT_PAT: ${{ secrets.CHECKOUT_PAT }}
+        run: |
+          if [ -z "$CHECKOUT_PAT" ]; then
+            echo "ERROR: CHECKOUT_PAT is not set. Add a GitHub token with repo and read:packages so checkout and EC2 image pulls can authenticate."
+            exit 1
+          fi
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # The storefront is compiled with the path prefix nginx serves it under.
+      - name: Build and Push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deploy/ecommerce/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            VITE_BASE_PATH=${{ env.BASE_PATH }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha,scope=ecommerce
+          cache-to: type=gha,mode=max,scope=ecommerce
+
+      - name: Prepare EC2 deploy directory
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            sudo mkdir -p /opt/vocab-agent
+            sudo chown -R "${USER}:${USER}" /opt/vocab-agent
+
+      # Includes the nginx config with the /ecommerce location.
+      - name: Copy Compose deployment files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "docker-compose.yml,deploy"
+          target: "/opt/vocab-agent"
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            printf '%s' '${{ secrets.CHECKOUT_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+
+            cd /opt/vocab-agent
+            ENV_FILE=/opt/vocab-agent/deploy/ec2.env
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "ERROR: $ENV_FILE does not exist. Deploy the main stack first (deploy.yml)."
+              exit 1
+            fi
+
+            export ECOMMERCE_IMAGE='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}'
+            COMPOSE="docker compose --env-file $ENV_FILE -f docker-compose.yml -f deploy/ecommerce/docker-compose.ecommerce.yml"
+
+            # Only this service: the main stack is owned by deploy.yml.
+            $COMPOSE pull ${{ env.CONTAINER }}
+            $COMPOSE up -d --no-deps ${{ env.CONTAINER }}
+
+            sleep 3
+            if ! docker ps --filter name=${{ env.CONTAINER }} --format "{{.Names}}" | grep -q "^${{ env.CONTAINER }}$"; then
+              echo "ERROR: Container failed to start or crashed on startup!"
+              docker logs ${{ env.CONTAINER }}
+              exit 1
+            fi
+
+            # Pick up the /ecommerce location without dropping connections.
+            if docker ps --filter name=notify-nginx --format "{{.Names}}" | grep -q "^notify-nginx$"; then
+              docker exec notify-nginx nginx -t
+              docker exec notify-nginx nginx -s reload
+            else
+              echo "WARNING: notify-nginx is not running; /ecommerce is not reachable from outside until the main stack is deployed."
+            fi
+
+            docker image prune -af --filter "until=24h"
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            set -e
+            echo "── Container status ──"
+            docker ps -a --filter name=${{ env.CONTAINER }} --format "table {{.ID}}\t{{.Status}}\t{{.Ports}}"
+
+            echo ""
+            echo "── Health check ──"
+            URL="http://localhost:${{ env.PORT }}${{ env.BASE_PATH }}/api/products"
+            # Wait up to 60s for the app to start responding
+            for i in $(seq 1 12); do
+              if curl -sf "$URL" > /dev/null 2>&1; then
+                echo "✓ E-commerce app is serving on port ${{ env.PORT }}"
+                exit 0
+              fi
+              echo "  Waiting for app to start... (attempt $i/12)"
+              sleep 5
+            done
+            echo "✗ E-commerce app did not respond at $URL in time"
+            docker logs --tail 50 ${{ env.CONTAINER }}
+            exit 1

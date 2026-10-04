@@ -1,6 +1,6 @@
 The **Notify.ai Client SDK** is a lightweight Java library that integrates into Spring Boot applications. It captures annotated domain events, packages method context as semantic event payloads, and sends those events to the Notify.ai control plane.
 
-> **Note**: Spring Boot is the first supported runtime. Additional language and framework SDKs are planned.
+> **Note**: This page covers Java and Spring Boot. SDKs for Python, Go and TypeScript are documented on their own pages in this section.
 
 ##  Integration Guide
 

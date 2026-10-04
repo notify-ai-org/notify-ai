@@ -357,6 +357,70 @@ body {
   min-width: 0;
 }
 
+/* Embedded example app (EcommercePlayground) */
+.playground {
+  margin-bottom: 2.5rem;
+}
+
+.playground-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.playground-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.playground-hint,
+.playground-note {
+  color: hsl(var(--text-muted));
+  font-size: 0.925rem;
+  line-height: 1.6;
+  max-width: 62ch;
+}
+
+.playground-hint code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: hsl(var(--text-main));
+  background: hsl(var(--bg-card));
+  border: 1px solid hsl(var(--border-color));
+  border-radius: 4px;
+  padding: 0.1rem 0.35rem;
+}
+
+.playground-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.playground-actions .docs-secondary-btn {
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.playground-frame {
+  display: block;
+  width: 100%;
+  height: min(760px, 80vh);
+  border: 1px solid hsl(var(--border-color));
+  border-radius: 12px;
+  /* The storefront has its own light theme; keep the frame light in both docs themes. */
+  background: #fff;
+}
+
+.playground-note {
+  margin-top: 0.75rem;
+  font-size: 0.825rem;
+}
+
 /* Table of Contents */
 .toc-container {
   width: var(--toc-width);

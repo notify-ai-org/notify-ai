@@ -3,6 +3,9 @@ import acpServerRaw from './acp_server.md?raw';
 import engineRaw from './engine.md?raw';
 import artifactEngineRaw from './artifact_engine.md?raw';
 import clientRaw from './client.md?raw';
+import clientPythonRaw from './client_python.md?raw';
+import clientGoRaw from './client_go.md?raw';
+import clientTsRaw from './client_ts.md?raw';
 import ecommerceRaw from './ecommerce_app.md?raw';
 import bankingRaw from './banking_app.md?raw';
 
@@ -58,9 +61,27 @@ export const docsRegistry: DocCategory[] = [
     items: [
       {
         id: 'client',
-        title: 'Client AOP SDK',
+        title: 'Java SDK (Spring Boot)',
         category: 'Developer SDK',
         content: clientRaw,
+      },
+      {
+        id: 'client-python',
+        title: 'Python SDK',
+        category: 'Developer SDK',
+        content: clientPythonRaw,
+      },
+      {
+        id: 'client-go',
+        title: 'Go SDK',
+        category: 'Developer SDK',
+        content: clientGoRaw,
+      },
+      {
+        id: 'client-ts',
+        title: 'TypeScript SDK',
+        category: 'Developer SDK',
+        content: clientTsRaw,
       },
     ],
   },
