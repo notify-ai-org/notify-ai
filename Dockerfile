@@ -18,7 +18,6 @@ COPY artifact-engine/pom.xml artifact-engine/
 COPY access/pom.xml access/
 COPY common/pom.xml common/
 COPY examples/ecommerce-app/pom.xml examples/ecommerce-app/
-COPY examples/banking-app/pom.xml examples/banking-app/
 
 # Download dependencies offline to optimize build time. Maven Central can
 # transiently time out in Docker builds, so retry cache warmup before failing.
