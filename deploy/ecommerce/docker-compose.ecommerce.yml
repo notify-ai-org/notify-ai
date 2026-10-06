@@ -12,6 +12,11 @@ services:
     image: ${ECOMMERCE_IMAGE:-ghcr.io/notify-ai-org/ecommerce-app:latest}
     container_name: ecommerce-app
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
     environment:
       SERVER_PORT: 8090
       # Must match the nginx location and the VITE_BASE_PATH the image was built with.

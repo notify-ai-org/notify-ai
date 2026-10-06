@@ -37,7 +37,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn clean package -DskipTests -T 1C ${MAVEN_RETRY_OPTS}
 
 # Stage 2: Ubuntu provides the system libraries supported by Playwright Chromium.
-FROM eclipse-temurin:17-jdk-jammy
+FROM eclipse-temurin:17-jre-jammy
 
 WORKDIR /app
 

@@ -121,6 +121,9 @@ jobs:
             export ECOMMERCE_IMAGE='${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}'
             COMPOSE="docker compose --env-file $ENV_FILE -f docker-compose.yml -f deploy/ecommerce/docker-compose.ecommerce.yml"
 
+            # Free space before downloading layers; images used by running containers are kept.
+            docker image prune -af
+
             # Only this service: the main stack is owned by deploy.yml.
             $COMPOSE pull ${{ env.CONTAINER }}
             $COMPOSE up -d --no-deps ${{ env.CONTAINER }}

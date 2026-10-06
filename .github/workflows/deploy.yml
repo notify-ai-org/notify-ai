@@ -114,7 +114,9 @@ jobs:
             printf '%s' '${{ secrets.CHECKOUT_PAT }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
 
             # Free space before downloading layers; a failed pull never reaches post-deploy cleanup.
-            docker image prune -af --filter "until=24h"
+            # No age filter: several deploys in one day would otherwise pile up. Images used by
+            # running containers are always kept.
+            docker image prune -af
 
             # Pull the latest image
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}

@@ -1,8 +1,16 @@
+# Docker keeps container logs forever by default; cap them so they cannot fill the host disk.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   postgres:
     image: postgres:16-alpine
     container_name: notify-postgres
     restart: unless-stopped
+    logging: *default-logging
     environment:
       POSTGRES_DB: notify_db
       POSTGRES_USER: notification_user
@@ -21,6 +29,7 @@ services:
     image: redis:7-alpine
     container_name: notify-redis
     restart: unless-stopped
+    logging: *default-logging
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
     ports:
       - "127.0.0.1:6379:6379"
@@ -41,6 +50,7 @@ services:
     image: notify/vocab-agent:latest
     container_name: vocab-agent
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,6 +106,7 @@ services:
     image: nginx:1.27-alpine
     container_name: notify-nginx
     restart: unless-stopped
+    logging: *default-logging
     depends_on:
       - vocab-agent
     ports:
