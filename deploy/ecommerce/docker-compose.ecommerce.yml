@@ -24,7 +24,7 @@ services:
       # The H2 console has no real password; never expose it on a public host.
       SPRING_H2_CONSOLE_ENABLED: "false"
       NOTIFY_AI_PROPERTIES_ACPSERVERURL: ${ECOMMERCE_ACP_SERVER_URL:-http://vocab-agent:8080}
-      NOTIFY_AI_PROPERTIES_CLIENTTOKEN: ${ECOMMERCE_NOTIFY_CLIENT_TOKEN:-client-1618cc7d-26f2-48ab-ba7a-42e0a4debc3e}
+      NOTIFY_AI_PROPERTIES_CLIENTTOKEN: ${ECOMMERCE_NOTIFY_CLIENT_TOKEN:-client-aa353f56-614a-4597-be75-9d07e6d3c2e9}
     expose:
       - "8090"
     ports:
