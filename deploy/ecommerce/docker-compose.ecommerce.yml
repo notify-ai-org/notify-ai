@@ -30,6 +30,10 @@ services:
       SPRING_H2_CONSOLE_ENABLED: "false"
       NOTIFY_AI_PROPERTIES_ACPSERVERURL: ${ECOMMERCE_ACP_SERVER_URL:-http://vocab-agent:8080}
       NOTIFY_AI_PROPERTIES_CLIENTTOKEN: ${ECOMMERCE_NOTIFY_CLIENT_TOKEN:-client-aa353f56-614a-4597-be75-9d07e6d3c2e9}
+      # In-app notifications (the storefront bell). Key-only: unset leaves the feature off.
+      # The webhook URL must equal the endpoint of the tenant's IN_APP channel in Notify.
+      ECOMMERCE_IN_APP_WEBHOOK_URL:
+      ECOMMERCE_IN_APP_SIGNING_SECRET:
     expose:
       - "8090"
     ports:

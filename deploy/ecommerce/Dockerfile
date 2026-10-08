@@ -27,8 +27,11 @@ COPY . .
 COPY --from=ui /app/examples/ecommerce-app/src/main/resources/static/portals/shop/ \
     examples/ecommerce-app/src/main/resources/static/portals/shop/
 
+# The client SDK is not a module of the root build, and the app uses SDK classes (InAppSubject)
+# newer than the published artifact, so install it from the checked-out submodule first.
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn clean package -DskipTests -pl examples/ecommerce-app -am ${MAVEN_RETRY_OPTS}
+    mvn install -DskipTests -f client/pom.xml ${MAVEN_RETRY_OPTS} \
+    && mvn clean package -DskipTests -pl examples/ecommerce-app -am ${MAVEN_RETRY_OPTS}
 
 # Stage 3: runtime.
 FROM eclipse-temurin:17-jre-jammy
