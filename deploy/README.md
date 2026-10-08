@@ -102,3 +102,14 @@ DLQ replay thread and agent stop: apply `migrations/012_dlq_replay_and_agent_sto
 Compact-named schedule tables: apply `migrations/013_event_schedule_compact_names.sql` on databases whose schedule table is `eventschedule` rather than `event_schedule`. Migration 008 only covers the snake_case names, and Hibernate's `ddl-auto` cannot add the NOT NULL `mutationpending`, `revoked`, `revision` and `version` columns to a populated table, so schedule reads and updates fail at runtime. The migration adds them with 008's defaults and the matching `(tenant_id, subject, revoked)` index. It is idempotent and does nothing on snake_case databases.
 
 Redis-backed scheduler: with `REDIS_ENABLED=true` the engine's Quartz scheduler stores jobs and triggers in Redis (`engine/.../quartz/RedisJobStore`, keys under `notify:quartz:`), so schedules survive restarts and each trigger fires on exactly one replica. With Redis disabled Quartz keeps its in-memory store and schedules are lost on restart, as before. Optional settings: `scheduler.job-store.key-prefix` (default `notify:quartz:`) and `scheduler.job-store.misfire-threshold-ms` (default 60000). The old `notify:scheduler:events` sorted set is no longer written or read; remove it once with `redis-cli DEL notify:scheduler:events`. Schedules that exist only in a running instance's memory at the time of this deploy are not migrated; they are lost when that instance stops, as with any restart before this change.
+
+Postgres image with pgvector: `docker-compose.yml` runs `pgvector/pgvector:pg16` instead of `postgres:16-alpine`, because artifact search needs the `vector` extension library (without it every search fails with `could not access file "$libdir/vector"`). Same major version, so the existing `postgres-data` volume is reused. The old image is Alpine (musl) and the new one is Debian (glibc), which sort text differently, so rebuild indexes once after the first start on an existing volume:
+
+```bash
+docker compose --env-file deploy/ec2.env pull postgres
+docker compose --env-file deploy/ec2.env up -d postgres
+docker compose --env-file deploy/ec2.env exec postgres psql -U notification_user -d notify_db \
+  -c 'CREATE EXTENSION IF NOT EXISTS vector;' -c 'REINDEX DATABASE notify_db;'
+```
+
+Take a `pg_dump` before switching. On a fresh volume no extra step is needed.
