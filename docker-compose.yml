@@ -72,7 +72,9 @@ services:
       NOTIFICATION_SECRETS_ROLE_ARN:
       NOTIFICATION_SECRETS_RUNTIME_ROLE_ARN:
       NOTIFICATION_SECRETS_CACHE_ENABLED: ${NOTIFICATION_SECRETS_CACHE_ENABLED:-false}
-      NOTIFY_ENVIRONMENT: ${NOTIFY_ENVIRONMENT:-production}
+      # Key-only for the same reason: the environment is part of every secret name and tag, and
+      # must match the IAM policies in deploy/iam.
+      NOTIFY_ENVIRONMENT:
       WHATSAPP_ENABLED: ${WHATSAPP_ENABLED:-true}
       REDIS_HOST: redis
       REDIS_ENABLED: true
