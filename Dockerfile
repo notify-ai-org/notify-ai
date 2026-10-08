@@ -32,9 +32,11 @@ RUN --mount=type=cache,target=/root/.m2 \
 # Copy the rest of the source code
 COPY . .
 
-# Build the project, skipping tests to speed up the process
+# Build only the access application and the modules it depends on. The example apps have their
+# own images (deploy/ecommerce) and may need an unreleased client SDK, so they must not be able
+# to break this build.
 RUN --mount=type=cache,target=/root/.m2 \
-    mvn clean package -DskipTests -T 1C ${MAVEN_RETRY_OPTS}
+    mvn clean package -DskipTests -T 1C -pl access -am ${MAVEN_RETRY_OPTS}
 
 # Stage 2: Ubuntu provides the system libraries supported by Playwright Chromium.
 FROM eclipse-temurin:17-jre-jammy
