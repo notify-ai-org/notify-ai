@@ -91,7 +91,7 @@ cd /opt/vocab-agent
 docker compose --env-file deploy/ec2.env up -d
 ```
 
-Adaptive event scheduling: apply `migrations/008_adaptive_event_scheduling.sql` before deploying the new processor/scheduler contracts. It adds subject history snapshots, schedule event/subject references, revisions, revocation and pending-mutation state. Existing shared schedules retain revision zero and continue running. Update tenant prompt overrides and restart agents; configure Redis for standby context. See `acp-server/README.md` for the output contracts and recovery behavior.
+Adaptive event scheduling: apply `migrations/008_adaptive_event_scheduling.sql` before deploying the new processor/scheduler contracts. It adds subject history snapshots, schedule event/subject references, revisions, revocation and pending-mutation state. Existing shared schedules retain revision zero and continue running. Update tenant prompt overrides and restart agents; standby context is stored in the database (see migration 014). See `acp-server/README.md` for the output contracts and recovery behavior.
 
 Recipient preferences: apply `migrations/010_recipient_preferences.sql` before deploying the preferences portal. It adds per-recipient opt-outs, preferred channel and quiet hours keyed by the stable subject ID, and a `recipient_id` column on notification jobs. The engine records suppressed sends as `SUPPRESSED` attempt logs (excluded from channel metrics); jobs created before the migration carry no recipient and are not filtered. Rebuild portals with `./notify-ui/build-all.sh` so `/portals/preferences` is served.
 
@@ -113,3 +113,5 @@ docker compose --env-file deploy/ec2.env exec postgres psql -U notification_user
 ```
 
 Take a `pg_dump` before switching. On a fresh volume no extra step is needed.
+
+Standby events in the database: apply `migrations/014_standby_events.sql`. Standby snapshots move from Redis (`notify:standby:*`) to the `standby_event` table, so putting an event on standby no longer needs Redis. Snapshots held in Redis at deploy time are not migrated; they only provide context for later events and expire on their own. Remove the old keys with `redis-cli --scan --pattern 'notify:standby:*' | xargs redis-cli DEL` once deployed.
