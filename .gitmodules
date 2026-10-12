@@ -40,3 +40,7 @@
 	path = client-ts
 	url = https://github.com/notify-ai-org/client-ts.git
 	branch = main
+[submodule "typesafe-sdk-java"]
+	path = typesafe-sdk-java
+	url = https://github.com/notify-ai-org/typesafe-sdk-java.git
+	branch = main
