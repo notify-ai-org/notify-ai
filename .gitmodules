@@ -7,18 +7,12 @@
 [submodule "acp-server"]
 	path = acp-server
 	url = https://github.com/notify-ai-org/acp-server.git
-[submodule "client"]
-	path = client
-	url = https://github.com/notify-ai-org/client.git
 [submodule "common"]
 	path = common
 	url = https://github.com/notify-ai-org/common.git
 [submodule "engine"]
 	path = engine
 	url = https://github.com/notify-ai-org/engine.git
-[submodule "examples"]
-	path = examples
-	url = https://github.com/notify-ai-org/examples.git
 [submodule "notify-ui"]
 	path = notify-ui
 	url = https://github.com/notify-ai-org/notify-ui.git
@@ -28,19 +22,3 @@
 [submodule "artifact-engine"]
 	path = artifact-engine
 	url = https://github.com/notify-ai-org/artifact-engine.git
-[submodule "client-go"]
-	path = client-go
-	url = https://github.com/notify-ai-org/client-go.git
-	branch = main
-[submodule "client-python"]
-	path = client-python
-	url = https://github.com/notify-ai-org/client-python.git
-	branch = main
-[submodule "client-ts"]
-	path = client-ts
-	url = https://github.com/notify-ai-org/client-ts.git
-	branch = main
-[submodule "typesafe-sdk-java"]
-	path = typesafe-sdk-java
-	url = https://github.com/notify-ai-org/typesafe-sdk-java.git
-	branch = main
