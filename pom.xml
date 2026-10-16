@@ -43,6 +43,7 @@
         <module>engine</module>
         <module>artifact-engine</module>
         <module>adk-java</module>
+        <module>examples/ecommerce-app</module>
     </modules>
     
     <properties>

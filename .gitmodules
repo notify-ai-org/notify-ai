@@ -22,3 +22,6 @@
 [submodule "artifact-engine"]
 	path = artifact-engine
 	url = https://github.com/notify-ai-org/artifact-engine.git
+[submodule "examples"]
+	path = examples
+	url = https://github.com/notify-ai-org/examples.git

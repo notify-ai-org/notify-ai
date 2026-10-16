@@ -16,6 +16,7 @@ COPY engine/pom.xml engine/
 COPY artifact-engine/pom.xml artifact-engine/
 COPY access/pom.xml access/
 COPY common/pom.xml common/
+COPY examples/ecommerce-app/pom.xml examples/ecommerce-app/
 
 # Download dependencies offline to optimize build time. Maven Central can
 # transiently time out in Docker builds, so retry cache warmup before failing.
@@ -30,7 +31,9 @@ RUN --mount=type=cache,target=/root/.m2 \
 # Copy the rest of the source code
 COPY . .
 
-# Build only the access application and the modules it depends on.
+# Build only the access application and the modules it depends on. The example apps have their
+# own images (deploy/ecommerce) and may need an unreleased client SDK, so they must not be able
+# to break this build.
 RUN --mount=type=cache,target=/root/.m2 \
     mvn clean package -DskipTests -T 1C -pl access -am ${MAVEN_RETRY_OPTS}
 
