@@ -25,15 +25,14 @@ git submodule update --init --recursive
 
 | Path | Repository | |
 |---|---|---|
-| `client` | [notify-ai-org/client](https://github.com/notify-ai-org/client) | Java client SDK |
 | `client-go` | [notify-ai-org/client-go](https://github.com/notify-ai-org/client-go) | Go client SDK |
 | `client-python` | [notify-ai-org/client-python](https://github.com/notify-ai-org/client-python) | Python client SDK |
 | `client-ts` | [notify-ai-org/client-ts](https://github.com/notify-ai-org/client-ts) | TypeScript client SDK |
-| `examples` | [notify-ai-org/examples](https://github.com/notify-ai-org/examples) | Example apps (Java `banking-app`, plus the submodules below) |
-| `examples/ecommerce-app` | [notify-ai-org/ecommerce-app](https://github.com/notify-ai-org/ecommerce-app) | E-commerce example (Spring Boot + React storefront) |
-| `examples/banking-app-go` | [notify-ai-org/banking-app-go](https://github.com/notify-ai-org/banking-app-go) | Banking example on the Go SDK |
 
-The root `go.work` builds the Go example apps against the local `client-go` checkout.
+The Java client SDK lives in [notify-ai-org/client](https://github.com/notify-ai-org/client)
+and is consumed from Maven Central. Example apps live in
+[notify-ai-org/examples](https://github.com/notify-ai-org/examples), which builds and
+deploys them with its own workflows.
 
 ## 🚀 Running Locally
 
@@ -81,16 +80,16 @@ npm run dev
 ```
 
 ### 5. Run Example Applications
-Test the end-to-end integration by running one of the sample apps:
+Test the end-to-end integration by running one of the sample apps from a checkout of
+[notify-ai-org/examples](https://github.com/notify-ai-org/examples):
 ```bash
+git clone --recurse-submodules https://github.com/notify-ai-org/examples.git
+
 # Start the E-Commerce sample (runs on port 8090)
-mvn spring-boot:run -pl examples/ecommerce-app
+(cd examples/ecommerce-app && mvn spring-boot:run)
 
-# Start the Banking sample (runs on port 8091)
-mvn spring-boot:run -pl examples/banking-app
-
-# Or the Go port of the Banking sample (also defaults to 8091; set PORT to run both)
-(cd examples/banking-app-go && NOTIFY_AI_CLIENT_TOKEN=client-... PORT=8094 go run .)
+# Or the Go Banking sample (defaults to 8091)
+(cd examples/banking-app-go && NOTIFY_AI_CLIENT_TOKEN=client-... go run .)
 ```
 
 ## 🐳 Running Locally With Docker Compose

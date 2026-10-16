@@ -9,10 +9,8 @@ well-scoped changes are easiest to review.
 - `access` - Spring Boot web API and static portal host.
 - `acp-server` - agent orchestration and event processing.
 - `engine` - notification scheduling, dispatch, and DLQ handling.
-- `api`, `common`, `annotations`, `client` - shared models, utilities,
-  annotations, and Java SDK code.
+- `api`, `common`, `annotations` - shared models, utilities, and annotations.
 - `notify-ui` - React microfrontend portals.
-- `examples` - sample client applications.
 - `adk-java` - Google ADK Java code. Follow `adk-java/CONTRIBUTING.md` for
   changes scoped to that module.
 
