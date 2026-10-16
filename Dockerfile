@@ -9,7 +9,6 @@ ARG MAVEN_RETRY_OPTS="-Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http
 COPY pom.xml .
 COPY api/pom.xml api/
 COPY acp-server/pom.xml acp-server/
-COPY client/pom.xml client/
 COPY adk-java/pom.xml adk-java/
 COPY adk-java/core/pom.xml adk-java/core/
 COPY adk-java/a2a/pom.xml adk-java/a2a/
