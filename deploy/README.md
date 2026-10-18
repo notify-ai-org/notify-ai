@@ -33,6 +33,32 @@ The nginx container expects Let's Encrypt certificates at:
 /etc/letsencrypt/live/app.notify-ai.dev/privkey.pem
 ```
 
+### Certificate renewal
+
+Renewal uses the webroot method: certbot writes HTTP-01 challenges to
+`/var/www/certbot` on the host, which the nginx container serves on port 80.
+The standalone method cannot renew while the container holds port 80. Switch the
+renewal method once, and reload nginx after every renewal so it serves the new
+certificate:
+
+```bash
+sudo mkdir -p /var/www/certbot
+docker compose --env-file deploy/ec2.env up -d nginx   # picks up the /var/www/certbot mount
+sudo certbot certonly --webroot -w /var/www/certbot -d app.notify-ai.dev \
+  --force-renewal --deploy-hook "docker exec notify-nginx nginx -s reload"
+sudo certbot renew --dry-run
+```
+
+`certonly --webroot` stores the webroot and deploy hook in
+`/etc/letsencrypt/renewal/app.notify-ai.dev.conf`, so the certbot timer
+(`systemctl list-timers | grep certbot`) renews and reloads unattended. Check the
+expiry with:
+
+```bash
+echo | openssl s_client -connect app.notify-ai.dev:443 -servername app.notify-ai.dev 2>/dev/null \
+  | openssl x509 -noout -enddate
+```
+
 ## Start or redeploy
 
 ```bash

@@ -120,6 +120,8 @@ services:
     volumes:
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      # certbot --webroot writes HTTP-01 challenges here; nginx serves them for renewal.
+      - /var/www/certbot:/var/www/certbot:ro
       - nginx-cache:/var/cache/nginx
 
 volumes:
