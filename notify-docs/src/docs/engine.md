@@ -132,7 +132,13 @@ the existing delivery failure flow.
 Applications can deduplicate by `(tenantId, id, recipientId)` or by `id` for a
 recipient-specific URL. There is no separate IN_APP idempotency header.
 
-Send engagement callbacks to `POST /api/callbacks/notifications/{tenantId}/{channelId}/webhook`:
+Each provider has one callback URL shared by every tenant,
+`/api/callbacks/notifications/{provider}`. Notify reads the `notificationId` the
+callback names, looks up that notification's channel, and verifies the signature
+with that channel's credentials. A callback that names notifications from more than
+one channel, or an unknown notification, is rejected with 401.
+
+Send engagement callbacks to `POST /api/callbacks/notifications/webhook`:
 
 ```json
 {
@@ -152,6 +158,38 @@ and the supplied `IN_APP` channel is preserved as `in_app`. Omitting `channel`
 keeps the existing webhook default. The old `/in_app` callback route and
 `IN_APP_*` environment settings are no longer used. Keep callback secrets in
 your application backend.
+
+## EMAIL through SendGrid
+
+An EMAIL channel uses either provider `SMTP` or provider `SENDGRID`; a tenant has
+one EMAIL channel. The SendGrid connector sends through the v3 Mail Send API
+(`https://api.sendgrid.com/v3/mail/send`, or `api.eu.sendgrid.com` when the
+`region` setting is `eu`).
+
+Settings: `from` (required; an address on a domain or single sender verified in
+SendGrid), and optional `fromName`, `region`, `defaultHtml`, `subjectPrefix` and
+`callbackAllowedIps`. Submit `apiKey` (Mail Send access) through the credential
+API, and `webhookVerificationKey` when callbacks are needed. Job attributes
+`isHtml` and `replyTo` behave as they do for SMTP; cc and bcc come from the email
+subject, and an address repeated across to, cc and bcc is sent once.
+
+Each message carries the notification ID as the `notificationId` custom argument,
+which SendGrid copies onto every event for that message. To receive delivery and
+engagement status:
+
+1. In SendGrid, open Settings → Mail Settings → Event Webhook and set the post URL
+   to `https://<your host>/api/callbacks/notifications/sendgrid`.
+2. Select the events to receive and enable Signed Event Webhook.
+3. Copy the verification key SendGrid shows into the channel's
+   `webhookVerificationKey` credential. Callbacks fail with 401 until it is set.
+
+Events map to notification statuses: `processed` → `QUEUED`, `delivered` →
+`DELIVERED`, `deferred` → `DEFERRED`, `bounce` (including `blocked`) → `BOUNCED`,
+`dropped` → `FAILED`, `open` → `OPENED`, `click` → `CLICKED`, `spamreport` →
+`COMPLAINED`, and `unsubscribe` / `group_unsubscribe` → `UNSUBSCRIBED`. Other events,
+and events for mail sent outside Notify, are acknowledged without being recorded.
+`sg_event_id` deduplicates retried deliveries. Open tracking depends on the
+recipient's mail client loading images, so treat open counts as approximate.
 
 ## WHATSAPP connector (Meta)
 
@@ -189,7 +227,7 @@ templates. Use approved templates when messaging outside Meta's customer service
 window; text delivery remains subject to Meta's messaging rules.
 
 Register your public HTTPS callback URL as
-`/api/callbacks/notifications/{tenantId}/{channelId}/whatsapp` in Meta and subscribe the app to the
+`/api/callbacks/notifications/whatsapp` in Meta and subscribe the app to the
 WhatsApp Business Account's messages events. The GET endpoint echoes
 `hub.challenge` only when `hub.mode=subscribe` and `hub.verify_token` matches.
 POST callbacks are verified against the raw request with the Meta app secret and
@@ -255,7 +293,7 @@ FCM does not guarantee idempotency for these sends; applications can use
 `notificationId` to deduplicate processing after retries.
 
 For delivery or engagement reporting, have your authenticated application
-backend POST to `/api/callbacks/notifications/{tenantId}/{channelId}/push` using the same JSON
+backend POST to `/api/callbacks/notifications/push` using the same JSON
 envelope as the webhook engagement example (omit its `channel` field). Set
 `recipientId` to the FCM registration token and use
 a status such as `DISPLAYED` or `OPENED`. Sign the raw request bytes using
