@@ -97,7 +97,12 @@ Supply the application's delivery URL on the IN_APP subject, with an optional
 user ID when multiple users share the endpoint:
 
 ```json
-{"channel":"IN_APP","url":"https://app.example/inbox","userId":"customer-42","correlationId":"order-123"}
+{
+  "channel":"IN_APP",
+  "url":"https://app.example/inbox",
+  "userId":"customer-42",
+  "correlationId":"order-123"
+}
 ```
 
 The Java SDK exposes
@@ -169,19 +174,11 @@ one EMAIL channel. The SendGrid connector sends through the v3 Mail Send API
 Settings: `from` (required; an address on a domain or single sender verified in
 SendGrid), and optional `fromName`, `region`, `defaultHtml`, `subjectPrefix` and
 `callbackAllowedIps`. Submit `apiKey` (Mail Send access) through the credential
-API, and `webhookVerificationKey` when callbacks are needed. Job attributes
-`isHtml` and `replyTo` behave as they do for SMTP; cc and bcc come from the email
-subject, and an address repeated across to, cc and bcc is sent once.
+API. Job attributes `isHtml` and `replyTo` behave as they do for SMTP; 
+cc and bcc come from the email subject, and an address repeated across to, cc and bcc is sent once.
 
 Each message carries the notification ID as the `notificationId` custom argument,
-which SendGrid copies onto every event for that message. To receive delivery and
-engagement status:
-
-1. In SendGrid, open Settings → Mail Settings → Event Webhook and set the post URL
-   to `https://<your host>/api/callbacks/notifications/sendgrid`.
-2. Select the events to receive and enable Signed Event Webhook.
-3. Copy the verification key SendGrid shows into the channel's
-   `webhookVerificationKey` credential. Callbacks fail with 401 until it is set.
+which SendGrid copies onto every event for that message.
 
 Events map to notification statuses: `processed` → `QUEUED`, `delivered` →
 `DELIVERED`, `deferred` → `DEFERRED`, `bounce` (including `blocked`) → `BOUNCED`,
@@ -204,7 +201,10 @@ credential API, with `appSecret` and `verifyToken` when callbacks are needed.
 Supply a subject with an international phone number:
 
 ```json
-{"channel":"WHATSAPP","phoneNumber":"+14155552671"}
+{
+"channel":"WHATSAPP",
+"phoneNumber":"+14155552671"
+}
 ```
 
 The Java SDK exposes `new WhatsAppSubject(phoneNumber, correlationId, attributes)`.
@@ -226,9 +226,7 @@ Its values must already be resolved. The connector does not create or approve
 templates. Use approved templates when messaging outside Meta's customer service
 window; text delivery remains subject to Meta's messaging rules.
 
-Register your public HTTPS callback URL as
-`/api/callbacks/notifications/whatsapp` in Meta and subscribe the app to the
-WhatsApp Business Account's messages events. The GET endpoint echoes
+The GET endpoint echoes
 `hub.challenge` only when `hub.mode=subscribe` and `hub.verify_token` matches.
 POST callbacks are verified against the raw request with the Meta app secret and
 `X-Hub-Signature-256`.
@@ -261,7 +259,11 @@ to send to that project. `PUSH_ENABLED=false` disables sending globally.
 Recipient JSON:
 
 ```json
-{"channel":"PUSH","deviceToken":"fcm-registration-token","correlationId":"order-123"}
+{
+  "channel":"PUSH",
+  "deviceToken":"fcm-registration-token",
+  "correlationId":"order-123"
+}
 ```
 
 The Java client already exposes

@@ -36,7 +36,6 @@
     </scm>
     
     <modules>
-        <module>api</module>
         <module>common</module>
         <module>acp-server</module>
         <module>access</module>

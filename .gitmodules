@@ -1,9 +1,6 @@
 [submodule "access"]
 	path = access
 	url = https://github.com/notify-ai-org/access.git
-[submodule "api"]
-	path = api
-	url = https://github.com/notify-ai-org/api.git
 [submodule "acp-server"]
 	path = acp-server
 	url = https://github.com/notify-ai-org/acp-server.git

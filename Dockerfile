@@ -7,7 +7,6 @@ ARG MAVEN_RETRY_OPTS="-Dmaven.wagon.http.retryHandler.count=5 -Dmaven.wagon.http
 
 # Copy the parent pom and module poms to cache dependencies
 COPY pom.xml .
-COPY api/pom.xml api/
 COPY acp-server/pom.xml acp-server/
 COPY adk-java/pom.xml adk-java/
 COPY adk-java/core/pom.xml adk-java/core/

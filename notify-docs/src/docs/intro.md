@@ -6,29 +6,10 @@ After login, open the **Clients** portal and generate a client. Copy the
 generated **Client ID**. Your Spring Boot application uses this ID when the
 Notify.ai SDK registers its scanned events, vocabulary, rules, and callbacks.
 
-## Add the client SDK dependency to your application's `pom.xml`:
 
-```xml
-<dependency>
-  <groupId>dev.notify-ai</groupId>
-  <artifactId>notify-ai-agent-client</artifactId>
-  <version>1.0.1</version>
-</dependency>
-```
-
-##  Add the Client ID to Your Spring Boot App
-In the upstream Spring Boot application that embeds the Notify.ai client SDK,
-add the generated Client ID to `src/main/resources/application.properties`:
-
-```properties
-notify.ai.properties.base-package=com.myapp
-notify.ai.properties.application-name=my-service
-notify.ai.properties.client-token=client-your-generated-id
-```
-
-Use `notify.ai.properties.acp-server-url=http://localhost:8080` only when the
-Notify.ai backend is running locally for testing. For any hosted or shared
-environment, set this value to that environment's Notify.ai backend URL.
+##  Add the Client ID to Your  App
+In the upstream application that embeds the Notify.ai client SDK,
+add the generated Client ID as a property
 
 The current SDK property name is `client-token`, but the value to paste here is
 the **Client ID** generated in the portal.
