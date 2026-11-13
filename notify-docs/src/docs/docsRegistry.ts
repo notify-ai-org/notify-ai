@@ -2,6 +2,7 @@ import introRaw from './intro.md?raw';
 import acpServerRaw from './acp_server.md?raw';
 import engineRaw from './engine.md?raw';
 import artifactEngineRaw from './artifact_engine.md?raw';
+import artifactEngineInternalsRaw from './artifact_engine_internals.md?raw';
 import clientRaw from './client.md?raw';
 import clientPythonRaw from './client_python.md?raw';
 import clientGoRaw from './client_go.md?raw';
@@ -53,6 +54,12 @@ export const docsRegistry: DocCategory[] = [
         title: 'Artifact Storage and Retrieval Engine',
         category: 'Core Modules',
         content: artifactEngineRaw,
+      },
+      {
+        id: 'artifact-engine-internals',
+        title: 'Inside the Artifact Engine',
+        category: 'Core Modules',
+        content: artifactEngineInternalsRaw,
       },
     ],
   },
